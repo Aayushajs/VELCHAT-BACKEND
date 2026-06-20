@@ -7,6 +7,8 @@ export interface TelemetryConfig {
   serviceName: string;
   serviceVersion: string;
   otlpEndpoint?: string;
+  /** OTLP exporter headers (e.g. Grafana Cloud basic-auth: `{ Authorization: 'Basic ...' }`). */
+  otlpHeaders?: Record<string, string>;
 }
 
 let sdk: NodeSDK | undefined;
@@ -28,7 +30,10 @@ export function startTelemetry(cfg: TelemetryConfig): void {
       'service.name': cfg.serviceName,
       'service.version': cfg.serviceVersion,
     }),
-    traceExporter: new OTLPTraceExporter({ url: `${cfg.otlpEndpoint}/v1/traces` }),
+    traceExporter: new OTLPTraceExporter({
+      url: `${cfg.otlpEndpoint}/v1/traces`,
+      headers: cfg.otlpHeaders,
+    }),
     instrumentations: [
       getNodeAutoInstrumentations({
         // fs instrumentation is noisy and rarely useful in services.

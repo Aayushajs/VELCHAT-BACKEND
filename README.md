@@ -12,11 +12,16 @@ Production-grade, multi-tenant, real-time, end-to-end encrypted (personal).
 > in a separate repo and is intentionally out of scope here.
 
 ```
-apps/        13 NestJS microservices (api-gateway, realtime-gateway, auth, user, chat,
-             group-channel, presence, notification, media, search, call, automation, ai)
-packages/    proto · shared-types · shared-utils · crypto · config
-deploy/      helm/ · argocd/ · k8s/   (GitOps; no secrets)
-infra/       terraform/ · migrations/ · observability/
+apps/         13 NestJS microservices (api-gateway, realtime-gateway, auth, user, chat,
+              group-channel, presence, notification, media, search, call, automation, ai)
+libs/         config · shared-utils · shared-types · proto · crypto · event-bus · storage · search
+migrations/   @velchat/migrations — SQL migrations + forward-only runner
+docker/       compose.yml (local infra) + <service>.Dockerfile per service
+deploy/       helm/ · argocd/ · k8s/   (GitOps self-host path; no secrets)
+infra/        terraform/ · observability/
+postman/      API collection
+tools/        scaffold (service generator) · gateway (local dev gateway + start-all)
+render.yaml   Render Blueprint (free-tier deploy)
 ```
 
 ## Prerequisites

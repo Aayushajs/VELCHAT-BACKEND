@@ -8,8 +8,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
     "test": "jest",
-    "start": "node dist/main.js",
-    "dev": "tsx watch src/main.ts",
+    "start": "cross-env SERVICE_NAME=realtime-gateway HTTP_PORT=3001 node dist/main.js",
+    "dev": "cross-env SERVICE_NAME=realtime-gateway HTTP_PORT=3001 tsx watch src/main.ts",
     "clean": "rimraf dist .turbo coverage"
   },
   "dependencies": {
@@ -17,6 +17,7 @@
     "@nestjs/core": "^10.4.15",
     "@nestjs/platform-express": "^10.4.15",
     "@velchat/config": "workspace:*",
+    "@velchat/event-bus": "workspace:*",
     "@velchat/shared-types": "workspace:*",
     "@velchat/shared-utils": "workspace:*",
     "ioredis": "^5.4.2",

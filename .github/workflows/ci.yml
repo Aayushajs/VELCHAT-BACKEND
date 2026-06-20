@@ -40,10 +40,10 @@ jobs:
           fetch-depth: 0
       - uses: bufbuild/buf-action@v1
         with:
-          input: packages/proto
+          input: libs/proto
           # Block incompatible schema changes before merge (§G7-1).
           breaking: true
-          breaking_against: 'https://github.com/${{ github.repository }}.git#branch=main,subdir=packages/proto'
+          breaking_against: 'https://github.com/${{ github.repository }}.git#branch=main,subdir=libs/proto'
 
   security:
     name: SBOM · Trivy · cosign

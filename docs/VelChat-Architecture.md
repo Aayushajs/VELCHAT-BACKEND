@@ -1768,7 +1768,7 @@ apps/
   call-service/  automation-service/  ai-service/
 clients/
   mobile/ (React Native)   web/ (React)   desktop/ (Electron)   admin/ (React)
-packages/
+libs/
   proto/         # .proto contracts (source of truth)
   shared-types/  # generated TS types
   shared-utils/  # logging, tracing, auth guards, kafka client, idempotency

@@ -26,7 +26,7 @@ Stack: pnpm workspaces + Turborepo, NestJS, TypeScript strict, gRPC + protobuf (
 
 Create exactly the monorepo from §D3:
 - apps/: api-gateway, realtime-gateway, auth-service, user-service, chat-service, group-channel-service, presence-service, notification-service, media-service, search-service, call-service, automation-service, ai-service (skeletons for all 13; only NestJS scaffold + health/ready + OTel + Kafka + DB clients wired; no business logic yet)
-- packages/: proto (buf workspace), shared-types (generated), shared-utils (logger, tracer, kafkaClient, idempotency, tenant-context (ALS), authz guards, errors), config (zod env schema), crypto (libsignal wrapper stub)
+- libs/: proto (buf workspace), shared-types (generated), shared-utils (logger, tracer, kafkaClient, idempotency, tenant-context (ALS), authz guards, errors), config (zod env schema), crypto (libsignal wrapper stub)
 - deploy/: helm/ per service, argocd/ app-of-apps, k8s/ base manifests
 - infra/: terraform stubs (cluster only), migrations/
 

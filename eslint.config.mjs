@@ -9,7 +9,7 @@ export default tseslint.config(
       '**/coverage/**',
       '**/.turbo/**',
       '**/node_modules/**',
-      'packages/shared-types/src/gen/**',
+      'libs/shared-types/src/gen/**',
       '**/*.js',
       '**/*.cjs',
       '**/*.mjs',

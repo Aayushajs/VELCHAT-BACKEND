@@ -1,25 +1,19 @@
 import { Module, type DynamicModule } from '@nestjs/common';
-import {
-  kafkaBrokers,
-  requirePostgresUrl,
-  requireS3Endpoint,
-  type AppConfig,
-} from '@velchat/config';
+import { requirePostgresUrl, type AppConfig } from '@velchat/config';
 import type { Logger } from 'pino';
 import {
   ObservabilityModule,
   InfraLifecycle,
   type ServiceMetrics,
   type ManagedResource,
-  EventPublisher,
-  createKafka,
 } from '@velchat/shared-utils';
+import { createEventBus } from '@velchat/event-bus';
+import { createStorage } from '@velchat/storage';
 import { PostgresClient } from './infra/clients/postgres.client';
-import { ObjectStoreClient } from './infra/clients/objectstore.client';
 
-export const EVENT_PUBLISHER = Symbol('EVENT_PUBLISHER');
+export const EVENT_BUS = Symbol('EVENT_BUS');
 export const PG_CLIENT = Symbol('PG_CLIENT');
-export const S3_CLIENT = Symbol('S3_CLIENT');
+export const STORAGE = Symbol('STORAGE');
 
 export interface AppDeps {
   config: AppConfig;
@@ -28,7 +22,7 @@ export interface AppDeps {
 }
 
 /**
- * Resumable uploads to MinIO, AV scan, transcode, thumbnails (§B11).
+ * Resumable uploads (Cloudinary/S3), AV scan, transcode, thumbnails (§B11).
  *
  * BOOT-0 skeleton: edge surface (health/ready/metrics, OTel, tenant context) + wired DB/Kafka
  * clients only. Business logic arrives in the phase prompts (see VelChat-ClaudeCode-Prompts.md).
@@ -49,34 +43,16 @@ export class AppModule {
       providers.push({ provide: PG_CLIENT, useValue: pg });
     }
 
-    if (deps.config.S3_ENDPOINT) {
-      const store = new ObjectStoreClient(
-        {
-          endpoint: requireS3Endpoint(deps.config),
-          region: deps.config.S3_REGION,
-          accessKey: deps.config.S3_ACCESS_KEY,
-          secretKey: deps.config.S3_SECRET_KEY,
-          bucket: deps.config.S3_BUCKET,
-        },
-        deps.logger,
-      );
-      managed.push(store);
-      providers.push({ provide: S3_CLIENT, useValue: store });
+    if (deps.config.EVENT_BUS === 'kafka' ? deps.config.KAFKA_BROKERS : deps.config.VALKEY_URL) {
+      const eventBus = createEventBus(deps.config, deps.logger);
+      managed.push(eventBus);
+      providers.push({ provide: EVENT_BUS, useValue: eventBus });
     }
 
-    if (deps.config.KAFKA_BROKERS) {
-      const kafka = createKafka({
-        clientId: deps.config.KAFKA_CLIENT_ID,
-        brokers: kafkaBrokers(deps.config),
-      });
-      const publisher = new EventPublisher(kafka);
-      managed.push({
-        name: 'kafka',
-        connect: () => publisher.connect(),
-        ping: async () => true,
-        close: () => publisher.disconnect(),
-      });
-      providers.push({ provide: EVENT_PUBLISHER, useValue: publisher });
+    if (
+      deps.config.STORAGE_PROVIDER === 's3' ? deps.config.S3_ENDPOINT : deps.config.CLOUDINARY_URL
+    ) {
+      providers.push({ provide: STORAGE, useValue: createStorage(deps.config) });
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);

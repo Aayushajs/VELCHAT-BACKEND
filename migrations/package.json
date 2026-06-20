@@ -1,0 +1,18 @@
+{
+  "name": "@velchat/migrations",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Centralized SQL migrations + forward-only runner (expand/contract per §G7).",
+  "scripts": {
+    "migrate": "tsx src/migrate.ts up",
+    "migrate:status": "tsx src/migrate.ts status",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rimraf .turbo"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10"
+  }
+}

@@ -1,13 +1,13 @@
 # @velchat/media-service
 
-Resumable uploads to MinIO, AV scan, transcode, thumbnails (§B11).
+Resumable uploads (Cloudinary/S3), AV scan, transcode, thumbnails (§B11).
 
-|            |              |
-| ---------- | ------------ |
-| HTTP port  | `3008`       |
-| gRPC port  | `50059`      |
-| Datastores | postgres, s3 |
-| Kafka      | both         |
+|            |          |
+| ---------- | -------- |
+| HTTP port  | `3008`   |
+| gRPC port  | `50059`  |
+| Datastores | postgres |
+| Kafka      | both     |
 
 ## Endpoints (BOOT-0)
 

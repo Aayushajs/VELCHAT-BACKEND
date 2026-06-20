@@ -1,18 +1,17 @@
 import { Module, type DynamicModule } from '@nestjs/common';
-import { kafkaBrokers, requireOpenSearchNode, type AppConfig } from '@velchat/config';
+import type { AppConfig } from '@velchat/config';
 import type { Logger } from 'pino';
 import {
   ObservabilityModule,
   InfraLifecycle,
   type ServiceMetrics,
   type ManagedResource,
-  EventPublisher,
-  createKafka,
 } from '@velchat/shared-utils';
-import { OpenSearchClient } from './infra/clients/opensearch.client';
+import { createEventBus } from '@velchat/event-bus';
+import { createSearchIndex } from '@velchat/search';
 
-export const EVENT_PUBLISHER = Symbol('EVENT_PUBLISHER');
-export const OPENSEARCH_CLIENT = Symbol('OPENSEARCH_CLIENT');
+export const EVENT_BUS = Symbol('EVENT_BUS');
+export const SEARCH_INDEX = Symbol('SEARCH_INDEX');
 
 export interface AppDeps {
   config: AppConfig;
@@ -21,7 +20,7 @@ export interface AppDeps {
 }
 
 /**
- * Indexes events to OpenSearch with tenant + ACL stamping (§B13).
+ * Indexes events to Atlas Search/OpenSearch with tenant + ACL stamping (§B13).
  *
  * BOOT-0 skeleton: edge surface (health/ready/metrics, OTel, tenant context) + wired DB/Kafka
  * clients only. Business logic arrives in the phase prompts (see VelChat-ClaudeCode-Prompts.md).
@@ -32,29 +31,20 @@ export class AppModule {
     const managed: ManagedResource[] = [];
     const providers: Array<{ provide: symbol; useValue: unknown }> = [];
 
-    if (deps.config.OPENSEARCH_NODE) {
-      const os = new OpenSearchClient(
-        requireOpenSearchNode(deps.config),
-        { username: deps.config.OPENSEARCH_USERNAME, password: deps.config.OPENSEARCH_PASSWORD },
-        deps.logger,
-      );
-      managed.push(os);
-      providers.push({ provide: OPENSEARCH_CLIENT, useValue: os });
+    if (deps.config.EVENT_BUS === 'kafka' ? deps.config.KAFKA_BROKERS : deps.config.VALKEY_URL) {
+      const eventBus = createEventBus(deps.config, deps.logger);
+      managed.push(eventBus);
+      providers.push({ provide: EVENT_BUS, useValue: eventBus });
     }
 
-    if (deps.config.KAFKA_BROKERS) {
-      const kafka = createKafka({
-        clientId: deps.config.KAFKA_CLIENT_ID,
-        brokers: kafkaBrokers(deps.config),
-      });
-      const publisher = new EventPublisher(kafka);
-      managed.push({
-        name: 'kafka',
-        connect: () => publisher.connect(),
-        ping: async () => true,
-        close: () => publisher.disconnect(),
-      });
-      providers.push({ provide: EVENT_PUBLISHER, useValue: publisher });
+    if (
+      deps.config.SEARCH_PROVIDER === 'opensearch'
+        ? deps.config.OPENSEARCH_NODE
+        : deps.config.MONGO_URL
+    ) {
+      const searchIndex = createSearchIndex(deps.config);
+      managed.push(searchIndex);
+      providers.push({ provide: SEARCH_INDEX, useValue: searchIndex });
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);

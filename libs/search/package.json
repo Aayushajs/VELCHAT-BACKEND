@@ -1,0 +1,20 @@
+{
+  "name": "@velchat/search",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "jest",
+    "clean": "rimraf dist .turbo coverage"
+  },
+  "dependencies": {
+    "@velchat/config": "workspace:*",
+    "@velchat/shared-utils": "workspace:*",
+    "@opensearch-project/opensearch": "^2.13.0",
+    "mongoose": "^8.9.3"
+  }
+}

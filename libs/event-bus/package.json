@@ -15,6 +15,7 @@
     "@velchat/config": "workspace:*",
     "@velchat/shared-utils": "workspace:*",
     "ioredis": "^5.4.2",
-    "kafkajs": "^2.2.4"
+    "kafkajs": "^2.2.4",
+    "pino": "^9.6.0"
   }
 }

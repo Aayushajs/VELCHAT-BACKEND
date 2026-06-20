@@ -76,7 +76,9 @@ export type AppConfig = Readonly<z.infer<typeof envSchema>>;
  * listing every offending key so misconfiguration is obvious in the boot log.
  */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
-  const parsed = envSchema.safeParse(env);
+  // Render (and many PaaS) inject the listen port as PORT; map it to HTTP_PORT when unset.
+  const source = env.PORT && !env.HTTP_PORT ? { ...env, HTTP_PORT: env.PORT } : env;
+  const parsed = envSchema.safeParse(source);
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map((i) => `  - ${i.path.join('.') || '(root)'}: ${i.message}`)

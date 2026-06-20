@@ -1,0 +1,93 @@
+{
+  "info": {
+    "name": "VelChat — Backend",
+    "description": "VelChat backend API collection. Hit the local dev gateway ({{gateway}} = http://localhost:8080, `pnpm gateway`) which routes by path prefix to each service, or call a service directly on its port. Set {{tenant}} for tenant-scoped routes.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "gateway", "value": "http://localhost:8080" },
+    { "key": "tenant", "value": "org-demo" },
+    { "key": "accessToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        { "name": "Gateway /health", "request": { "method": "GET", "url": "{{gateway}}/health" } },
+        {
+          "name": "api-gateway :3000/health",
+          "request": { "method": "GET", "url": "http://localhost:3000/health" }
+        },
+        {
+          "name": "auth :3002/health",
+          "request": { "method": "GET", "url": "http://localhost:3002/health" }
+        },
+        {
+          "name": "chat :3004/health",
+          "request": { "method": "GET", "url": "http://localhost:3004/health" }
+        },
+        {
+          "name": "auth :3002/metrics",
+          "request": { "method": "GET", "url": "http://localhost:3002/metrics" }
+        }
+      ]
+    },
+    {
+      "name": "Auth (P1 — §B2)",
+      "description": "Endpoints land in P1. Routed via the gateway: /auth/* → auth-service.",
+      "item": [
+        {
+          "name": "Register (cold-start, Reverse-OTP)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{gateway}}/auth/register",
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"+919999999999\"\n}" }
+          }
+        },
+        {
+          "name": "Verify (Reverse-OTP session)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{gateway}}/auth/verify",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"<from register>\",\n  \"token\": \"<token>\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Refresh token (rotating + DPoP)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{gateway}}/auth/token/refresh",
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"<opaque>\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chat (P2 — §B4)",
+      "item": [
+        {
+          "name": "Send message",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "x-tenant-id", "value": "{{tenant}}" }
+            ],
+            "url": "{{gateway}}/chat/messages",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"conversationId\": \"<id>\",\n  \"clientMsgId\": \"<uuid>\",\n  \"ciphertext\": \"<base64>\"\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -23,8 +23,8 @@ const SERVICES = [
   { name: 'group-channel-service', http: 3005, grpc: 50056, dbs: ['postgres'], kafka: 'both', desc: 'Conversations, members, channels, communities, device-list epochs (§B7).' },
   { name: 'presence-service', http: 3006, grpc: 50057, dbs: ['valkey'], kafka: 'both', desc: 'Presence, last-seen, rich status, status/stories (§B8).' },
   { name: 'notification-service', http: 3007, grpc: 50058, dbs: ['postgres'], kafka: 'consumer', desc: 'Durable outbox, push routing (APNs/FCM/WebPush), idempotent dispatch (§B10).' },
-  { name: 'media-service', http: 3008, grpc: 50059, dbs: ['postgres', 's3'], kafka: 'both', desc: 'Resumable uploads to MinIO, AV scan, transcode, thumbnails (§B11).' },
-  { name: 'search-service', http: 3009, grpc: 50060, dbs: ['opensearch'], kafka: 'consumer', desc: 'Indexes events to OpenSearch with tenant + ACL stamping (§B13).' },
+  { name: 'media-service', http: 3008, grpc: 50059, dbs: ['postgres'], storage: true, kafka: 'both', desc: 'Resumable uploads (Cloudinary/S3), AV scan, transcode, thumbnails (§B11).' },
+  { name: 'search-service', http: 3009, grpc: 50060, dbs: [], search: true, kafka: 'consumer', desc: 'Indexes events to Atlas Search/OpenSearch with tenant + ACL stamping (§B13).' },
   { name: 'call-service', http: 3010, grpc: 50061, dbs: ['postgres'], kafka: 'both', desc: 'WebRTC signaling, LiveKit tokens, meetings, recording (§B12).' },
   { name: 'automation-service', http: 3011, grpc: 50062, dbs: ['postgres'], kafka: 'both', desc: 'Bots, slash commands, workflows, outbound webhooks (§B17).' },
   { name: 'ai-service', http: 3012, grpc: 50063, dbs: ['valkey'], kafka: 'both', desc: 'Translation/STT/TTS/summary; enterprise-only server path (privacy fork §A26.1).' },
@@ -40,6 +40,34 @@ const DB_DEPS = {
 
 const DB_DEV_DEPS = {
   postgres: { '@types/pg': '^8.11.10' },
+};
+
+// Useful packages every service gets (the non-AWS, generally-useful set from the reference repo,
+// pinned to NestJS 10): config, OpenAPI/Swagger docs, inter-service HTTP, DTO validation.
+const COMMON_DEPS = {
+  '@nestjs/config': '^3.3.0',
+  '@nestjs/swagger': '^7.4.2',
+  '@nestjs/axios': '^3.1.3',
+  axios: '^1.7.9',
+  'class-validator': '^0.14.1',
+  'class-transformer': '^0.5.1',
+};
+
+// Per-service extras (pure-JS only — no native build deps, so installs never break on Windows).
+const EXTRA_DEPS = {
+  // auth needs: JWT (RS256), WebAuthn/passkeys, TOTP, QR for approve-on-trusted-device (§B2).
+  'auth-service': {
+    jsonwebtoken: '^9.0.2',
+    '@simplewebauthn/server': '^11.0.0',
+    otplib: '^12.0.1',
+    qrcode: '^1.5.4',
+  },
+  // media needs multipart upload parsing (§B11).
+  'media-service': { multer: '^1.4.5-lts.1' },
+};
+const EXTRA_DEV_DEPS = {
+  'auth-service': { '@types/jsonwebtoken': '^9.0.7', '@types/qrcode': '^1.5.5' },
+  'media-service': { '@types/multer': '^1.4.12' },
 };
 
 function write(rel, content) {
@@ -282,7 +310,8 @@ function buildAppModule(svc) {
   const configRequires = new Set();
   const sharedImports = ['ObservabilityModule', 'InfraLifecycle', 'type ServiceMetrics', 'type ManagedResource'];
   const clientImports = [];
-  const tokenDecls = ["export const EVENT_PUBLISHER = Symbol('EVENT_PUBLISHER');"];
+  const tokenDecls = ["export const EVENT_BUS = Symbol('EVENT_BUS');"];
+  const providerImports = ["import { createEventBus } from '@velchat/event-bus';"];
   const blocks = [];
 
   for (const db of svc.dbs) {
@@ -336,17 +365,43 @@ function buildAppModule(svc) {
     }
   }
 
-  // Kafka publisher for every service (DLQ + state-change events). Guarded by env.
-  configRequires.add('kafkaBrokers');
-  sharedImports.push('EventPublisher', 'createKafka');
+  // Event bus for every service (publish/consume + DLQ). Provider-agnostic: redis-streams
+  // (Upstash free tier) by default, kafka at scale. Guarded so the service still boots if the
+  // bus endpoint isn't configured yet.
+  const busGuard = `deps.config.EVENT_BUS === 'kafka' ? deps.config.KAFKA_BROKERS : deps.config.VALKEY_URL`;
   blocks.push(
-    `    if (deps.config.KAFKA_BROKERS) {\n` +
-      `      const kafka = createKafka({ clientId: deps.config.KAFKA_CLIENT_ID, brokers: kafkaBrokers(deps.config) });\n` +
-      `      const publisher = new EventPublisher(kafka);\n` +
-      `      managed.push({ name: 'kafka', connect: () => publisher.connect(), ping: async () => true, close: () => publisher.disconnect() });\n` +
-      `      providers.push({ provide: EVENT_PUBLISHER, useValue: publisher });\n` +
+    `    if (${busGuard}) {\n` +
+      `      const eventBus = createEventBus(deps.config, deps.logger);\n` +
+      `      managed.push(eventBus);\n` +
+      `      providers.push({ provide: EVENT_BUS, useValue: eventBus });\n` +
       `    }`,
   );
+
+  // Object storage (media-service): cloudinary free tier by default, s3/MinIO at scale.
+  if (svc.storage) {
+    providerImports.push(`import { createStorage } from '@velchat/storage';`);
+    tokenDecls.push("export const STORAGE = Symbol('STORAGE');");
+    const storageGuard = `deps.config.STORAGE_PROVIDER === 's3' ? deps.config.S3_ENDPOINT : deps.config.CLOUDINARY_URL`;
+    blocks.push(
+      `    if (${storageGuard}) {\n` +
+        `      providers.push({ provide: STORAGE, useValue: createStorage(deps.config) });\n` +
+        `    }`,
+    );
+  }
+
+  // Search index (search-service): Atlas Search free tier by default, OpenSearch at scale.
+  if (svc.search) {
+    providerImports.push(`import { createSearchIndex } from '@velchat/search';`);
+    tokenDecls.push("export const SEARCH_INDEX = Symbol('SEARCH_INDEX');");
+    const searchGuard = `deps.config.SEARCH_PROVIDER === 'opensearch' ? deps.config.OPENSEARCH_NODE : deps.config.MONGO_URL`;
+    blocks.push(
+      `    if (${searchGuard}) {\n` +
+        `      const searchIndex = createSearchIndex(deps.config);\n` +
+        `      managed.push(searchIndex);\n` +
+        `      providers.push({ provide: SEARCH_INDEX, useValue: searchIndex });\n` +
+        `    }`,
+    );
+  }
 
   const configImport =
     configRequires.size > 0
@@ -357,6 +412,7 @@ function buildAppModule(svc) {
 ${configImport}
 import type { Logger } from 'pino';
 import { ${sharedImports.join(', ')} } from '@velchat/shared-utils';
+${providerImports.join('\n')}
 ${clientImports.join('\n')}
 
 ${tokenDecls.join('\n')}
@@ -406,6 +462,7 @@ function buildPackageJson(svc) {
     '@velchat/config': 'workspace:*',
     '@velchat/shared-utils': 'workspace:*',
     '@velchat/shared-types': 'workspace:*',
+    '@velchat/event-bus': 'workspace:*',
     '@nestjs/common': '^10.4.15',
     '@nestjs/core': '^10.4.15',
     '@nestjs/platform-express': '^10.4.15',
@@ -413,7 +470,10 @@ function buildPackageJson(svc) {
     'reflect-metadata': '^0.2.2',
     'rxjs': '^7.8.1',
   };
-  let devDeps = {};
+  if (svc.storage) deps['@velchat/storage'] = 'workspace:*';
+  if (svc.search) deps['@velchat/search'] = 'workspace:*';
+  Object.assign(deps, COMMON_DEPS, EXTRA_DEPS[svc.name] ?? {});
+  let devDeps = { ...(EXTRA_DEV_DEPS[svc.name] ?? {}) };
   for (const db of svc.dbs) {
     Object.assign(deps, DB_DEPS[db] ?? {});
     Object.assign(devDeps, DB_DEV_DEPS[db] ?? {});
@@ -428,8 +488,9 @@ function buildPackageJson(svc) {
       typecheck: 'tsc -p tsconfig.json --noEmit',
       lint: 'eslint src',
       test: 'jest',
-      start: 'node dist/main.js',
-      dev: 'tsx watch src/main.ts',
+      // Self-contained: each service knows its own name + local port (so `pnpm dev` runs them all).
+      start: `cross-env SERVICE_NAME=${svc.name} HTTP_PORT=${svc.http} node dist/main.js`,
+      dev: `cross-env SERVICE_NAME=${svc.name} HTTP_PORT=${svc.http} tsx watch src/main.ts`,
       clean: 'rimraf dist .turbo coverage',
     },
     dependencies: Object.fromEntries(Object.entries(deps).sort()),
@@ -454,13 +515,24 @@ const tsconfig = `{
 const jestConfig = `module.exports = { ...require('../../jest.preset.cjs') };
 `;
 
-const telemetry = `// MUST be imported first (before any instrumented client) so OTel can patch http/grpc/kafka/db.
+const telemetry = `// MUST be imported first (before any instrumented client) so OTel can patch http/grpc/redis/db.
 import { startTelemetry } from '@velchat/shared-utils';
+
+function parseHeaders(raw: string | undefined): Record<string, string> {
+  if (!raw) return {};
+  const out: Record<string, string> = {};
+  for (const pair of raw.split(',')) {
+    const idx = pair.indexOf('=');
+    if (idx > 0) out[pair.slice(0, idx).trim()] = pair.slice(idx + 1).trim();
+  }
+  return out;
+}
 
 startTelemetry({
   serviceName: process.env.SERVICE_NAME ?? 'unknown-service',
   serviceVersion: process.env.SERVICE_VERSION ?? '0.0.0',
   otlpEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+  otlpHeaders: parseHeaders(process.env.OTEL_EXPORTER_OTLP_HEADERS),
 });
 `;
 
@@ -483,7 +555,7 @@ void main().catch((err) => {
 });
 `;
 
-function appSpec(svc) {
+function healthSpec(svc) {
   return `import { HealthController, createMetrics, type ObservabilityOptions } from '@velchat/shared-utils';
 
 describe('${svc.name} health', () => {
@@ -506,6 +578,39 @@ describe('${svc.name} health', () => {
 });
 `;
 }
+
+function securitySpec(svc) {
+  return `import { requireTenant, TenantContextMissingError } from '@velchat/shared-utils';
+
+/**
+ * Security regression for ${svc.name} (§D4 threat model + §G6 isolation).
+ * Add a concrete test per API/feature: happy path, edge cases, and the security cases.
+ * \`it.todo\` items below are the backlog to fill as endpoints land in the phase prompts.
+ */
+describe('${svc.name} security (§D4 / §G6)', () => {
+  it('tenant context fails closed — never defaults to "all"', () => {
+    expect(() => requireTenant()).toThrow(TenantContextMissingError);
+  });
+
+  it.todo('authorize-not-just-filter: single-resource read asserts resource.tenant_id == ctx (IDOR)');
+  it.todo('rate limiting + lockout on auth-sensitive endpoints');
+  it.todo('input validation rejects malformed / oversized payloads');
+  it.todo('no secret/PII/message-content in logs or error responses');
+});
+`;
+}
+
+const testReadme = (svc) => `# ${svc.name} — tests
+
+| Folder | What | Runs in |
+|--------|------|---------|
+| \`unit/\`        | pure logic, no I/O (fast) | \`pnpm test\` |
+| \`security/\`    | §D4 threat-model + §G6 isolation regression — one per relevant row | \`pnpm test\` |
+| \`integration/\` | testcontainers (real Postgres/Valkey/Mongo) | \`pnpm test:int\` |
+
+Write a test for **every API and every feature**: happy path + edge cases + the security cases.
+Service-internal unit specs may also live next to the code in \`src/**/*.spec.ts\`.
+`;
 
 function dockerfile(svc) {
   return `# syntax=docker/dockerfile:1
@@ -539,15 +644,20 @@ function envExample(svc) {
     `GRPC_PORT=${svc.grpc}`,
     `METRICS_PORT=9464`,
     ``,
-    `KAFKA_BROKERS=localhost:9092`,
-    `KAFKA_CLIENT_ID=${svc.name}`,
+    `# Provider selection (free-tier defaults)`,
+    `EVENT_BUS=redis-streams`,
+    `STORAGE_PROVIDER=cloudinary`,
+    `SEARCH_PROVIDER=atlas`,
+    ``,
+    `# Redis → Upstash (free) | local Valkey. Cache + Redis Streams event bus.`,
+    `VALKEY_URL=redis://localhost:6379`,
     `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`,
+    `# OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic <grafana-cloud-token>`,
   ];
-  if (svc.dbs.includes('postgres')) lines.push(``, `POSTGRES_URL=postgres://velchat:velchat@localhost:5432/velchat`);
-  if (svc.dbs.includes('mongo')) lines.push(`MONGO_URL=mongodb://velchat:velchat@localhost:27017/velchat?authSource=admin`);
-  if (svc.dbs.includes('valkey')) lines.push(`VALKEY_URL=redis://localhost:6379`);
-  if (svc.dbs.includes('opensearch')) lines.push(`OPENSEARCH_NODE=http://localhost:9200`, `OPENSEARCH_USERNAME=admin`, `OPENSEARCH_PASSWORD=Velchat_dev_1!`);
-  if (svc.dbs.includes('s3')) lines.push(`S3_ENDPOINT=http://localhost:9000`, `S3_ACCESS_KEY=velchatadmin`, `S3_SECRET_KEY=velchatadminsecret`, `S3_BUCKET=velchat-media`);
+  if (svc.dbs.includes('postgres')) lines.push(``, `# PostgreSQL → Neon (free)`, `POSTGRES_URL=postgres://velchat:velchat@localhost:5432/velchat`);
+  if (svc.dbs.includes('mongo')) lines.push(``, `# MongoDB → Atlas (free)`, `MONGO_URL=mongodb://velchat:velchat@localhost:27017/velchat?authSource=admin`);
+  if (svc.search) lines.push(``, `# Atlas Search uses MongoDB Atlas (free)`, `MONGO_URL=mongodb://velchat:velchat@localhost:27017/velchat?authSource=admin`);
+  if (svc.storage) lines.push(``, `# Media → Cloudinary (free)`, `CLOUDINARY_URL=`);
   return lines.join('\n') + '\n';
 }
 
@@ -603,13 +713,16 @@ for (const svc of SERVICES) {
   write(`${base}/package.json`, buildPackageJson(svc));
   write(`${base}/tsconfig.json`, tsconfig);
   write(`${base}/jest.config.cjs`, jestConfig);
-  write(`${base}/Dockerfile`, dockerfile(svc));
+  write(`docker/${svc.name}.Dockerfile`, dockerfile(svc));
   write(`${base}/.env.example`, envExample(svc));
   write(`${base}/README.md`, readme(svc));
   write(`${base}/src/telemetry.ts`, telemetry);
   write(`${base}/src/main.ts`, mainTs);
   write(`${base}/src/app.module.ts`, buildAppModule(svc));
-  write(`${base}/src/app.spec.ts`, appSpec(svc));
+  write(`${base}/test/README.md`, testReadme(svc));
+  write(`${base}/test/unit/health.spec.ts`, healthSpec(svc));
+  write(`${base}/test/security/${svc.name}.security.spec.ts`, securitySpec(svc));
+  write(`${base}/test/integration/.gitkeep`, '# testcontainers integration specs (run via pnpm test:int)\n');
   for (const db of svc.dbs) {
     write(`${base}/src/infra/clients/${CLIENT_FILE[db]}.ts`, CLIENT_FILES[db]);
   }
@@ -618,5 +731,31 @@ for (const svc of SERVICES) {
   // eslint-disable-next-line no-console
   console.log(`scaffolded ${svc.name} (${svc.dbs.join('+') || 'no-db'}, kafka:${svc.kafka})`);
 }
+
+// Domain route prefixes per service — consumed by the local dev gateway (tools/gateway).
+const ROUTES = {
+  'api-gateway': [],
+  'realtime-gateway': ['/ws', '/realtime'],
+  'auth-service': ['/auth'],
+  'user-service': ['/users', '/orgs', '/workspaces', '/teams', '/contacts'],
+  'chat-service': ['/chat', '/messages', '/conversations', '/polls'],
+  'group-channel-service': ['/channels', '/groups', '/communities'],
+  'presence-service': ['/presence', '/status'],
+  'notification-service': ['/notifications'],
+  'media-service': ['/media', '/files'],
+  'search-service': ['/search'],
+  'call-service': ['/calls', '/meetings'],
+  'automation-service': ['/automation', '/bots', '/workflows', '/commands'],
+  'ai-service': ['/ai', '/translate'],
+};
+const registry = SERVICES.map((s) => ({
+  name: s.name,
+  http: s.http,
+  grpc: s.grpc,
+  ws: Boolean(ROUTES[s.name]?.some((r) => r === '/ws' || r === '/realtime')),
+  routes: ROUTES[s.name] ?? [],
+}));
+write('tools/gateway/services.json', JSON.stringify(registry, null, 2));
+
 // eslint-disable-next-line no-console
-console.log(`\nDone: ${count} services.`);
+console.log(`\nDone: ${count} services + tools/gateway/services.json.`);

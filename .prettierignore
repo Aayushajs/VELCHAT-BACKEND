@@ -3,7 +3,7 @@ dist
 coverage
 .turbo
 pnpm-lock.yaml
-packages/shared-types/src/gen
+libs/shared-types/src/gen
 deploy/helm/**/templates
 # exact-contents files (must match the architecture doc verbatim — do not reflow)
 docs/

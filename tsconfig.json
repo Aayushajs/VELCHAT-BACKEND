@@ -3,6 +3,6 @@
   "compilerOptions": {
     "noEmit": true
   },
-  "include": ["apps/**/*.ts", "packages/**/*.ts"],
+  "include": ["apps/**/*.ts", "libs/**/*.ts", "migrations/**/*.ts"],
   "exclude": ["**/dist/**", "**/node_modules/**", "**/coverage/**"]
 }

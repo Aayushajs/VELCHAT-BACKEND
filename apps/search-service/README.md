@@ -1,13 +1,13 @@
 # @velchat/search-service
 
-Indexes events to OpenSearch with tenant + ACL stamping (§B13).
+Indexes events to Atlas Search/OpenSearch with tenant + ACL stamping (§B13).
 
-|            |            |
-| ---------- | ---------- |
-| HTTP port  | `3009`     |
-| gRPC port  | `50060`    |
-| Datastores | opensearch |
-| Kafka      | consumer   |
+|            |          |
+| ---------- | -------- |
+| HTTP port  | `3009`   |
+| gRPC port  | `50060`  |
+| Datastores | —        |
+| Kafka      | consumer |
 
 ## Endpoints (BOOT-0)
 

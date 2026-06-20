@@ -1,17 +1,16 @@
 import { Module, type DynamicModule } from '@nestjs/common';
-import { kafkaBrokers, requireValkeyUrl, type AppConfig } from '@velchat/config';
+import { requireValkeyUrl, type AppConfig } from '@velchat/config';
 import type { Logger } from 'pino';
 import {
   ObservabilityModule,
   InfraLifecycle,
   type ServiceMetrics,
   type ManagedResource,
-  EventPublisher,
-  createKafka,
 } from '@velchat/shared-utils';
+import { createEventBus } from '@velchat/event-bus';
 import { ValkeyClient } from './infra/clients/valkey.client';
 
-export const EVENT_PUBLISHER = Symbol('EVENT_PUBLISHER');
+export const EVENT_BUS = Symbol('EVENT_BUS');
 export const VALKEY_CLIENT = Symbol('VALKEY_CLIENT');
 
 export interface AppDeps {
@@ -38,19 +37,10 @@ export class AppModule {
       providers.push({ provide: VALKEY_CLIENT, useValue: valkey });
     }
 
-    if (deps.config.KAFKA_BROKERS) {
-      const kafka = createKafka({
-        clientId: deps.config.KAFKA_CLIENT_ID,
-        brokers: kafkaBrokers(deps.config),
-      });
-      const publisher = new EventPublisher(kafka);
-      managed.push({
-        name: 'kafka',
-        connect: () => publisher.connect(),
-        ping: async () => true,
-        close: () => publisher.disconnect(),
-      });
-      providers.push({ provide: EVENT_PUBLISHER, useValue: publisher });
+    if (deps.config.EVENT_BUS === 'kafka' ? deps.config.KAFKA_BROKERS : deps.config.VALKEY_URL) {
+      const eventBus = createEventBus(deps.config, deps.logger);
+      managed.push(eventBus);
+      providers.push({ provide: EVENT_BUS, useValue: eventBus });
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);
