@@ -6,9 +6,8 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  // Unit + security specs live in src/ and test/{unit,security}. Integration (testcontainers)
-  // lives in test/integration and runs via `test:int`, so it's ignored here.
-  roots: ['<rootDir>/src', '<rootDir>/test'],
+  // Unit + security specs live in src/ and test/{unit,security} (present in apps, optional in libs).
+  // Integration (testcontainers) lives in test/integration and runs via `test:int`, so it's ignored.
   testMatch: ['**/*.spec.ts'],
   testPathIgnorePatterns: ['/node_modules/', '/dist/', '/test/integration/'],
   moduleFileExtensions: ['ts', 'js', 'json'],
