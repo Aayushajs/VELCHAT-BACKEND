@@ -30,6 +30,18 @@ export class AuthController {
     return this.auth.getSession(body.sessionId);
   }
 
+  /** §B2.5 same-device login (step 1): get a nonce to sign with the device key. */
+  @Post('challenge')
+  challenge(@Body() body: { deviceId: string }) {
+    return this.auth.challenge(body.deviceId);
+  }
+
+  /** §B2.5 same-device login (step 2): present the device-key signature → tokens (no OTP). */
+  @Post('login/device-key')
+  loginDeviceKey(@Body() body: { deviceId: string; signature: string }) {
+    return this.auth.loginWithDeviceKey(body.deviceId, body.signature);
+  }
+
   /** Rotating refresh + reuse-detection + DPoP (§B2.3). */
   @Post('token/refresh')
   refresh(@Body() body: { refreshToken: string; cnfJkt?: string }) {

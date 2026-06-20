@@ -3,6 +3,7 @@ import { uuidv7, ValidationError, NotFoundError } from '@velchat/shared-utils';
 import { AuthRepository, type DeviceRow } from './auth.repository';
 import { TokenService } from './token.service';
 import { ReverseOtpService, type InboundProof } from './reverse-otp.service';
+import { DeviceKeyService } from './device-key.service';
 import { AuthEvents } from './auth.events';
 
 export interface RegisterInput {
@@ -29,10 +30,32 @@ export class AuthService {
     private readonly repo: AuthRepository,
     private readonly tokens: TokenService,
     private readonly revotp: ReverseOtpService,
+    private readonly deviceKey: DeviceKeyService,
     private readonly events: AuthEvents,
     private readonly redis: Redis,
     private readonly accessTtlSec: number,
   ) {}
+
+  /** §B2.5 same-device login (step 1): issue a nonce for the device to sign. */
+  async challenge(deviceId: string): Promise<{ nonce: string; expiresIn: number }> {
+    return this.deviceKey.challenge(deviceId);
+  }
+
+  /** §B2.5 same-device login (step 2): verify the device-key signature → issue tokens (no OTP). */
+  async loginWithDeviceKey(deviceId: string, signatureB64: string): Promise<Tokens> {
+    const pubkey = await this.repo.getDevicePubkey(deviceId);
+    if (!pubkey) throw new NotFoundError('Unknown or revoked device');
+    await this.deviceKey.verify(deviceId, signatureB64, pubkey);
+    const accountId = await this.accountForDevice(deviceId);
+    const access = this.tokens.issueAccess({
+      account_id: accountId,
+      device_id: deviceId,
+      scope: 'full',
+    });
+    const { token: refresh } = await this.tokens.issueRefresh(deviceId);
+    await this.repo.audit('login.device-key', accountId, deviceId);
+    return { accountId, deviceId, access, refresh, expiresIn: this.accessTtlSec };
+  }
 
   /** Step 1: user enters a number → start a Reverse-OTP session (₹0). */
   async register(input: RegisterInput): Promise<{ sessionId: string; expiresIn: number }> {

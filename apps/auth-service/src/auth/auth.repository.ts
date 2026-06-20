@@ -65,6 +65,15 @@ export class AuthRepository implements RefreshStore {
     return deviceId;
   }
 
+  async getDevicePubkey(deviceId: string): Promise<Buffer | null> {
+    const res = await this.pg.pool.query(
+      'SELECT device_pubkey FROM devices WHERE device_id = $1 AND revoked_at IS NULL',
+      [deviceId],
+    );
+    const row = res.rows[0] as { device_pubkey: Buffer } | undefined;
+    return row?.device_pubkey ?? null;
+  }
+
   async accountForDevice(deviceId: string): Promise<string | null> {
     const res = await this.pg.pool.query('SELECT account_id FROM devices WHERE device_id = $1', [
       deviceId,
