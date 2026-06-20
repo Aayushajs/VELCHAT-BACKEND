@@ -10,6 +10,9 @@ import { TokenService } from './token.service';
 import { ReverseOtpService } from './reverse-otp.service';
 import { RedisReverseOtpStore } from './reverse-otp.store';
 import { DeviceKeyService } from './device-key.service';
+import { MagicLinkService } from './magic-link.service';
+import { ApproveDeviceService } from './approve-device.service';
+import { LogMailer } from './mailer.port';
 import { AuthEvents } from './auth.events';
 import { loadOrGenerateKeyPair } from './keys';
 import type { PostgresClient } from '../infra/clients/postgres.client';
@@ -37,12 +40,17 @@ export class AuthModule {
     });
     const revotp = new ReverseOtpService(new RedisReverseOtpStore(deps.redis));
     const deviceKey = new DeviceKeyService(deps.redis);
+    const baseUrl = process.env.PUBLIC_BASE_URL ?? 'http://localhost:8080';
+    const magicLink = new MagicLinkService(deps.redis, new LogMailer(deps.logger), baseUrl);
+    const approve = new ApproveDeviceService(deps.redis);
     const events = new AuthEvents(deps.eventBus);
     const service = new AuthService(
       repo,
       tokens,
       revotp,
       deviceKey,
+      magicLink,
+      approve,
       events,
       deps.redis,
       deps.config.JWT_ACCESS_TTL_SECONDS,

@@ -53,7 +53,34 @@ export class AuthController {
     return this.auth.listDevices(accountId);
   }
 
-  // ── DAPT fallbacks — surface defined; full impl in the next P1 increments ──
+  // ── DAPT fallback: email magic-link (§B2.5) ──
+  @Post('magic/begin')
+  magicBegin(@Body() body: { email: string; platform: string; devicePubkeyBase64: string }) {
+    return this.auth.magicLinkBegin(body);
+  }
+
+  @Post('magic/verify')
+  magicVerify(@Body() body: { token: string }) {
+    return this.auth.magicLinkVerify(body.token);
+  }
+
+  // ── DAPT fallback: approve-on-trusted-device (QR + signed approval, §B2.5) ──
+  @Post('link/request')
+  linkRequest(@Body() body: { devicePubkeyBase64: string; platform: string }) {
+    return this.auth.linkRequest(body.devicePubkeyBase64, body.platform);
+  }
+
+  @Post('link/approve')
+  linkApprove(@Body() body: { linkId: string; approverDeviceId: string; signature: string }) {
+    return this.auth.linkApprove(body.linkId, body.approverDeviceId, body.signature);
+  }
+
+  @Post('link/poll')
+  linkPoll(@Body() body: { linkId: string }) {
+    return this.auth.linkPoll(body.linkId);
+  }
+
+  // ── Remaining DAPT/recovery — surface defined; full impl next increments ──
   @Post('passkey/register')
   @HttpCode(501)
   passkeyRegister(): never {

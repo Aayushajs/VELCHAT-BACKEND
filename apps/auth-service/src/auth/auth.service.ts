@@ -1,9 +1,11 @@
 import type { Redis } from 'ioredis';
-import { uuidv7, ValidationError, NotFoundError } from '@velchat/shared-utils';
+import { uuidv7, ValidationError, NotFoundError, UnauthorizedError } from '@velchat/shared-utils';
 import { AuthRepository, type DeviceRow } from './auth.repository';
 import { TokenService } from './token.service';
 import { ReverseOtpService, type InboundProof } from './reverse-otp.service';
 import { DeviceKeyService } from './device-key.service';
+import { MagicLinkService } from './magic-link.service';
+import { ApproveDeviceService } from './approve-device.service';
 import { AuthEvents } from './auth.events';
 
 export interface RegisterInput {
@@ -31,10 +33,23 @@ export class AuthService {
     private readonly tokens: TokenService,
     private readonly revotp: ReverseOtpService,
     private readonly deviceKey: DeviceKeyService,
+    private readonly magicLink: MagicLinkService,
+    private readonly approve: ApproveDeviceService,
     private readonly events: AuthEvents,
     private readonly redis: Redis,
     private readonly accessTtlSec: number,
   ) {}
+
+  /** Issue an access + refresh pair for an (account, device). */
+  private async mintTokens(accountId: string, deviceId: string): Promise<Tokens> {
+    const access = this.tokens.issueAccess({
+      account_id: accountId,
+      device_id: deviceId,
+      scope: 'full',
+    });
+    const { token: refresh } = await this.tokens.issueRefresh(deviceId);
+    return { accountId, deviceId, access, refresh, expiresIn: this.accessTtlSec };
+  }
 
   /** §B2.5 same-device login (step 1): issue a nonce for the device to sign. */
   async challenge(deviceId: string): Promise<{ nonce: string; expiresIn: number }> {
@@ -137,6 +152,79 @@ export class AuthService {
       refresh: rotated.token,
       expiresIn: this.accessTtlSec,
     };
+  }
+
+  // ── DAPT fallback: email magic-link (§B2.5, limited tier) ────────────────
+  async magicLinkBegin(input: {
+    email: string;
+    platform: string;
+    devicePubkeyBase64: string;
+  }): Promise<{ sent: true }> {
+    if (!input.email || !input.platform || !input.devicePubkeyBase64) {
+      throw new ValidationError('email, platform and devicePubkeyBase64 are required');
+    }
+    return this.magicLink.begin({
+      email: input.email,
+      platform: input.platform,
+      devicePubkeyDer: input.devicePubkeyBase64,
+    });
+  }
+
+  async magicLinkVerify(token: string): Promise<Tokens> {
+    const pending = await this.magicLink.consume(token);
+    const accountId = await this.repo.createAccount('limited'); // email-only → limited tier
+    await this.repo.upsertVerifiedIdentifier(accountId, 'email', pending.email.toLowerCase());
+    const deviceId = await this.repo.addDevice({
+      accountId,
+      platform: pending.platform,
+      devicePubkey: Buffer.from(pending.devicePubkeyDer, 'base64'),
+      trusted: true,
+    });
+    await this.repo.audit('user.registered.email', accountId, deviceId);
+    await this.events.userCreated(accountId);
+    await this.events.deviceAdded(accountId, deviceId, true);
+    return this.mintTokens(accountId, deviceId);
+  }
+
+  // ── DAPT: approve-on-trusted-device (§B2.5) ──────────────────────────────
+  async linkRequest(
+    devicePubkeyBase64: string,
+    platform: string,
+  ): Promise<{ linkId: string; challenge: string }> {
+    if (!devicePubkeyBase64 || !platform) {
+      throw new ValidationError('devicePubkeyBase64 and platform are required');
+    }
+    return this.approve.request(devicePubkeyBase64, platform);
+  }
+
+  /** A trusted device of the account signs the link challenge → new device provisioned. */
+  async linkApprove(
+    linkId: string,
+    approverDeviceId: string,
+    signatureB64: string,
+  ): Promise<{ approved: true }> {
+    const req = await this.approve.getRequest(linkId);
+    const approver = await this.repo.getDevice(approverDeviceId);
+    if (!approver) throw new NotFoundError('Approver device not found');
+    if (!approver.trusted) throw new UnauthorizedError('Approver device is not trusted');
+    this.approve.verifyApproval(req.challenge, approver.pubkey, signatureB64);
+
+    const newDeviceId = await this.repo.addDevice({
+      accountId: approver.accountId,
+      platform: req.platform,
+      devicePubkey: Buffer.from(req.newDevicePubkeyDer, 'base64'),
+      trusted: false,
+    });
+    const tokens = await this.mintTokens(approver.accountId, newDeviceId);
+    await this.approve.markApproved(linkId, tokens);
+    await this.repo.audit('device.linked', approver.accountId, newDeviceId);
+    await this.events.deviceAdded(approver.accountId, newDeviceId, false);
+    return { approved: true };
+  }
+
+  async linkPoll(linkId: string): Promise<{ status: 'pending' } | Tokens> {
+    const result = await this.approve.getResult<Tokens>(linkId);
+    return result ?? { status: 'pending' };
   }
 
   async listDevices(accountId: string): Promise<DeviceRow[]> {
