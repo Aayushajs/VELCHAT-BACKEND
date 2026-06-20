@@ -10,10 +10,7 @@ import {
 import { createEventBus } from '@velchat/event-bus';
 import { PostgresClient } from './infra/clients/postgres.client';
 import { ValkeyClient } from './infra/clients/valkey.client';
-
-export const EVENT_BUS = Symbol('EVENT_BUS');
-export const PG_CLIENT = Symbol('PG_CLIENT');
-export const VALKEY_CLIENT = Symbol('VALKEY_CLIENT');
+import { AuthModule } from './auth/auth.module';
 
 export interface AppDeps {
   config: AppConfig;
@@ -22,37 +19,35 @@ export interface AppDeps {
 }
 
 /**
- * DAPT auth, Reverse-OTP, tokens, device/key directory (§B2).
- *
- * BOOT-0 skeleton: edge surface (health/ready/metrics, OTel, tenant context) + wired DB/Kafka
- * clients only. Business logic arrives in the phase prompts (see VelChat-ClaudeCode-Prompts.md).
+ * auth-service (§B2): DAPT auth, Reverse-OTP, RS256/JWKS + rotating-refresh tokens, device/key
+ * directory. Identity = account_id (UUIDv7); phone/email are re-verifiable identifiers.
  */
 @Module({})
 export class AppModule {
   static forRoot(deps: AppDeps): DynamicModule {
     const managed: ManagedResource[] = [];
-    const providers: Array<{ provide: symbol; useValue: unknown }> = [];
+    const imports = [];
 
-    if (deps.config.POSTGRES_URL) {
+    // auth needs Postgres + Valkey; only wire the AuthModule when both are configured so the
+    // service still answers /health without infra (e.g. a bare container probe).
+    if (deps.config.POSTGRES_URL && deps.config.VALKEY_URL) {
       const pg = new PostgresClient(
         requirePostgresUrl(deps.config),
         deps.config.POSTGRES_MAX_POOL,
         deps.logger,
       );
-      managed.push(pg);
-      providers.push({ provide: PG_CLIENT, useValue: pg });
-    }
-
-    if (deps.config.VALKEY_URL) {
       const valkey = new ValkeyClient(requireValkeyUrl(deps.config), deps.logger);
-      managed.push(valkey);
-      providers.push({ provide: VALKEY_CLIENT, useValue: valkey });
-    }
-
-    if (deps.config.EVENT_BUS === 'kafka' ? deps.config.KAFKA_BROKERS : deps.config.VALKEY_URL) {
       const eventBus = createEventBus(deps.config, deps.logger);
-      managed.push(eventBus);
-      providers.push({ provide: EVENT_BUS, useValue: eventBus });
+      managed.push(pg, valkey, eventBus);
+      imports.push(
+        AuthModule.forRoot({
+          config: deps.config,
+          logger: deps.logger,
+          pg,
+          redis: valkey.redis,
+          eventBus,
+        }),
+      );
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);
@@ -66,9 +61,9 @@ export class AppModule {
           metrics: deps.metrics,
           readiness: () => lifecycle.isReady(),
         }),
+        ...imports,
       ],
-      providers: [{ provide: InfraLifecycle, useValue: lifecycle }, ...providers],
-      exports: providers.map((p) => p.provide),
+      providers: [{ provide: InfraLifecycle, useValue: lifecycle }],
     };
   }
 }
