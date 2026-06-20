@@ -105,6 +105,48 @@ export class AuthRepository implements RefreshStore {
     return res.rows as DeviceRow[];
   }
 
+  // ── Passkeys (WebAuthn, §B2.1) — cred_id stored as bytea ─────────────────
+  async insertPasskey(
+    accountId: string,
+    credIdB64url: string,
+    publicKey: Buffer,
+    counter: number,
+  ): Promise<void> {
+    await this.pg.pool.query(
+      'INSERT INTO passkeys(cred_id, account_id, public_key, sign_count) VALUES ($1, $2, $3, $4)',
+      [Buffer.from(credIdB64url, 'base64url'), accountId, publicKey, counter],
+    );
+  }
+
+  async listPasskeyCredIds(accountId: string): Promise<string[]> {
+    const res = await this.pg.pool.query('SELECT cred_id FROM passkeys WHERE account_id = $1', [
+      accountId,
+    ]);
+    return (res.rows as Array<{ cred_id: Buffer }>).map((r) => r.cred_id.toString('base64url'));
+  }
+
+  async getPasskeyByCredId(
+    credIdB64url: string,
+  ): Promise<{ accountId: string; publicKey: Buffer; counter: number } | null> {
+    const res = await this.pg.pool.query(
+      'SELECT account_id, public_key, sign_count FROM passkeys WHERE cred_id = $1',
+      [Buffer.from(credIdB64url, 'base64url')],
+    );
+    const row = res.rows[0] as
+      | { account_id: string; public_key: Buffer; sign_count: string | number }
+      | undefined;
+    return row
+      ? { accountId: row.account_id, publicKey: row.public_key, counter: Number(row.sign_count) }
+      : null;
+  }
+
+  async updatePasskeyCounter(credIdB64url: string, counter: number): Promise<void> {
+    await this.pg.pool.query('UPDATE passkeys SET sign_count = $2 WHERE cred_id = $1', [
+      Buffer.from(credIdB64url, 'base64url'),
+      counter,
+    ]);
+  }
+
   async audit(event: string, accountId?: string, deviceId?: string, ip?: string): Promise<void> {
     await this.pg.pool.query(
       'INSERT INTO auth_audit(account_id, event, device_id, ip) VALUES ($1, $2, $3, $4)',

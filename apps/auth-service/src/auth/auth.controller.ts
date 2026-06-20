@@ -80,17 +80,28 @@ export class AuthController {
     return this.auth.linkPoll(body.linkId);
   }
 
-  // ── Remaining DAPT/recovery — surface defined; full impl next increments ──
-  @Post('passkey/register')
-  @HttpCode(501)
-  passkeyRegister(): never {
-    throw new AppError(
-      'NOT_IMPLEMENTED',
-      'Passkey (WebAuthn) registration — next P1 increment (§B2.5)',
-      501,
-    );
+  // ── DAPT fallback: passkey / WebAuthn (§B2.5) ──
+  @Post('passkey/register/options')
+  passkeyRegisterOptions(@Body() body: { accountId: string; userName: string }) {
+    return this.auth.passkeyRegisterOptions(body.accountId, body.userName);
   }
 
+  @Post('passkey/register/verify')
+  passkeyRegisterVerify(@Body() body: { accountId: string; response: unknown }) {
+    return this.auth.passkeyRegisterVerify(body.accountId, body.response);
+  }
+
+  @Post('passkey/login/options')
+  passkeyLoginOptions(@Body() body: { accountId: string }) {
+    return this.auth.passkeyAuthOptions(body.accountId);
+  }
+
+  @Post('passkey/login/verify')
+  passkeyLoginVerify(@Body() body: { accountId: string; deviceId: string; response: unknown }) {
+    return this.auth.passkeyAuthVerify(body.accountId, body.response, body.deviceId);
+  }
+
+  // ── Remaining (recovery + number-change) — surface defined; full impl in P1.5 ──
   @Post('recovery/begin')
   @HttpCode(501)
   recoveryBegin(): never {

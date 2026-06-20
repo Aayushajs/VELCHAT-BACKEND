@@ -6,6 +6,7 @@ import { ReverseOtpService, type InboundProof } from './reverse-otp.service';
 import { DeviceKeyService } from './device-key.service';
 import { MagicLinkService } from './magic-link.service';
 import { ApproveDeviceService } from './approve-device.service';
+import { PasskeyService } from './passkey.service';
 import { AuthEvents } from './auth.events';
 
 export interface RegisterInput {
@@ -35,10 +36,49 @@ export class AuthService {
     private readonly deviceKey: DeviceKeyService,
     private readonly magicLink: MagicLinkService,
     private readonly approve: ApproveDeviceService,
+    private readonly passkey: PasskeyService,
     private readonly events: AuthEvents,
     private readonly redis: Redis,
     private readonly accessTtlSec: number,
   ) {}
+
+  // ── DAPT fallback: passkey / WebAuthn (§B2.5) ────────────────────────────
+  async passkeyRegisterOptions(
+    accountId: string,
+    userName: string,
+  ): Promise<{ challenge: string }> {
+    return this.passkey.registrationOptions(accountId, userName);
+  }
+
+  async passkeyRegisterVerify(accountId: string, response: unknown): Promise<{ registered: true }> {
+    const cred = await this.passkey.verifyRegistration(accountId, response);
+    await this.repo.insertPasskey(accountId, cred.credId, cred.publicKey, cred.counter);
+    await this.repo.audit('passkey.registered', accountId);
+    return { registered: true };
+  }
+
+  async passkeyAuthOptions(accountId: string): Promise<{ challenge: string }> {
+    const credIds = await this.repo.listPasskeyCredIds(accountId);
+    return this.passkey.authenticationOptions(accountId, credIds);
+  }
+
+  async passkeyAuthVerify(accountId: string, response: unknown, deviceId: string): Promise<Tokens> {
+    const credId = (response as { id?: string }).id;
+    if (!credId) throw new ValidationError('passkey response missing credential id');
+    const cred = await this.repo.getPasskeyByCredId(credId);
+    if (!cred || cred.accountId !== accountId) throw new UnauthorizedError('Unknown passkey');
+    const newCounter = await this.passkey.verifyAuthentication(accountId, response, {
+      credId,
+      publicKey: cred.publicKey,
+      counter: cred.counter,
+    });
+    await this.repo.updatePasskeyCounter(credId, newCounter);
+    const owner = await this.repo.getDevice(deviceId);
+    if (!owner || owner.accountId !== accountId)
+      throw new UnauthorizedError('Device not on account');
+    await this.repo.audit('login.passkey', accountId, deviceId);
+    return this.mintTokens(accountId, deviceId);
+  }
 
   /** Issue an access + refresh pair for an (account, device). */
   private async mintTokens(accountId: string, deviceId: string): Promise<Tokens> {

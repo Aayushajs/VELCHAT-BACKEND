@@ -12,6 +12,7 @@ import { RedisReverseOtpStore } from './reverse-otp.store';
 import { DeviceKeyService } from './device-key.service';
 import { MagicLinkService } from './magic-link.service';
 import { ApproveDeviceService } from './approve-device.service';
+import { PasskeyService } from './passkey.service';
 import { LogMailer } from './mailer.port';
 import { AuthEvents } from './auth.events';
 import { loadOrGenerateKeyPair } from './keys';
@@ -43,6 +44,14 @@ export class AuthModule {
     const baseUrl = process.env.PUBLIC_BASE_URL ?? 'http://localhost:8080';
     const magicLink = new MagicLinkService(deps.redis, new LogMailer(deps.logger), baseUrl);
     const approve = new ApproveDeviceService(deps.redis);
+    const passkey = new PasskeyService(
+      {
+        rpID: process.env.WEBAUTHN_RP_ID ?? 'localhost',
+        rpName: process.env.WEBAUTHN_RP_NAME ?? 'VelChat',
+        origin: process.env.WEBAUTHN_ORIGIN ?? baseUrl,
+      },
+      deps.redis,
+    );
     const events = new AuthEvents(deps.eventBus);
     const service = new AuthService(
       repo,
@@ -51,6 +60,7 @@ export class AuthModule {
       deviceKey,
       magicLink,
       approve,
+      passkey,
       events,
       deps.redis,
       deps.config.JWT_ACCESS_TTL_SECONDS,
