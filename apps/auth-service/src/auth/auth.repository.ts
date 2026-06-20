@@ -147,6 +147,69 @@ export class AuthRepository implements RefreshStore {
     ]);
   }
 
+  // ── Number change (§B2.6) ────────────────────────────────────────────────
+  async findVerifiedPhoneAccount(phoneNorm: string): Promise<string | null> {
+    const res = await this.pg.pool.query(
+      "SELECT account_id FROM identifiers WHERE kind = 'phone' AND value_norm = $1 AND verified_at IS NOT NULL",
+      [phoneNorm],
+    );
+    const row = res.rows[0] as { account_id: string } | undefined;
+    return row?.account_id ?? null;
+  }
+
+  /** Atomically re-point the account's phone identifier to a new number on the SAME account_id. */
+  async repointPhone(accountId: string, newNorm: string): Promise<void> {
+    const client = await this.pg.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const upd = await client.query(
+        "UPDATE identifiers SET value_norm = $2, value_hash = $3, verified_at = now() WHERE account_id = $1 AND kind = 'phone'",
+        [accountId, newNorm, sha256(newNorm)],
+      );
+      if (upd.rowCount === 0) {
+        await client.query(
+          "INSERT INTO identifiers(account_id, kind, value_norm, value_hash, verified_at, is_primary) VALUES ($1, 'phone', $2, $3, now(), true)",
+          [accountId, newNorm, sha256(newNorm)],
+        );
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /** Full session revocation for an account's device (recovery / device-loss, §B2.7). */
+  async revokeDeviceTokens(deviceId: string): Promise<void> {
+    await this.pg.pool.query('UPDATE refresh_tokens SET revoked = true WHERE device_id = $1', [
+      deviceId,
+    ]);
+  }
+
+  // ── Recovery backup codes (§B2.7) ────────────────────────────────────────
+  async storeBackupCodes(accountId: string, codeHashes: string[]): Promise<void> {
+    await this.pg.pool.query('DELETE FROM recovery_backup_codes WHERE account_id = $1', [
+      accountId,
+    ]);
+    for (const codeHash of codeHashes) {
+      await this.pg.pool.query(
+        'INSERT INTO recovery_backup_codes(account_id, code_hash, used) VALUES ($1, $2, false)',
+        [accountId, codeHash],
+      );
+    }
+  }
+
+  /** Consume a backup code (single-use). Returns true if a matching unused code was found. */
+  async consumeBackupCode(accountId: string, codeHash: string): Promise<boolean> {
+    const res = await this.pg.pool.query(
+      'UPDATE recovery_backup_codes SET used = true WHERE account_id = $1 AND code_hash = $2 AND used = false RETURNING id',
+      [accountId, codeHash],
+    );
+    return (res.rowCount ?? 0) > 0;
+  }
+
   async audit(event: string, accountId?: string, deviceId?: string, ip?: string): Promise<void> {
     await this.pg.pool.query(
       'INSERT INTO auth_audit(account_id, event, device_id, ip) VALUES ($1, $2, $3, $4)',

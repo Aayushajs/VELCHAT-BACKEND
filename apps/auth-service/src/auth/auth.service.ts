@@ -1,5 +1,12 @@
 import type { Redis } from 'ioredis';
-import { uuidv7, ValidationError, NotFoundError, UnauthorizedError } from '@velchat/shared-utils';
+import {
+  uuidv7,
+  ValidationError,
+  NotFoundError,
+  UnauthorizedError,
+  ConflictError,
+  RateLimitError,
+} from '@velchat/shared-utils';
 import { AuthRepository, type DeviceRow } from './auth.repository';
 import { TokenService } from './token.service';
 import { ReverseOtpService, type InboundProof } from './reverse-otp.service';
@@ -7,6 +14,9 @@ import { DeviceKeyService } from './device-key.service';
 import { MagicLinkService } from './magic-link.service';
 import { ApproveDeviceService } from './approve-device.service';
 import { PasskeyService } from './passkey.service';
+import { RecoveryService, type RecoveryFactor } from './recovery.service';
+import { RateLimiter } from './rate-limiter';
+import { generateBackupCodes, hashCode } from './backup-codes';
 import { AuthEvents } from './auth.events';
 
 export interface RegisterInput {
@@ -37,10 +47,75 @@ export class AuthService {
     private readonly magicLink: MagicLinkService,
     private readonly approve: ApproveDeviceService,
     private readonly passkey: PasskeyService,
+    private readonly recovery: RecoveryService,
+    private readonly rateLimiter: RateLimiter,
     private readonly events: AuthEvents,
     private readonly redis: Redis,
     private readonly accessTtlSec: number,
   ) {}
+
+  // ── Number change (§B2.6 — safe migration, no recycled-number takeover) ──
+  /** Precondition: a TRUSTED device of the account (proves control of the OLD account). */
+  async numberChangeBegin(
+    accountId: string,
+    newPhone: string,
+    trustedDeviceId: string,
+  ): Promise<{ sessionId: string }> {
+    const device = await this.repo.getDevice(trustedDeviceId);
+    if (!device || device.accountId !== accountId) {
+      throw new UnauthorizedError('Device does not belong to this account');
+    }
+    if (!device.trusted) {
+      throw new UnauthorizedError('Number change requires a trusted device');
+    }
+    const sessionId = uuidv7();
+    await this.revotp.start(newPhone, sessionId);
+    await this.redis.set(`numchange:${sessionId}`, JSON.stringify({ accountId }), 'EX', 300);
+    return { sessionId };
+  }
+
+  // ── Recovery (§B2.7 — 2 factors + delay + notify; full session revocation) ──
+  async recoveryBegin(accountId: string): Promise<{ recoveryId: string; delaySec: number }> {
+    await this.repo.audit('recovery.begin', accountId);
+    // Notify ALL channels (email + push + trusted devices) — wired in P7 notification-service.
+    return this.recovery.begin(accountId, true);
+  }
+
+  async recoveryAddFactor(
+    recoveryId: string,
+    factor: RecoveryFactor,
+  ): Promise<{ factors: number }> {
+    return this.recovery.addFactor(recoveryId, factor);
+  }
+
+  /** Verify a backup code → counts as the `backup-code` recovery factor. */
+  async recoveryUseBackupCode(
+    recoveryId: string,
+    accountId: string,
+    code: string,
+  ): Promise<{ factors: number }> {
+    const ok = await this.repo.consumeBackupCode(accountId, hashCode(code));
+    if (!ok) throw new UnauthorizedError('Invalid or already-used backup code');
+    return this.recovery.addFactor(recoveryId, 'backup-code');
+  }
+
+  async recoveryComplete(recoveryId: string): Promise<{ recovered: true }> {
+    const req = await this.recovery.assertCompletable(recoveryId);
+    // Full session revocation across all the account's devices (§B2.7).
+    const devices = await this.repo.listDevices(req.accountId);
+    for (const d of devices) await this.repo.revokeDeviceTokens(d.device_id);
+    await this.recovery.consume(recoveryId);
+    await this.repo.audit('recovery.complete', req.accountId);
+    return { recovered: true };
+  }
+
+  /** Issue fresh backup codes (shown once). */
+  async issueBackupCodes(accountId: string): Promise<{ codes: string[] }> {
+    const { codes, hashes } = generateBackupCodes(10);
+    await this.repo.storeBackupCodes(accountId, hashes);
+    await this.repo.audit('backup-codes.issued', accountId);
+    return { codes };
+  }
 
   // ── DAPT fallback: passkey / WebAuthn (§B2.5) ────────────────────────────
   async passkeyRegisterOptions(
@@ -117,6 +192,10 @@ export class AuthService {
     if (!input.phone || !input.platform || !input.devicePubkeyBase64) {
       throw new ValidationError('phone, platform and devicePubkeyBase64 are required');
     }
+    // §B2.8: anti-pumping / Sybil — cap registration attempts per number.
+    if (!(await this.rateLimiter.allow(`register:${input.phone}`, 5, 3600))) {
+      throw new RateLimitError('Too many registration attempts for this number');
+    }
     const sessionId = uuidv7();
     const { expiresAt } = await this.revotp.start(input.phone, sessionId);
     // Remember the device material to provision once the webhook confirms the proof.
@@ -135,6 +214,21 @@ export class AuthService {
    */
   async handleReverseOtpWebhook(proof: InboundProof): Promise<{ verified: true }> {
     const { phone } = await this.revotp.verify(proof);
+
+    // Number-change session? Re-point the phone on the SAME account (§B2.6) — data stays on account_id.
+    const numChange = await this.redis.get(`numchange:${proof.sessionId}`);
+    if (numChange) {
+      const { accountId } = JSON.parse(numChange) as { accountId: string };
+      const existing = await this.repo.findVerifiedPhoneAccount(phone);
+      if (existing && existing !== accountId) {
+        throw new ConflictError('Number already in use by another account'); // block / offer merge
+      }
+      await this.repo.repointPhone(accountId, phone);
+      await this.redis.del(`numchange:${proof.sessionId}`);
+      await this.repo.audit('number.changed', accountId);
+      await this.events.identifierChanged(accountId, 'phone');
+      return { verified: true };
+    }
 
     const raw = await this.redis.get(`revotp:input:${proof.sessionId}`);
     if (!raw) throw new NotFoundError('Registration session expired');

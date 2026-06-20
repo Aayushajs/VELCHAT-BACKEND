@@ -27,6 +27,12 @@ export interface DeviceAddedPayload {
   trusted: boolean;
 }
 
+export interface IdentifierChangedPayload {
+  account_id: AccountId;
+  kind: 'phone' | 'email';
+  changed_at: Iso8601;
+}
+
 export interface MessageSentPayload {
   conversation_id: ConversationId;
   message_id: string;
@@ -47,6 +53,7 @@ export interface PresenceChangedPayload {
 export interface EventPayloads {
   'user.created': UserCreatedPayload;
   'device.added': DeviceAddedPayload;
+  'identifier.changed': IdentifierChangedPayload;
   'message.sent': MessageSentPayload;
   'presence.changed': PresenceChangedPayload;
 }

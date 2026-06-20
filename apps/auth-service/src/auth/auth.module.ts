@@ -13,6 +13,8 @@ import { DeviceKeyService } from './device-key.service';
 import { MagicLinkService } from './magic-link.service';
 import { ApproveDeviceService } from './approve-device.service';
 import { PasskeyService } from './passkey.service';
+import { RecoveryService } from './recovery.service';
+import { RateLimiter } from './rate-limiter';
 import { LogMailer } from './mailer.port';
 import { AuthEvents } from './auth.events';
 import { loadOrGenerateKeyPair } from './keys';
@@ -52,6 +54,8 @@ export class AuthModule {
       },
       deps.redis,
     );
+    const recovery = new RecoveryService(deps.redis);
+    const rateLimiter = new RateLimiter(deps.redis);
     const events = new AuthEvents(deps.eventBus);
     const service = new AuthService(
       repo,
@@ -61,6 +65,8 @@ export class AuthModule {
       magicLink,
       approve,
       passkey,
+      recovery,
+      rateLimiter,
       events,
       deps.redis,
       deps.config.JWT_ACCESS_TTL_SECONDS,

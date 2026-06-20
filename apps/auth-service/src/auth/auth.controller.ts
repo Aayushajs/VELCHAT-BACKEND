@@ -1,7 +1,7 @@
 import { Controller, Post, Get, Body, Query, HttpCode } from '@nestjs/common';
-import { AppError } from '@velchat/shared-utils';
 import { AuthService, type RegisterInput } from './auth.service';
 import type { InboundProof } from './reverse-otp.service';
+import type { RecoveryFactor } from './recovery.service';
 
 /** REST surface for auth (§B2 / flow C1). gRPC contract lives in libs/proto (P-later). */
 @Controller('auth')
@@ -101,17 +101,38 @@ export class AuthController {
     return this.auth.passkeyAuthVerify(body.accountId, body.response, body.deviceId);
   }
 
-  // ── Remaining (recovery + number-change) — surface defined; full impl in P1.5 ──
-  @Post('recovery/begin')
-  @HttpCode(501)
-  recoveryBegin(): never {
-    throw new AppError('NOT_IMPLEMENTED', 'Account recovery — next P1 increment (§B2.7)', 501);
+  // ── Number change (§B2.6) — trusted device + Reverse-OTP verify NEW number ──
+  @Post('number-change/begin')
+  numberChangeBegin(
+    @Body() body: { accountId: string; newPhone: string; trustedDeviceId: string },
+  ) {
+    return this.auth.numberChangeBegin(body.accountId, body.newPhone, body.trustedDeviceId);
   }
 
-  @Post('number-change/begin')
-  @HttpCode(501)
-  numberChangeBegin(): never {
-    throw new AppError('NOT_IMPLEMENTED', 'Number change — next P1 increment (§B2.6)', 501);
+  // ── Recovery (§B2.7) — 2 factors + cooling-off + full session revocation ──
+  @Post('recovery/begin')
+  recoveryBegin(@Body() body: { accountId: string }) {
+    return this.auth.recoveryBegin(body.accountId);
+  }
+
+  @Post('recovery/factor')
+  recoveryFactor(@Body() body: { recoveryId: string; factor: RecoveryFactor }) {
+    return this.auth.recoveryAddFactor(body.recoveryId, body.factor);
+  }
+
+  @Post('recovery/backup-code')
+  recoveryBackupCode(@Body() body: { recoveryId: string; accountId: string; code: string }) {
+    return this.auth.recoveryUseBackupCode(body.recoveryId, body.accountId, body.code);
+  }
+
+  @Post('recovery/complete')
+  recoveryComplete(@Body() body: { recoveryId: string }) {
+    return this.auth.recoveryComplete(body.recoveryId);
+  }
+
+  @Post('backup-codes/issue')
+  backupCodes(@Body() body: { accountId: string }) {
+    return this.auth.issueBackupCodes(body.accountId);
   }
 }
 
