@@ -1,6 +1,9 @@
 // Errors
 export * from './errors';
 
+// IDs
+export { uuidv7 } from './ids';
+
 // Tenant context (§G6)
 export * from './tenant-context';
 
