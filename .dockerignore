@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/coverage
+**/.turbo
+.git
+.github
+*.md
+.env
+.env.*
+deploy
+infra
+docs

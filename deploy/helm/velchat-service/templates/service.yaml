@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "velchat-service.name" . }}
+  labels:
+    {{- include "velchat-service.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "velchat-service.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.ports.http }}
+      targetPort: http
+    - name: grpc
+      port: {{ .Values.ports.grpc }}
+      targetPort: grpc
+    - name: metrics
+      port: {{ .Values.ports.metrics }}
+      targetPort: metrics

@@ -1,0 +1,43 @@
+# Defaults for a VelChat stateless service. Override per service in deploy/helm/values/<svc>.yaml.
+name: velchat-service
+
+image:
+  repository: registry.local/velchat/velchat-service
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+ports:
+  http: 3000
+  grpc: 50051
+  metrics: 9464
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: '1'
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+# Non-secret config (ConfigMap). Secrets come from Sealed Secrets (envFrom.secretRef), never here.
+config: {}
+envFrom:
+  - configMapRef:
+      name: '{{ .Values.name }}-config'
+  # - secretRef:
+  #     name: "{{ .Values.name }}-secrets"
+
+# graceful drain window (§B9)
+terminationGracePeriodSeconds: 45

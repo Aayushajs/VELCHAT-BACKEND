@@ -1,0 +1,14 @@
+# Per-service overrides for the generic velchat-service chart.
+name: realtime-gateway
+image:
+  repository: registry.local/velchat/realtime-gateway
+  tag: latest
+ports:
+  http: 3001
+  grpc: 50052
+  metrics: 9464
+envFrom:
+  - configMapRef:
+      name: realtime-gateway-config
+  - secretRef:
+      name: realtime-gateway-secrets

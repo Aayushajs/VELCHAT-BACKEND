@@ -1,0 +1,14 @@
+# Per-service overrides for the generic velchat-service chart.
+name: presence-service
+image:
+  repository: registry.local/velchat/presence-service
+  tag: latest
+ports:
+  http: 3006
+  grpc: 50057
+  metrics: 9464
+envFrom:
+  - configMapRef:
+      name: presence-service-config
+  - secretRef:
+      name: presence-service-secrets

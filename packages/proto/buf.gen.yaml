@@ -1,0 +1,14 @@
+version: v2
+clean: true
+managed:
+  enabled: true
+plugins:
+  # Generates TypeScript types + service definitions into packages/shared-types/src/gen.
+  # Free/OSS plugin (ts-proto, MIT). Run via `pnpm proto:gen` (requires buf).
+  - remote: buf.build/community/stephenh-ts-proto
+    out: ../shared-types/src/gen
+    opt:
+      - nestJs=true
+      - outputServices=grpc-js
+      - esModuleInterop=true
+      - useExactTypes=false

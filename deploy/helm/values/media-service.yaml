@@ -1,0 +1,14 @@
+# Per-service overrides for the generic velchat-service chart.
+name: media-service
+image:
+  repository: registry.local/velchat/media-service
+  tag: latest
+ports:
+  http: 3008
+  grpc: 50059
+  metrics: 9464
+envFrom:
+  - configMapRef:
+      name: media-service-config
+  - secretRef:
+      name: media-service-secrets

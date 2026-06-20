@@ -1,0 +1,14 @@
+# Per-service overrides for the generic velchat-service chart.
+name: automation-service
+image:
+  repository: registry.local/velchat/automation-service
+  tag: latest
+ports:
+  http: 3011
+  grpc: 50062
+  metrics: 9464
+envFrom:
+  - configMapRef:
+      name: automation-service-config
+  - secretRef:
+      name: automation-service-secrets

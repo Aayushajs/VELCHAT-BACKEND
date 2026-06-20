@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: velchat-prod
+  labels:
+    app.kubernetes.io/part-of: velchat
+    # P0 installs Linkerd; this opts the namespace into the mesh for mTLS (§A14).
+    linkerd.io/inject: enabled

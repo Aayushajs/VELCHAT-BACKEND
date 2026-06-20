@@ -1,0 +1,13 @@
+node_modules
+dist
+coverage
+.turbo
+pnpm-lock.yaml
+packages/shared-types/src/gen
+deploy/helm/**/templates
+# exact-contents files (must match the architecture doc verbatim — do not reflow)
+docs/
+VelChat-Architecture-v2.md
+VelChat-ClaudeCode-Prompts.md
+CLAUDE.md
+.claude/

@@ -1,0 +1,14 @@
+# Per-service overrides for the generic velchat-service chart.
+name: ai-service
+image:
+  repository: registry.local/velchat/ai-service
+  tag: latest
+ports:
+  http: 3012
+  grpc: 50063
+  metrics: 9464
+envFrom:
+  - configMapRef:
+      name: ai-service-config
+  - secretRef:
+      name: ai-service-secrets

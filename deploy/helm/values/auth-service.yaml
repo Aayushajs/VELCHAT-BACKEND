@@ -1,0 +1,14 @@
+# Per-service overrides for the generic velchat-service chart.
+name: auth-service
+image:
+  repository: registry.local/velchat/auth-service
+  tag: latest
+ports:
+  http: 3002
+  grpc: 50053
+  metrics: 9464
+envFrom:
+  - configMapRef:
+      name: auth-service-config
+  - secretRef:
+      name: auth-service-secrets

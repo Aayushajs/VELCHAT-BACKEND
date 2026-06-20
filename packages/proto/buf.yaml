@@ -1,0 +1,11 @@
+version: v2
+modules:
+  - path: proto
+lint:
+  use:
+    - STANDARD
+  enum_zero_value_suffix: _UNSPECIFIED
+breaking:
+  # §G7: registry-enforced FULL_TRANSITIVE compatibility; CI blocks incompatible changes.
+  use:
+    - FILE

@@ -1,0 +1,14 @@
+# Per-service overrides for the generic velchat-service chart.
+name: notification-service
+image:
+  repository: registry.local/velchat/notification-service
+  tag: latest
+ports:
+  http: 3007
+  grpc: 50058
+  metrics: 9464
+envFrom:
+  - configMapRef:
+      name: notification-service-config
+  - secretRef:
+      name: notification-service-secrets

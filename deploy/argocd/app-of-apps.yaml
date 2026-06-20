@@ -1,0 +1,48 @@
+# App-of-apps: one ArgoCD ApplicationSet that templates the generic velchat-service chart over
+# all 13 backend services. Per-service overrides live in deploy/helm/values/<svc>.yaml.
+# (P0 adds the data-tier operators, mesh, and observability stack as their own Applications.)
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: velchat-services
+  namespace: argocd
+spec:
+  goTemplate: true
+  generators:
+    - list:
+        elements:
+          - { name: api-gateway }
+          - { name: realtime-gateway }
+          - { name: auth-service }
+          - { name: user-service }
+          - { name: chat-service }
+          - { name: group-channel-service }
+          - { name: presence-service }
+          - { name: notification-service }
+          - { name: media-service }
+          - { name: search-service }
+          - { name: call-service }
+          - { name: automation-service }
+          - { name: ai-service }
+  template:
+    metadata:
+      name: 'velchat-{{ .name }}'
+    spec:
+      project: velchat
+      source:
+        repoURL: https://example.com/velchat/backend.git
+        targetRevision: main
+        path: deploy/helm/velchat-service
+        helm:
+          releaseName: '{{ .name }}'
+          valueFiles:
+            - '../values/{{ .name }}.yaml'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: velchat-prod
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

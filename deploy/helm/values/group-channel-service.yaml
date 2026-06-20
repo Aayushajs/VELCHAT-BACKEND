@@ -1,0 +1,14 @@
+# Per-service overrides for the generic velchat-service chart.
+name: group-channel-service
+image:
+  repository: registry.local/velchat/group-channel-service
+  tag: latest
+ports:
+  http: 3005
+  grpc: 50056
+  metrics: 9464
+envFrom:
+  - configMapRef:
+      name: group-channel-service-config
+  - secretRef:
+      name: group-channel-service-secrets

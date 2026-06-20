@@ -1,0 +1,14 @@
+# Per-service overrides for the generic velchat-service chart.
+name: api-gateway
+image:
+  repository: registry.local/velchat/api-gateway
+  tag: latest
+ports:
+  http: 3000
+  grpc: 50051
+  metrics: 9464
+envFrom:
+  - configMapRef:
+      name: api-gateway-config
+  - secretRef:
+      name: api-gateway-secrets

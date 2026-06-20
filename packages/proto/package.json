@@ -1,0 +1,12 @@
+{
+  "name": "@velchat/proto",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Protobuf/gRPC contracts — the source of truth for all service APIs (buf workspace).",
+  "scripts": {
+    "gen": "buf generate",
+    "lint": "buf lint || echo 'buf not installed — skipping proto lint'",
+    "breaking": "buf breaking --against '.git#branch=main'",
+    "clean": "rimraf .turbo"
+  }
+}

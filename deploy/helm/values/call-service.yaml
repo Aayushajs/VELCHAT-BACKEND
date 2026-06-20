@@ -1,0 +1,14 @@
+# Per-service overrides for the generic velchat-service chart.
+name: call-service
+image:
+  repository: registry.local/velchat/call-service
+  tag: latest
+ports:
+  http: 3010
+  grpc: 50061
+  metrics: 9464
+envFrom:
+  - configMapRef:
+      name: call-service-config
+  - secretRef:
+      name: call-service-secrets

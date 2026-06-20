@@ -1,0 +1,14 @@
+# Per-service overrides for the generic velchat-service chart.
+name: chat-service
+image:
+  repository: registry.local/velchat/chat-service
+  tag: latest
+ports:
+  http: 3004
+  grpc: 50055
+  metrics: 9464
+envFrom:
+  - configMapRef:
+      name: chat-service-config
+  - secretRef:
+      name: chat-service-secrets

@@ -1,0 +1,14 @@
+# Per-service overrides for the generic velchat-service chart.
+name: search-service
+image:
+  repository: registry.local/velchat/search-service
+  tag: latest
+ports:
+  http: 3009
+  grpc: 50060
+  metrics: 9464
+envFrom:
+  - configMapRef:
+      name: search-service-config
+  - secretRef:
+      name: search-service-secrets
