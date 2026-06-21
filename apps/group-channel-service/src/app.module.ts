@@ -9,9 +9,7 @@ import {
 } from '@velchat/common';
 import { createEventBus } from '@velchat/event-bus';
 import { PostgresClient } from '@velchat/database';
-
-export const EVENT_BUS = Symbol('EVENT_BUS');
-export const PG_CLIENT = Symbol('PG_CLIENT');
+import { ChannelsModule } from './channels/channels.module';
 
 export interface AppDeps {
   config: AppConfig;
@@ -20,16 +18,14 @@ export interface AppDeps {
 }
 
 /**
- * Conversations, members, channels, communities, device-list epochs (§B7).
- *
- * BOOT-0 skeleton: edge surface (health/ready/metrics, OTel, tenant context) + wired DB/Kafka
- * clients only. Business logic arrives in the phase prompts (see VelChat-ClaudeCode-Prompts.md).
+ * group-channel-service (§B7): conversations (dm/group/channel/community), membership, roles.
+ * Membership changes emit channel.member.* / conversation.created — consumed by realtime fan-out.
  */
 @Module({})
 export class AppModule {
   static forRoot(deps: AppDeps): DynamicModule {
     const managed: ManagedResource[] = [];
-    const providers: Array<{ provide: symbol; useValue: unknown }> = [];
+    const imports: DynamicModule[] = [];
 
     if (deps.config.POSTGRES_URL) {
       const pg = new PostgresClient(
@@ -37,14 +33,9 @@ export class AppModule {
         deps.config.POSTGRES_MAX_POOL,
         deps.logger,
       );
-      managed.push(pg);
-      providers.push({ provide: PG_CLIENT, useValue: pg });
-    }
-
-    if (deps.config.EVENT_BUS === 'kafka' ? deps.config.KAFKA_BROKERS : deps.config.VALKEY_URL) {
       const eventBus = createEventBus(deps.config, deps.logger);
-      managed.push(eventBus);
-      providers.push({ provide: EVENT_BUS, useValue: eventBus });
+      managed.push(pg, eventBus);
+      imports.push(ChannelsModule.forRoot({ pg, eventBus }));
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);
@@ -58,9 +49,9 @@ export class AppModule {
           metrics: deps.metrics,
           readiness: () => lifecycle.isReady(),
         }),
+        ...imports,
       ],
-      providers: [{ provide: InfraLifecycle, useValue: lifecycle }, ...providers],
-      exports: providers.map((p) => p.provide),
+      providers: [{ provide: InfraLifecycle, useValue: lifecycle }],
     };
   }
 }

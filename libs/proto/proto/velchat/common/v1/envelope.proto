@@ -2,20 +2,20 @@ syntax = "proto3";
 
 package velchat.common.v1;
 
-import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
 
 // Standard Kafka event envelope (§G7-3 / §G6-4). Mirrors @velchat/common EventEnvelope.
 // Evolution rule: additive-only fields; registry enforces FULL_TRANSITIVE (§G7-1).
 message EventEnvelope {
   string event_type = 1;
   uint32 schema_version = 2;
-  string event_id = 3;                      // idempotency key (§A11)
+  string event_id = 3; // idempotency key (§A11)
   google.protobuf.Timestamp occurred_at = 4;
-  string tenant_id = 5;                      // schema-mandatory for tenant-scoped events (§G6-4)
+  string tenant_id = 5; // schema-mandatory for tenant-scoped events (§G6-4)
   string producer = 6;
-  string trace_id = 7;                       // OTel correlation
-  string key = 8;                            // partition key for per-entity ordering (§A11)
+  string trace_id = 7; // OTel correlation
+  string key = 8; // partition key for per-entity ordering (§A11)
   google.protobuf.Struct payload = 9;
 }
 

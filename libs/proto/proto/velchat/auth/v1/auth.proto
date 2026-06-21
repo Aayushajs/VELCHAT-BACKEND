@@ -15,7 +15,7 @@ message IntrospectTokenRequest {
 
 message IntrospectTokenResponse {
   bool active = 1;
-  string account_id = 2;      // identity (§B2)
+  string account_id = 2; // identity (§B2)
   string tenant_id = 3;
   string device_id = 4;
   uint64 expires_at = 5;

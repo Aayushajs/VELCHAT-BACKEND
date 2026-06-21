@@ -33,6 +33,21 @@ export interface IdentifierChangedPayload {
   changed_at: Iso8601;
 }
 
+export interface ConversationCreatedPayload {
+  conversation_id: ConversationId;
+  type: 'dm' | 'group' | 'channel' | 'broadcast' | 'community';
+  tenant_id: TenantId | null;
+  created_by: AccountId;
+  member_ids: AccountId[];
+}
+
+export interface ChannelMemberPayload {
+  conversation_id: ConversationId;
+  user_id: AccountId;
+  role: 'owner' | 'admin' | 'member';
+  tenant_id: TenantId | null;
+}
+
 export interface MessageSentPayload {
   conversation_id: ConversationId;
   message_id: string;
@@ -54,6 +69,9 @@ export interface EventPayloads {
   'user.created': UserCreatedPayload;
   'device.added': DeviceAddedPayload;
   'identifier.changed': IdentifierChangedPayload;
+  'conversation.created': ConversationCreatedPayload;
+  'channel.member.added': ChannelMemberPayload;
+  'channel.member.removed': ChannelMemberPayload;
   'message.sent': MessageSentPayload;
   'presence.changed': PresenceChangedPayload;
 }
