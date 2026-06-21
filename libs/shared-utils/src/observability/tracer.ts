@@ -1,8 +1,3 @@
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { Resource } from '@opentelemetry/resources';
-
 export interface TelemetryConfig {
   serviceName: string;
   serviceVersion: string;
@@ -11,21 +6,26 @@ export interface TelemetryConfig {
   otlpHeaders?: Record<string, string>;
 }
 
-let sdk: NodeSDK | undefined;
+// Minimal handle so importing this module never pulls the (heavy, optional) OpenTelemetry graph.
+let sdk: { shutdown: () => Promise<void> } | undefined;
 
 /**
- * Bootstrap OpenTelemetry. MUST be called before NestJS / any instrumented client is
- * imported-and-used so auto-instrumentation can patch http/grpc/kafkajs/ioredis/pg/mongo.
- * No-op (logs a warning) when no OTLP endpoint is configured.
+ * Bootstrap OpenTelemetry. OTel packages are loaded LAZILY (dynamic import) only when an OTLP
+ * endpoint is configured — so importing @velchat/shared-utils stays light and tests/services that
+ * don't enable tracing never touch the instrumentation graph. No-op without an endpoint.
  */
-export function startTelemetry(cfg: TelemetryConfig): void {
-  if (sdk) return;
-  if (!cfg.otlpEndpoint) {
-    // Tracing is optional in local/dev without a collector; never crash boot over it.
-    return;
-  }
+export async function startTelemetry(cfg: TelemetryConfig): Promise<void> {
+  if (sdk || !cfg.otlpEndpoint) return;
 
-  sdk = new NodeSDK({
+  const [{ NodeSDK }, { getNodeAutoInstrumentations }, { OTLPTraceExporter }, { Resource }] =
+    await Promise.all([
+      import('@opentelemetry/sdk-node'),
+      import('@opentelemetry/auto-instrumentations-node'),
+      import('@opentelemetry/exporter-trace-otlp-http'),
+      import('@opentelemetry/resources'),
+    ]);
+
+  const instance = new NodeSDK({
     resource: new Resource({
       'service.name': cfg.serviceName,
       'service.version': cfg.serviceVersion,
@@ -36,13 +36,12 @@ export function startTelemetry(cfg: TelemetryConfig): void {
     }),
     instrumentations: [
       getNodeAutoInstrumentations({
-        // fs instrumentation is noisy and rarely useful in services.
         '@opentelemetry/instrumentation-fs': { enabled: false },
       }),
     ],
   });
-
-  sdk.start();
+  instance.start();
+  sdk = instance;
 }
 
 export async function shutdownTelemetry(): Promise<void> {

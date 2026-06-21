@@ -305,6 +305,15 @@ const TOKEN = {
   opensearch: 'OPENSEARCH_CLIENT',
   s3: 'S3_CLIENT',
 };
+// Infra clients are SHARED packages now (no per-service copy). CLIENT_FILES above is kept only as
+// reference; the canonical source is libs/{database,cache,search,storage}.
+const CLIENT_LIB = {
+  postgres: '@velchat/database',
+  mongo: '@velchat/database',
+  valkey: '@velchat/cache',
+  opensearch: '@velchat/search',
+  s3: '@velchat/storage',
+};
 
 function buildAppModule(svc) {
   const configRequires = new Set();
@@ -315,7 +324,7 @@ function buildAppModule(svc) {
   const blocks = [];
 
   for (const db of svc.dbs) {
-    clientImports.push(`import { ${CLIENT_CLASS[db]} } from './infra/clients/${CLIENT_FILE[db]}';`);
+    clientImports.push(`import { ${CLIENT_CLASS[db]} } from '${CLIENT_LIB[db]}';`);
     tokenDecls.push(`export const ${TOKEN[db]} = Symbol('${TOKEN[db]}');`);
     if (db === 'postgres') {
       configRequires.add('requirePostgresUrl');
@@ -477,6 +486,7 @@ function buildPackageJson(svc) {
   for (const db of svc.dbs) {
     Object.assign(deps, DB_DEPS[db] ?? {});
     Object.assign(devDeps, DB_DEV_DEPS[db] ?? {});
+    deps[CLIENT_LIB[db]] = 'workspace:*';
   }
   const pkg = {
     name: `@velchat/${svc.name}`,
@@ -528,7 +538,7 @@ function parseHeaders(raw: string | undefined): Record<string, string> {
   return out;
 }
 
-startTelemetry({
+void startTelemetry({
   serviceName: process.env.SERVICE_NAME ?? 'unknown-service',
   serviceVersion: process.env.SERVICE_VERSION ?? '0.0.0',
   otlpEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
@@ -723,9 +733,7 @@ for (const svc of SERVICES) {
   write(`${base}/test/unit/health.spec.ts`, healthSpec(svc));
   write(`${base}/test/security/${svc.name}.security.spec.ts`, securitySpec(svc));
   write(`${base}/test/integration/.gitkeep`, '# testcontainers integration specs (run via pnpm test:int)\n');
-  for (const db of svc.dbs) {
-    write(`${base}/src/infra/clients/${CLIENT_FILE[db]}.ts`, CLIENT_FILES[db]);
-  }
+  // Infra clients are shared packages (libs/{database,cache,search,storage}) — not generated per service.
   write(`deploy/helm/values/${svc.name}.yaml`, helmValues(svc));
   count += 1;
   // eslint-disable-next-line no-console

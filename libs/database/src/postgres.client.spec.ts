@@ -17,7 +17,6 @@ describe('PostgresClient.withTenantTransaction (§G6 RLS GUC)', () => {
       release: () => undefined,
     };
     const pg = new PostgresClient('postgres://unused', 1, console as never);
-    // Replace the real pool (constructed but never connected) with an in-memory fake.
     (pg as unknown as { pool: { connect: () => Promise<typeof fakeClient> } }).pool = {
       connect: async () => fakeClient,
     };
@@ -26,14 +25,12 @@ describe('PostgresClient.withTenantTransaction (§G6 RLS GUC)', () => {
 
   it('sets the tenant GUC inside the transaction and commits', async () => {
     const { pg, calls } = clientWithFakePool();
-
     const result = await runWithTenant({ tenantId: 'org-A', scope: 'tenant' }, () =>
       pg.withTenantTransaction(async (tx) => {
         await tx.query('SELECT 1');
         return 'done';
       }),
     );
-
     expect(result).toBe('done');
     expect(calls.map((c) => c.text)).toEqual([
       'BEGIN',

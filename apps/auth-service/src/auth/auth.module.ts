@@ -18,7 +18,7 @@ import { RateLimiter } from './rate-limiter';
 import { LogMailer } from './mailer.port';
 import { AuthEvents } from './auth.events';
 import { loadOrGenerateKeyPair } from './keys';
-import type { PostgresClient } from '../infra/clients/postgres.client';
+import type { PostgresClient } from '@velchat/database';
 
 export interface AuthModuleDeps {
   config: AppConfig;

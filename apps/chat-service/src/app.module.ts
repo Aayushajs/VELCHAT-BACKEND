@@ -8,8 +8,8 @@ import {
   type ManagedResource,
 } from '@velchat/shared-utils';
 import { createEventBus } from '@velchat/event-bus';
-import { MongoClient } from './infra/clients/mongo.client';
-import { ValkeyClient } from './infra/clients/valkey.client';
+import { MongoClient } from '@velchat/database';
+import { ValkeyClient } from '@velchat/cache';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const MONGO_CLIENT = Symbol('MONGO_CLIENT');

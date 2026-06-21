@@ -20,6 +20,7 @@
     "@nestjs/platform-express": "^10.4.15",
     "@nestjs/swagger": "^7.4.2",
     "@velchat/config": "workspace:*",
+    "@velchat/database": "workspace:*",
     "@velchat/event-bus": "workspace:*",
     "@velchat/shared-types": "workspace:*",
     "@velchat/shared-utils": "workspace:*",

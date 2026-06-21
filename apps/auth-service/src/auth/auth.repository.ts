@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { uuidv7 } from '@velchat/shared-utils';
-import type { PostgresClient } from '../infra/clients/postgres.client';
+import type { PostgresClient } from '@velchat/database';
 import type { RefreshRecord, RefreshStore } from './token.service';
 
 export interface DeviceRow {

@@ -8,8 +8,8 @@ import {
   type ManagedResource,
 } from '@velchat/shared-utils';
 import { createEventBus } from '@velchat/event-bus';
-import { PostgresClient } from './infra/clients/postgres.client';
-import { ValkeyClient } from './infra/clients/valkey.client';
+import { PostgresClient } from '@velchat/database';
+import { ValkeyClient } from '@velchat/cache';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const PG_CLIENT = Symbol('PG_CLIENT');

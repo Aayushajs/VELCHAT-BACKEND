@@ -1,7 +1,8 @@
 {
-  "name": "@velchat/storage",
+  "name": "@velchat/database",
   "version": "0.1.0",
   "private": true,
+  "description": "Shared data-store clients: Postgres (with §G6 RLS guardrail) + MongoDB. Connection + health only — each service still owns its own schema (§A10).",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -12,10 +13,12 @@
     "clean": "rimraf dist .turbo coverage"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.717.0",
-    "@aws-sdk/s3-request-presigner": "^3.717.0",
-    "@velchat/config": "workspace:*",
     "@velchat/shared-utils": "workspace:*",
-    "cloudinary": "^2.5.1"
+    "drizzle-orm": "^0.38.3",
+    "mongoose": "^8.9.5",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10"
   }
 }

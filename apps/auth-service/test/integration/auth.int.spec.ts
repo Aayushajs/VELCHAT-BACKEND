@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import pino from 'pino';
 import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainers';
-import { PostgresClient } from '../../src/infra/clients/postgres.client';
+import { PostgresClient } from '@velchat/database';
 import { AuthRepository } from '../../src/auth/auth.repository';
 import { TokenService } from '../../src/auth/token.service';
 import { loadOrGenerateKeyPair } from '../../src/auth/keys';

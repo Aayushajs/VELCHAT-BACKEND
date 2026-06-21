@@ -8,8 +8,8 @@ import {
   type ManagedResource,
 } from '@velchat/shared-utils';
 import { createEventBus } from '@velchat/event-bus';
-import { PostgresClient } from './infra/clients/postgres.client';
-import { ValkeyClient } from './infra/clients/valkey.client';
+import { PostgresClient } from '@velchat/database';
+import { ValkeyClient } from '@velchat/cache';
 import { AuthModule } from './auth/auth.module';
 
 export interface AppDeps {
@@ -20,16 +20,16 @@ export interface AppDeps {
 
 /**
  * auth-service (§B2): DAPT auth, Reverse-OTP, RS256/JWKS + rotating-refresh tokens, device/key
- * directory. Identity = account_id (UUIDv7); phone/email are re-verifiable identifiers.
+ * directory. Shared infra clients come from @velchat/database + @velchat/cache (no per-service copy).
  */
 @Module({})
 export class AppModule {
   static forRoot(deps: AppDeps): DynamicModule {
     const managed: ManagedResource[] = [];
-    const imports = [];
+    const imports: DynamicModule[] = [];
 
-    // auth needs Postgres + Valkey; only wire the AuthModule when both are configured so the
-    // service still answers /health without infra (e.g. a bare container probe).
+    // auth needs Postgres + Valkey; only wire AuthModule when both are configured so the service
+    // still answers /health without infra.
     if (deps.config.POSTGRES_URL && deps.config.VALKEY_URL) {
       const pg = new PostgresClient(
         requirePostgresUrl(deps.config),

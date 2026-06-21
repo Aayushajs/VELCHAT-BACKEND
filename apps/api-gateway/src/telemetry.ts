@@ -11,7 +11,7 @@ function parseHeaders(raw: string | undefined): Record<string, string> {
   return out;
 }
 
-startTelemetry({
+void startTelemetry({
   serviceName: process.env.SERVICE_NAME ?? 'unknown-service',
   serviceVersion: process.env.SERVICE_VERSION ?? '0.0.0',
   otlpEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,

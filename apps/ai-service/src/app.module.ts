@@ -8,7 +8,7 @@ import {
   type ManagedResource,
 } from '@velchat/shared-utils';
 import { createEventBus } from '@velchat/event-bus';
-import { ValkeyClient } from './infra/clients/valkey.client';
+import { ValkeyClient } from '@velchat/cache';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const VALKEY_CLIENT = Symbol('VALKEY_CLIENT');

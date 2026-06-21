@@ -10,6 +10,7 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
+    "setup": "pnpm install && pnpm build",
     "build": "turbo run build",
     "build:libs": "turbo run build --filter=\"./libs/*\"",
     "build:services": "turbo run build --filter=\"./apps/*\"",

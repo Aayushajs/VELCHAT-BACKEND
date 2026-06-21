@@ -1,7 +1,7 @@
 import mongoose, { type Connection } from 'mongoose';
-import type { Logger } from 'pino';
-import type { ManagedResource } from '@velchat/shared-utils';
+import type { Logger, ManagedResource } from '@velchat/shared-utils';
 
+/** MongoDB connection + health (chat documents). Shared; each service owns its own collections. */
 export class MongoClient implements ManagedResource {
   readonly name = 'mongo';
   private conn?: Connection;

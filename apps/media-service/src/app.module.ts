@@ -9,7 +9,7 @@ import {
 } from '@velchat/shared-utils';
 import { createEventBus } from '@velchat/event-bus';
 import { createStorage } from '@velchat/storage';
-import { PostgresClient } from './infra/clients/postgres.client';
+import { PostgresClient } from '@velchat/database';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const PG_CLIENT = Symbol('PG_CLIENT');
