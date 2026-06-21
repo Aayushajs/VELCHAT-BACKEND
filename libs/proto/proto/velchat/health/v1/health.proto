@@ -4,14 +4,14 @@ package velchat.health.v1;
 
 // gRPC health/readiness contract, mirrored by the HTTP /health and /ready endpoints.
 service HealthService {
-  rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
+  rpc Check(CheckRequest) returns (CheckResponse);
 }
 
-message HealthCheckRequest {
+message CheckRequest {
   string service = 1;
 }
 
-message HealthCheckResponse {
+message CheckResponse {
   ServingStatus status = 1;
 
   enum ServingStatus {
