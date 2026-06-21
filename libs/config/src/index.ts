@@ -1,3 +1,7 @@
+// Load a local `.env` in development. No-op when the file is absent (prod/K8s/Render inject env via
+// the platform / Sealed Secrets). dotenv never overrides already-set process.env, so cross-env and
+// platform values always win over the file.
+import 'dotenv/config';
 import { z } from 'zod';
 
 /**

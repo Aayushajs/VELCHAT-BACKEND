@@ -64,17 +64,38 @@ Write-Host "===============================================" -ForegroundColor Cy
 Write-Host "Press Ctrl+C to stop all. Keep this window open." -ForegroundColor Gray
 Write-Host ""
 
+# Cleanup that actually kills the service processes. Start-Job spawns pnpm→node grandchildren that
+# orphan on Ctrl+C, so the reliable kill is BY LISTENING PORT (every service + the gateway), plus
+# the jobs and a command-line sweep as a backstop.
+$ports = @($services | ForEach-Object { $_.http }) + 8080
+function Stop-All {
+  Write-Host "`nStopping all services..." -ForegroundColor Yellow
+  $jobs | Stop-Job -ErrorAction SilentlyContinue
+  $jobs | Remove-Job -Force -ErrorAction SilentlyContinue
+  foreach ($p in $ports) {
+    try {
+      Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty OwningProcess -Unique |
+        ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
+    } catch { }
+  }
+  Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -match 'dist\\main\.js|dev-gateway\.mjs' } |
+    ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch { } }
+  Write-Host "Stopped." -ForegroundColor Green
+}
+
+# Ctrl+C → run cleanup then exit (trap fires even if `finally` is skipped).
+trap {
+  Stop-All
+  break
+}
+
 try {
   while ($true) {
     Start-Sleep -Seconds 5
     foreach ($j in $jobs) { if ($j.State -eq 'Failed') { Write-Host ("job {0} failed" -f $j.Name) -ForegroundColor Yellow } }
   }
 } finally {
-  Write-Host "`nStopping all services..." -ForegroundColor Yellow
-  $jobs | Stop-Job -ErrorAction SilentlyContinue
-  $jobs | Remove-Job -Force -ErrorAction SilentlyContinue
-  Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
-    Where-Object { $_.CommandLine -match 'dist\\main\.js|dev-gateway\.mjs' } |
-    ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {} }
-  Write-Host "Stopped." -ForegroundColor Green
+  Stop-All
 }
