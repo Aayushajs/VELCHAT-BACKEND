@@ -126,8 +126,8 @@ function killChild(child) {
 function killByPorts() {
   const portSet = new Set([...services.map((s) => s.http), GATEWAY_PORT].map(Number));
   if (process.platform === 'win32') {
-    // netstat → PIDs listening on our ports → taskkill /F (no slow PowerShell cmdlets).
-    const res = spawnSync('netstat', ['-ano'], { encoding: 'utf8' });
+    // netstat → PIDs listening on our ports → one taskkill /F for all (no slow PowerShell cmdlets).
+    const res = spawnSync('netstat', ['-ano'], { encoding: 'utf8', timeout: 8000 });
     const pids = new Set();
     for (const raw of (res.stdout ?? '').split('\n')) {
       const f = raw.trim().split(/\s+/);
@@ -135,9 +135,12 @@ function killByPorts() {
         pids.add(f[4]);
       }
     }
-    for (const pid of pids) {
+    if (pids.size > 0) {
+      const args = ['/F'];
+      for (const pid of pids) args.push('/PID', pid);
+      // One call for all PIDs; hard timeout so a wedged process can never hang startup.
       try {
-        spawnSync('taskkill', ['/F', '/PID', pid], { stdio: 'ignore' });
+        spawnSync('taskkill', args, { stdio: 'ignore', timeout: 8000 });
       } catch {
         /* best effort */
       }
@@ -173,10 +176,10 @@ async function main() {
   );
 
   // Pre-clean: a previous run may still hold these ports → kill it first, then start fresh
-  // (avoids EADDRINUSE). Wait until the gateway port is actually free before spawning.
+  // (avoids EADDRINUSE). killByPorts is bounded (hard timeout) so this never hangs.
   process.stdout.write(color('  cleaning up any previous run...\n', C.gray));
   killByPorts();
-  for (let i = 0; i < 20 && (await httpOk(GATEWAY_PORT, '/health', 500)); i += 1) await sleep(300);
+  await sleep(1000); // let the OS release the ports
 
   services.forEach((s, i) =>
     start(
