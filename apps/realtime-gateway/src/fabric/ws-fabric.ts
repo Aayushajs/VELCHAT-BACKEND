@@ -7,6 +7,7 @@ import type { Logger } from '@velchat/common';
 import { ConnectionRegistry } from './connection-registry';
 import { SendQueue, type Frame } from './send-queue';
 import type { InboundSink } from '../fanout/receipt-publisher';
+import type { SkdmService, SkdmTarget } from '../fanout/skdm.service';
 
 interface SocketCtx {
   connId: string;
@@ -30,6 +31,8 @@ export interface WsFabricOptions {
   heartbeatMs?: number;
   /** Sink for inbound delivered/read receipts (§B4.4); omitted in dev when there is no bus. */
   sink?: InboundSink;
+  /** Sender-key distribution relay (§G1-2); omitted in dev when there is no bus. */
+  skdm?: SkdmService;
 }
 
 /**
@@ -97,6 +100,9 @@ export class WsFabric {
     });
 
     this.write(ctx, { kind: 'durable', type: 'connected', data: { connId: ctx.connId } });
+
+    // Replay any sender-key messages queued while this device was offline (§G1-2).
+    void this.opts.skdm?.flushOnConnect(ctx.userId, ctx.deviceId);
   }
 
   /** §B9.3 inbound: typing / read-ack / sync. (Routed to chat/presence services off this in P2c/P7.) */
@@ -124,6 +130,23 @@ export class WsFabric {
         if (!conv || seq === null || !this.opts.sink) break;
         const op = msg.type === 'read' ? this.opts.sink.read : this.opts.sink.delivered;
         await op.call(this.opts.sink, ctx.userId, conv, seq);
+        break;
+      }
+      case 'skdm': {
+        // §G1-2: a member distributes the group's epoch sender key (ciphertext per recipient device).
+        const conv = typeof msg.conversationId === 'string' ? msg.conversationId : null;
+        const epoch = typeof msg.epoch === 'number' ? msg.epoch : null;
+        const targets = Array.isArray(msg.targets) ? (msg.targets as SkdmTarget[]) : null;
+        if (!conv || epoch === null || !targets || !this.opts.skdm) break;
+        await this.opts.skdm.distribute(conv, epoch, ctx.userId, targets);
+        break;
+      }
+      case 'skdm-request': {
+        // §G1-2: this device can't decrypt the epoch → ask the other members to re-send the SKDM.
+        const conv = typeof msg.conversationId === 'string' ? msg.conversationId : null;
+        const epoch = typeof msg.epoch === 'number' ? msg.epoch : null;
+        if (!conv || epoch === null || !this.opts.skdm) break;
+        await this.opts.skdm.request(conv, epoch, ctx.userId, ctx.deviceId);
         break;
       }
       // 'typing' fan-out wired in P7 (presence).

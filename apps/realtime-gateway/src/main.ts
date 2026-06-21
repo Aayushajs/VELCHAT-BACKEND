@@ -13,6 +13,8 @@ import { MembershipProjection } from './fanout/membership-projection';
 import { ValkeyPodPublisher } from './fanout/valkey-pod-publisher';
 import { FanoutConsumer } from './fanout/fanout-consumer';
 import { ReceiptPublisher } from './fanout/receipt-publisher';
+import { SkdmStore } from './fanout/skdm-store';
+import { SkdmService } from './fanout/skdm.service';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -29,19 +31,22 @@ async function main(): Promise<void> {
     await valkey.connect();
     const registry = new ConnectionRegistry(valkey.redis);
     const bus = app.get<EventBus>(EVENT_BUS, { strict: false });
+    const router = new EventRouter(registry, new ValkeyPodPublisher(valkey.redis));
+    const projection = new MembershipProjection(valkey.redis);
+    // Sender-key distribution relay (§G1-2) — Valkey-backed, independent of the event bus.
+    const skdm = new SkdmService(new SkdmStore(valkey.redis), router, projection, logger);
 
     const fabric = new WsFabric(app.getHttpServer(), valkey.redis, registry, logger, {
       podId: process.env.POD_ID ?? hostname(),
       jwtPublicKey: process.env.JWT_PUBLIC_KEY,
       // Inbound delivered/read acks → durable receipt events (§B4.4).
       sink: bus ? new ReceiptPublisher(bus) : undefined,
+      skdm,
     });
     await fabric.start();
 
     // §B9.2 fan-out: consume durable events → resolve members → push to online sockets.
     if (bus) {
-      const router = new EventRouter(registry, new ValkeyPodPublisher(valkey.redis));
-      const projection = new MembershipProjection(valkey.redis);
       const fanout = new FanoutConsumer(bus, projection, router, logger);
       fanout.register();
       await bus.start();
