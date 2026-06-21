@@ -33,6 +33,13 @@ export interface IdentifierChangedPayload {
   changed_at: Iso8601;
 }
 
+/** Emitted whenever the account's device list changes (§G1-3) so senders re-fetch + re-fan-out. */
+export interface DeviceListChangedPayload {
+  account_id: AccountId;
+  epoch: number;
+  changed_at: Iso8601;
+}
+
 export interface ConversationCreatedPayload {
   conversation_id: ConversationId;
   type: 'dm' | 'group' | 'channel' | 'broadcast' | 'community';
@@ -78,6 +85,7 @@ export interface PresenceChangedPayload {
 export interface EventPayloads {
   'user.created': UserCreatedPayload;
   'device.added': DeviceAddedPayload;
+  'device.list.changed': DeviceListChangedPayload;
   'identifier.changed': IdentifierChangedPayload;
   'conversation.created': ConversationCreatedPayload;
   'channel.member.added': ChannelMemberPayload;

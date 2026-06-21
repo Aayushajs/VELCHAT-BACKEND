@@ -3,6 +3,7 @@ import type { EventBus } from '@velchat/event-bus';
 import type {
   UserCreatedPayload,
   DeviceAddedPayload,
+  DeviceListChangedPayload,
   IdentifierChangedPayload,
 } from '@velchat/shared-types';
 
@@ -36,6 +37,19 @@ export class AuthEvents {
         producer: 'auth-service',
         tenantId: null,
         payload: { account_id: accountId, device_id: deviceId, trusted },
+      }),
+    );
+  }
+
+  async deviceListChanged(accountId: string, epoch: number): Promise<void> {
+    await this.bus.publish<DeviceListChangedPayload>(
+      'device.list.changed',
+      buildEnvelope({
+        eventType: 'device.list.changed',
+        key: accountId,
+        producer: 'auth-service',
+        tenantId: null,
+        payload: { account_id: accountId, epoch, changed_at: new Date().toISOString() },
       }),
     );
   }
