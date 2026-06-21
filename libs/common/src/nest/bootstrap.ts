@@ -33,12 +33,27 @@ export async function bootstrapService(
   const { DocumentBuilder, SwaggerModule } = await import('@nestjs/swagger');
   const openapi = new DocumentBuilder()
     .setTitle(`VelChat — ${opts.config.SERVICE_NAME}`)
-    .setDescription(`API documentation for ${opts.config.SERVICE_NAME}.`)
+    .setDescription(
+      [
+        `REST API for the VelChat **${opts.config.SERVICE_NAME}**.`,
+        '',
+        'A free, self-hostable WhatsApp + Teams + Slack hybrid. Personal content is E2EE (the',
+        'server stores only ciphertext); enterprise/workspace content is server-readable.',
+        '',
+        'Auth: send `Authorization: Bearer <access JWT>` (DAPT, device-bound).',
+        'Index of every service: http://localhost:8080/docs',
+      ].join('\n'),
+    )
     .setVersion(opts.config.SERVICE_VERSION)
-    .addBearerAuth()
+    .setLicense('AGPL-3.0 / OSS', 'https://www.gnu.org/licenses/agpl-3.0.html')
+    .addServer(`http://localhost:${opts.config.HTTP_PORT}`, 'direct (this service)')
+    .addServer('http://localhost:8080', 'dev gateway (unified)')
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
     .build();
   SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, openapi), {
     jsonDocumentUrl: 'docs-json',
+    customSiteTitle: `VelChat ${opts.config.SERVICE_NAME} API`,
+    swaggerOptions: { persistAuthorization: true, displayRequestDuration: true },
   });
 
   // Graceful drain: stop accepting, let in-flight finish, flush telemetry (§B9).

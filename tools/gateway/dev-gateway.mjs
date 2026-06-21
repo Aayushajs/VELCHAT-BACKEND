@@ -17,6 +17,8 @@ import httpProxy from 'http-proxy';
 const here = dirname(fileURLToPath(import.meta.url));
 const services = JSON.parse(readFileSync(join(here, 'services.json'), 'utf8'));
 const PORT = Number(process.env.GATEWAY_PORT ?? 8080);
+// Per-request logging floods the terminal; off by default, on with GATEWAY_VERBOSE=1 / --verbose.
+const VERBOSE = process.env.GATEWAY_VERBOSE === '1' || process.argv.includes('--verbose');
 
 const routeTable = [];
 let defaultTarget = null;
@@ -29,9 +31,12 @@ routeTable.sort((a, b) => b.prefix.length - a.prefix.length); // longest prefix 
 
 function match(url) {
   for (const r of routeTable) {
-    if (url === r.prefix || url.startsWith(`${r.prefix}/`) || url.startsWith(`${r.prefix}?`)) return r;
+    if (url === r.prefix || url.startsWith(`${r.prefix}/`) || url.startsWith(`${r.prefix}?`))
+      return r;
   }
-  return defaultTarget ? { prefix: '/', target: defaultTarget, ws: false, name: 'api-gateway' } : null;
+  return defaultTarget
+    ? { prefix: '/', target: defaultTarget, ws: false, name: 'api-gateway' }
+    : null;
 }
 
 const proxy = httpProxy.createProxyServer({ changeOrigin: true, ws: true });
@@ -60,18 +65,26 @@ const server = http.createServer((req, res) => {
     res.end();
     return;
   }
-  if (req.url === '/health' || req.url === '/') {
+  if (req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'ok', gateway: 'velchat-dev', routes: routeTable.length }));
+    return;
+  }
+  // One place to reach every service's Swagger UI (each service serves its own at /docs).
+  if (req.url === '/docs' || req.url === '/' || req.url === '/docs/') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(docsIndexHtml());
     return;
   }
   const r = match(req.url);
   if (!r) {
     res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Not Found', message: 'No service route matched', path: req.url }));
+    res.end(
+      JSON.stringify({ error: 'Not Found', message: 'No service route matched', path: req.url }),
+    );
     return;
   }
-  console.log(`${req.method} ${req.url} → ${r.name} (${r.target})`);
+  if (VERBOSE) console.log(`${req.method} ${req.url} → ${r.name} (${r.target})`);
   proxy.web(req, res, { target: r.target });
 });
 
@@ -84,6 +97,56 @@ server.on('upgrade', (req, socket, head) => {
   }
   proxy.ws(req, socket, head, { target });
 });
+
+/** A single index linking to every service's own Swagger UI + OpenAPI JSON. */
+function docsIndexHtml() {
+  const cards = services
+    .map((s) => {
+      const base = `http://localhost:${s.http}`;
+      const routes = s.routes.length ? s.routes.join(' ') : '(internal)';
+      return `<li>
+        <div class="svc">
+          <span class="name">${s.name}</span>
+          <span class="port">:${s.http}</span>
+        </div>
+        <div class="routes">${routes}</div>
+        <div class="links">
+          <a href="${base}/docs" target="_blank" rel="noreferrer">Swagger UI →</a>
+          <a class="ghost" href="${base}/docs-json" target="_blank" rel="noreferrer">OpenAPI JSON</a>
+        </div>
+      </li>`;
+    })
+    .join('\n');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VelChat — API docs</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    background: #0b0f17; color: #e6edf3; padding: 40px 20px; }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; font-size: 26px; }
+  p.sub { margin: 0 0 28px; color: #8b97a7; }
+  ul { list-style: none; padding: 0; margin: 0; display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  li { background: #131a26; border: 1px solid #1f2937; border-radius: 12px; padding: 16px 18px; }
+  .svc { display: flex; align-items: baseline; justify-content: space-between; }
+  .name { font-weight: 600; font-size: 15px; }
+  .port { color: #6b7689; font-size: 13px; }
+  .routes { color: #7d8aa0; font-size: 12px; margin: 6px 0 14px; word-break: break-word; }
+  .links a { display: inline-block; text-decoration: none; font-size: 13px; font-weight: 600;
+    background: #2563eb; color: #fff; padding: 7px 12px; border-radius: 8px; margin-right: 8px; }
+  .links a.ghost { background: transparent; color: #8ab4ff; padding-left: 0; }
+  footer { margin-top: 28px; color: #6b7689; font-size: 13px; }
+  code { background: #1f2937; padding: 1px 6px; border-radius: 5px; }
+</style></head><body><div class="wrap">
+  <h1>VelChat — API documentation</h1>
+  <p class="sub">Unified gateway on <code>http://localhost:${PORT}</code>. Each service publishes its own Swagger UI — open one below.</p>
+  <ul>${cards}</ul>
+  <footer>Routed via the dev gateway · ${routeTable.length} path prefixes · start with <code>pnpm start:all</code></footer>
+</div></body></html>`;
+}
 
 server.listen(PORT, () => {
   console.log(`\n  VelChat dev gateway → http://localhost:${PORT}\n`);
