@@ -122,15 +122,39 @@ function killChild(child) {
   }
 }
 
-/** Windows backstop: kill anything still listening on our ports (catches orphaned grandchildren). */
+/** Kill anything listening on our ports — used both to pre-clean a stale run and on shutdown. */
 function killByPorts() {
-  if (process.platform !== 'win32') return;
-  const ports = [...services.map((s) => s.http), GATEWAY_PORT].join(',');
-  const ps = `$ports=@(${ports}); foreach($p in $ports){ Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue } }`;
-  try {
-    spawnSync('powershell', ['-NoProfile', '-Command', ps], { stdio: 'ignore' });
-  } catch {
-    /* best effort */
+  const portSet = new Set([...services.map((s) => s.http), GATEWAY_PORT].map(Number));
+  if (process.platform === 'win32') {
+    // netstat → PIDs listening on our ports → one taskkill /F for all (no slow PowerShell cmdlets).
+    const res = spawnSync('netstat', ['-ano'], { encoding: 'utf8', timeout: 8000 });
+    const pids = new Set();
+    for (const raw of (res.stdout ?? '').split('\n')) {
+      const f = raw.trim().split(/\s+/);
+      if (f.length >= 5 && f[3] === 'LISTENING' && portSet.has(Number(f[1].split(':').pop()))) {
+        pids.add(f[4]);
+      }
+    }
+    if (pids.size > 0) {
+      const args = ['/F'];
+      for (const pid of pids) args.push('/PID', pid);
+      // One call for all PIDs; hard timeout so a wedged process can never hang startup.
+      try {
+        spawnSync('taskkill', args, { stdio: 'ignore', timeout: 8000 });
+      } catch {
+        /* best effort */
+      }
+    }
+  } else {
+    // POSIX best-effort: free each port via lsof if available.
+    const ports = [...portSet].join(' ');
+    try {
+      spawnSync('sh', ['-c', `for p in ${ports}; do lsof -ti tcp:$p | xargs -r kill -9; done`], {
+        stdio: 'ignore',
+      });
+    } catch {
+      /* best effort */
+    }
   }
 }
 
@@ -150,6 +174,12 @@ async function main() {
   process.stdout.write(
     color('\nVelChat - starting backend services + gateway...\n\n', C.cyan + C.bold),
   );
+
+  // Pre-clean: a previous run may still hold these ports → kill it first, then start fresh
+  // (avoids EADDRINUSE). killByPorts is bounded (hard timeout) so this never hangs.
+  process.stdout.write(color('  cleaning up any previous run...\n', C.gray));
+  killByPorts();
+  await sleep(1000); // let the OS release the ports
 
   services.forEach((s, i) =>
     start(
