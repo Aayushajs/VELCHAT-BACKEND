@@ -16,9 +16,10 @@ interface SocketCtx {
   alive: boolean;
 }
 
-/** What a pod publishes to `pod:{podId}` to deliver a frame to a specific user's sockets. */
+/** What a pod publishes to `pod:{podId}` to deliver a frame. `deviceId` (optional) targets one device. */
 interface PodEnvelope {
   userId: string;
+  deviceId?: string;
   frame: Frame;
 }
 
@@ -145,7 +146,9 @@ export class WsFabric {
       return;
     }
     for (const { ctx } of this.sockets.values()) {
-      if (ctx.userId === env.userId) this.write(ctx, env.frame);
+      if (ctx.userId !== env.userId) continue;
+      if (env.deviceId && ctx.deviceId !== env.deviceId) continue; // per-device target (§B5.3/§G1-2)
+      this.write(ctx, env.frame);
     }
   }
 
