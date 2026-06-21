@@ -6,6 +6,7 @@ import type { Redis } from 'ioredis';
 import type { Logger } from '@velchat/common';
 import { ConnectionRegistry } from './connection-registry';
 import { SendQueue, type Frame } from './send-queue';
+import type { InboundSink } from '../fanout/receipt-publisher';
 
 interface SocketCtx {
   connId: string;
@@ -26,6 +27,8 @@ export interface WsFabricOptions {
   /** RS256 public key (JWKS) to verify access tokens; decode-only when absent (dev). */
   jwtPublicKey?: string;
   heartbeatMs?: number;
+  /** Sink for inbound delivered/read receipts (§B4.4); omitted in dev when there is no bus. */
+  sink?: InboundSink;
 }
 
 /**
@@ -112,7 +115,17 @@ export class WsFabric {
         // Reconnect (C16): client sends last cursor → directs it to backfill missed via chat history.
         this.write(ctx, { kind: 'durable', type: 'sync', data: { cursor: msg.cursor ?? null } });
         break;
-      // 'typing' / 'read' produce events to the bus — wired in P2c.
+      case 'delivered':
+      case 'read': {
+        // §B4.4 compact receipt: covers every message at or below `seq`. Server-truth, not client-trusted.
+        const conv = typeof msg.conversationId === 'string' ? msg.conversationId : null;
+        const seq = typeof msg.seq === 'number' ? msg.seq : null;
+        if (!conv || seq === null || !this.opts.sink) break;
+        const op = msg.type === 'read' ? this.opts.sink.read : this.opts.sink.delivered;
+        await op.call(this.opts.sink, ctx.userId, conv, seq);
+        break;
+      }
+      // 'typing' fan-out wired in P7 (presence).
       default:
         break;
     }
