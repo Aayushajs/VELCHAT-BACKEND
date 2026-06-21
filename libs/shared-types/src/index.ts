@@ -58,6 +58,16 @@ export interface MessageSentPayload {
   sent_at: Iso8601;
 }
 
+/** Compact receipt covering every message up to `up_to_seq` (§B4.4). */
+export interface MessageReceiptPayload {
+  conversation_id: ConversationId;
+  up_to_seq: number;
+  /** The recipient who acknowledged (delivered/read). */
+  user_id: AccountId;
+  state: 'delivered' | 'read';
+  at: Iso8601;
+}
+
 export interface PresenceChangedPayload {
   account_id: AccountId;
   status: 'online' | 'offline' | 'away';
@@ -73,6 +83,8 @@ export interface EventPayloads {
   'channel.member.added': ChannelMemberPayload;
   'channel.member.removed': ChannelMemberPayload;
   'message.sent': MessageSentPayload;
+  'message.delivered': MessageReceiptPayload;
+  'message.read': MessageReceiptPayload;
   'presence.changed': PresenceChangedPayload;
 }
 

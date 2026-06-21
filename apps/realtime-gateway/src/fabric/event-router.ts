@@ -1,13 +1,20 @@
 import type { ConnectionRegistry } from './connection-registry';
 
+/** Delivered to a pod's `pod:{podId}` channel; the owning pod writes the frame to that user's sockets. */
+export interface PodEnvelope {
+  userId: string;
+  frame: unknown;
+}
+
 export interface PodPublisher {
-  /** Publish a frame to the Valkey channel `pod:{podId}`; the owning pod writes it to the socket. */
-  publishToPod(podId: string, frame: unknown): Promise<void>;
+  /** Publish to the Valkey channel `pod:{podId}`; the owning pod writes `frame` to `userId`'s sockets. */
+  publishToPod(podId: string, envelope: PodEnvelope): Promise<void>;
 }
 
 /**
- * §B9.2 delivery: for each recipient, look up the pods holding their sockets and publish the frame
- * to each pod's channel. Cross-pod via Valkey pub/sub (low latency); Kafka remains the durable source.
+ * §B9.2 delivery: for each recipient, look up the pods holding their sockets and publish a
+ * {userId, frame} envelope to each pod's channel. Cross-pod via Valkey pub/sub (low latency);
+ * the event bus remains the durable source, so a missed live push is re-synced by cursor (§G4).
  */
 export class EventRouter {
   constructor(
@@ -21,7 +28,7 @@ export class EventRouter {
     for (const userId of recipientUserIds) {
       const pods = await this.registry.podsFor(userId);
       for (const podId of pods) {
-        await this.pub.publishToPod(podId, frame);
+        await this.pub.publishToPod(podId, { userId, frame });
         deliveries += 1;
       }
     }
