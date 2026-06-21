@@ -1,6 +1,6 @@
 import { createPublicKey, randomBytes, verify } from 'node:crypto';
 import type { Redis } from 'ioredis';
-import { UnauthorizedError } from '@velchat/shared-utils';
+import { UnauthorizedError } from '@velchat/common';
 
 /**
  * Device-key challenge login (§B2.5 — same device, no OTP). The server issues a nonce; the client

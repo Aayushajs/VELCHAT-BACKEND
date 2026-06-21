@@ -1,6 +1,6 @@
 import { createPublicKey, randomBytes, verify } from 'node:crypto';
 import type { Redis } from 'ioredis';
-import { UnauthorizedError, NotFoundError } from '@velchat/shared-utils';
+import { UnauthorizedError, NotFoundError } from '@velchat/common';
 
 export interface LinkRequest {
   newDevicePubkeyDer: string;

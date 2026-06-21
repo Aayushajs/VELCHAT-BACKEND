@@ -13,7 +13,7 @@ Production-grade, multi-tenant, real-time, end-to-end encrypted (personal).
 ```
 apps/         13 NestJS microservices (api-gateway, realtime-gateway, auth, user, chat,
               group-channel, presence, notification, media, search, call, automation, ai)
-libs/         config · shared-utils · shared-types · proto · crypto · event-bus · storage · search
+libs/         config · common · shared-types · proto · crypto · event-bus · storage · search
 migrations/   @velchat/migrations — SQL migrations + forward-only runner
 docker/       compose.yml (local infra) + <service>.Dockerfile per service
 deploy/       helm/ · argocd/ · k8s/   (GitOps self-host path; no secrets)

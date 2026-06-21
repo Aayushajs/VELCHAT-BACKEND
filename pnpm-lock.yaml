@@ -80,6 +80,9 @@ importers:
       '@velchat/cache':
         specifier: workspace:*
         version: link:../../libs/cache
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../../libs/common
       '@velchat/config':
         specifier: workspace:*
         version: link:../../libs/config
@@ -89,9 +92,6 @@ importers:
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
-      '@velchat/shared-utils':
-        specifier: workspace:*
-        version: link:../../libs/shared-utils
       axios:
         specifier: ^1.7.9
         version: 1.18.0
@@ -134,6 +134,9 @@ importers:
       '@nestjs/swagger':
         specifier: ^7.4.2
         version: 7.4.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../../libs/common
       '@velchat/config':
         specifier: workspace:*
         version: link:../../libs/config
@@ -143,9 +146,6 @@ importers:
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
-      '@velchat/shared-utils':
-        specifier: workspace:*
-        version: link:../../libs/shared-utils
       axios:
         specifier: ^1.7.9
         version: 1.18.0
@@ -191,6 +191,9 @@ importers:
       '@velchat/cache':
         specifier: workspace:*
         version: link:../../libs/cache
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../../libs/common
       '@velchat/config':
         specifier: workspace:*
         version: link:../../libs/config
@@ -206,9 +209,6 @@ importers:
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
-      '@velchat/shared-utils':
-        specifier: workspace:*
-        version: link:../../libs/shared-utils
       axios:
         specifier: ^1.7.9
         version: 1.18.0
@@ -279,6 +279,9 @@ importers:
       '@nestjs/swagger':
         specifier: ^7.4.2
         version: 7.4.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../../libs/common
       '@velchat/config':
         specifier: workspace:*
         version: link:../../libs/config
@@ -291,9 +294,6 @@ importers:
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
-      '@velchat/shared-utils':
-        specifier: workspace:*
-        version: link:../../libs/shared-utils
       axios:
         specifier: ^1.7.9
         version: 1.18.0
@@ -343,6 +343,9 @@ importers:
       '@nestjs/swagger':
         specifier: ^7.4.2
         version: 7.4.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../../libs/common
       '@velchat/config':
         specifier: workspace:*
         version: link:../../libs/config
@@ -355,9 +358,6 @@ importers:
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
-      '@velchat/shared-utils':
-        specifier: workspace:*
-        version: link:../../libs/shared-utils
       axios:
         specifier: ^1.7.9
         version: 1.18.0
@@ -410,6 +410,9 @@ importers:
       '@velchat/cache':
         specifier: workspace:*
         version: link:../../libs/cache
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../../libs/common
       '@velchat/config':
         specifier: workspace:*
         version: link:../../libs/config
@@ -422,9 +425,6 @@ importers:
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
-      '@velchat/shared-utils':
-        specifier: workspace:*
-        version: link:../../libs/shared-utils
       axios:
         specifier: ^1.7.9
         version: 1.18.0
@@ -470,6 +470,9 @@ importers:
       '@nestjs/swagger':
         specifier: ^7.4.2
         version: 7.4.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../../libs/common
       '@velchat/config':
         specifier: workspace:*
         version: link:../../libs/config
@@ -482,9 +485,6 @@ importers:
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
-      '@velchat/shared-utils':
-        specifier: workspace:*
-        version: link:../../libs/shared-utils
       axios:
         specifier: ^1.7.9
         version: 1.18.0
@@ -534,6 +534,9 @@ importers:
       '@nestjs/swagger':
         specifier: ^7.4.2
         version: 7.4.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../../libs/common
       '@velchat/config':
         specifier: workspace:*
         version: link:../../libs/config
@@ -546,9 +549,6 @@ importers:
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
-      '@velchat/shared-utils':
-        specifier: workspace:*
-        version: link:../../libs/shared-utils
       '@velchat/storage':
         specifier: workspace:*
         version: link:../../libs/storage
@@ -607,6 +607,9 @@ importers:
       '@nestjs/swagger':
         specifier: ^7.4.2
         version: 7.4.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../../libs/common
       '@velchat/config':
         specifier: workspace:*
         version: link:../../libs/config
@@ -619,9 +622,6 @@ importers:
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
-      '@velchat/shared-utils':
-        specifier: workspace:*
-        version: link:../../libs/shared-utils
       axios:
         specifier: ^1.7.9
         version: 1.18.0
@@ -674,6 +674,9 @@ importers:
       '@velchat/cache':
         specifier: workspace:*
         version: link:../../libs/cache
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../../libs/common
       '@velchat/config':
         specifier: workspace:*
         version: link:../../libs/config
@@ -683,9 +686,6 @@ importers:
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
-      '@velchat/shared-utils':
-        specifier: workspace:*
-        version: link:../../libs/shared-utils
       axios:
         specifier: ^1.7.9
         version: 1.18.0
@@ -731,6 +731,9 @@ importers:
       '@velchat/cache':
         specifier: workspace:*
         version: link:../../libs/cache
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../../libs/common
       '@velchat/config':
         specifier: workspace:*
         version: link:../../libs/config
@@ -740,9 +743,6 @@ importers:
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
-      '@velchat/shared-utils':
-        specifier: workspace:*
-        version: link:../../libs/shared-utils
       axios:
         specifier: ^1.7.9
         version: 1.18.0
@@ -785,6 +785,9 @@ importers:
       '@nestjs/swagger':
         specifier: ^7.4.2
         version: 7.4.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../../libs/common
       '@velchat/config':
         specifier: workspace:*
         version: link:../../libs/config
@@ -797,9 +800,6 @@ importers:
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
-      '@velchat/shared-utils':
-        specifier: workspace:*
-        version: link:../../libs/shared-utils
       axios:
         specifier: ^1.7.9
         version: 1.18.0
@@ -842,6 +842,9 @@ importers:
       '@velchat/cache':
         specifier: workspace:*
         version: link:../../libs/cache
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../../libs/common
       '@velchat/config':
         specifier: workspace:*
         version: link:../../libs/config
@@ -854,9 +857,6 @@ importers:
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
-      '@velchat/shared-utils':
-        specifier: workspace:*
-        version: link:../../libs/shared-utils
       axios:
         specifier: ^1.7.9
         version: 1.18.0
@@ -891,113 +891,14 @@ importers:
 
   libs/cache:
     dependencies:
-      '@velchat/shared-utils':
+      '@velchat/common':
         specifier: workspace:*
-        version: link:../shared-utils
+        version: link:../common
       ioredis:
         specifier: ^5.4.2
         version: 5.11.1
 
-  libs/config:
-    dependencies:
-      dotenv:
-        specifier: ^16.4.7
-        version: 16.6.1
-      zod:
-        specifier: ^3.24.1
-        version: 3.25.76
-
-  libs/crypto: {}
-
-  libs/database:
-    dependencies:
-      '@velchat/shared-utils':
-        specifier: workspace:*
-        version: link:../shared-utils
-      drizzle-orm:
-        specifier: ^0.38.3
-        version: 0.38.4(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(pg@8.22.0)
-      mongoose:
-        specifier: ^8.9.5
-        version: 8.24.0
-      pg:
-        specifier: ^8.13.1
-        version: 8.22.0
-    devDependencies:
-      '@types/pg':
-        specifier: ^8.11.10
-        version: 8.20.0
-
-  libs/event-bus:
-    dependencies:
-      '@velchat/config':
-        specifier: workspace:*
-        version: link:../config
-      '@velchat/shared-utils':
-        specifier: workspace:*
-        version: link:../shared-utils
-      ioredis:
-        specifier: ^5.4.2
-        version: 5.11.1
-      kafkajs:
-        specifier: ^2.2.4
-        version: 2.2.4
-      pino:
-        specifier: ^9.6.0
-        version: 9.14.0
-
-  libs/mail:
-    dependencies:
-      '@velchat/config':
-        specifier: workspace:*
-        version: link:../config
-      '@velchat/shared-utils':
-        specifier: workspace:*
-        version: link:../shared-utils
-      nodemailer:
-        specifier: ^6.9.16
-        version: 6.10.1
-    devDependencies:
-      '@types/nodemailer':
-        specifier: ^6.4.17
-        version: 6.4.24
-
-  libs/proto: {}
-
-  libs/push:
-    dependencies:
-      '@velchat/config':
-        specifier: workspace:*
-        version: link:../config
-      '@velchat/shared-utils':
-        specifier: workspace:*
-        version: link:../shared-utils
-      web-push:
-        specifier: ^3.6.7
-        version: 3.6.7
-    devDependencies:
-      '@types/web-push':
-        specifier: ^3.6.4
-        version: 3.6.4
-
-  libs/search:
-    dependencies:
-      '@opensearch-project/opensearch':
-        specifier: ^2.13.0
-        version: 2.13.0
-      '@velchat/config':
-        specifier: workspace:*
-        version: link:../config
-      '@velchat/shared-utils':
-        specifier: workspace:*
-        version: link:../shared-utils
-      mongoose:
-        specifier: ^8.9.3
-        version: 8.24.0
-
-  libs/shared-types: {}
-
-  libs/shared-utils:
+  libs/common:
     dependencies:
       '@nestjs/common':
         specifier: ^10.4.15
@@ -1054,6 +955,105 @@ importers:
         specifier: ^11.0.5
         version: 11.1.1
 
+  libs/config:
+    dependencies:
+      dotenv:
+        specifier: ^16.4.7
+        version: 16.6.1
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+
+  libs/crypto: {}
+
+  libs/database:
+    dependencies:
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../common
+      drizzle-orm:
+        specifier: ^0.38.3
+        version: 0.38.4(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(pg@8.22.0)
+      mongoose:
+        specifier: ^8.9.5
+        version: 8.24.0
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
+
+  libs/event-bus:
+    dependencies:
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../common
+      '@velchat/config':
+        specifier: workspace:*
+        version: link:../config
+      ioredis:
+        specifier: ^5.4.2
+        version: 5.11.1
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
+      pino:
+        specifier: ^9.6.0
+        version: 9.14.0
+
+  libs/mail:
+    dependencies:
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../common
+      '@velchat/config':
+        specifier: workspace:*
+        version: link:../config
+      nodemailer:
+        specifier: ^6.9.16
+        version: 6.10.1
+    devDependencies:
+      '@types/nodemailer':
+        specifier: ^6.4.17
+        version: 6.4.24
+
+  libs/proto: {}
+
+  libs/push:
+    dependencies:
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../common
+      '@velchat/config':
+        specifier: workspace:*
+        version: link:../config
+      web-push:
+        specifier: ^3.6.7
+        version: 3.6.7
+    devDependencies:
+      '@types/web-push':
+        specifier: ^3.6.4
+        version: 3.6.4
+
+  libs/search:
+    dependencies:
+      '@opensearch-project/opensearch':
+        specifier: ^2.13.0
+        version: 2.13.0
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../common
+      '@velchat/config':
+        specifier: workspace:*
+        version: link:../config
+      mongoose:
+        specifier: ^8.9.3
+        version: 8.24.0
+
+  libs/shared-types: {}
+
   libs/storage:
     dependencies:
       '@aws-sdk/client-s3':
@@ -1062,12 +1062,12 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.717.0
         version: 3.1073.0
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../common
       '@velchat/config':
         specifier: workspace:*
         version: link:../config
-      '@velchat/shared-utils':
-        specifier: workspace:*
-        version: link:../shared-utils
       cloudinary:
         specifier: ^2.5.1
         version: 2.10.0

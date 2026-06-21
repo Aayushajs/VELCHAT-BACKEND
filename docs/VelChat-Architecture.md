@@ -1771,7 +1771,7 @@ clients/
 libs/
   proto/         # .proto contracts (source of truth)
   shared-types/  # generated TS types
-  shared-utils/  # logging, tracing, auth guards, kafka client, idempotency
+  common/  # logging, tracing, auth guards, kafka client, idempotency
   crypto/        # libsignal wrappers (shared client)
   ui/            # design system + block-kit renderer
   config/        # env schema, feature flags

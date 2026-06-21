@@ -15,7 +15,7 @@
     "@aws-sdk/client-s3": "^3.717.0",
     "@aws-sdk/s3-request-presigner": "^3.717.0",
     "@velchat/config": "workspace:*",
-    "@velchat/shared-utils": "workspace:*",
+    "@velchat/common": "workspace:*",
     "cloudinary": "^2.5.1"
   }
 }

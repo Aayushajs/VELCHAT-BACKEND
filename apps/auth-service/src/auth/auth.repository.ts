@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { uuidv7 } from '@velchat/shared-utils';
+import { uuidv7 } from '@velchat/common';
 import type { PostgresClient } from '@velchat/database';
 import type { RefreshRecord, RefreshStore } from './tokens/token.service';
 

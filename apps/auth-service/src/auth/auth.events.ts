@@ -1,4 +1,4 @@
-import { buildEnvelope } from '@velchat/shared-utils';
+import { buildEnvelope } from '@velchat/common';
 import type { EventBus } from '@velchat/event-bus';
 import type {
   UserCreatedPayload,

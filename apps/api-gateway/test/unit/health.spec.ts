@@ -1,4 +1,4 @@
-import { HealthController, createMetrics, type ObservabilityOptions } from '@velchat/shared-utils';
+import { HealthController, createMetrics, type ObservabilityOptions } from '@velchat/common';
 
 describe('api-gateway health', () => {
   const opts: ObservabilityOptions = {

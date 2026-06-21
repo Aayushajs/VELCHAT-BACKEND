@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Redis } from 'ioredis';
-import { ValidationError, NotFoundError } from '@velchat/shared-utils';
+import { ValidationError, NotFoundError } from '@velchat/common';
 
 export type RecoveryFactor =
   | 'passkey'

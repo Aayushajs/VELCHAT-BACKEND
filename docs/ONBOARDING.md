@@ -34,7 +34,7 @@ apps/
 
 libs/
 ├── config        # @velchat/config       — zod env schema (fail-closed)
-├── shared-utils  # @velchat/shared-utils  — logger, tracer, tenant-context (ALS), errors,
+├── common  # @velchat/common  — logger, tracer, tenant-context (ALS), errors,
 │                   idempotency, metrics, Nest health/metrics/bootstrap, RLS helpers
 ├── shared-types  # @velchat/shared-types  — event payloads + generated proto types
 ├── proto         # @velchat/proto         — .proto contracts (buf workspace)

@@ -1,7 +1,7 @@
 import './telemetry';
 import 'reflect-metadata';
 import { loadConfig } from '@velchat/config';
-import { createLogger, createMetrics, bootstrapService } from '@velchat/shared-utils';
+import { createLogger, createMetrics, bootstrapService } from '@velchat/common';
 import { AppModule } from './app.module';
 
 async function main(): Promise<void> {

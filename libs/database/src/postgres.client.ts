@@ -1,5 +1,5 @@
 import { Pool, type PoolClient } from 'pg';
-import { requireTenant, type Logger, type ManagedResource } from '@velchat/shared-utils';
+import { requireTenant, type Logger, type ManagedResource } from '@velchat/common';
 
 /** Postgres client + the §G6 RLS guardrail (set 'app.tenant' GUC per transaction). Shared. */
 export class PostgresClient implements ManagedResource {

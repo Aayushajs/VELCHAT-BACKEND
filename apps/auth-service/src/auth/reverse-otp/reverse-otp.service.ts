@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { AppError } from '@velchat/shared-utils';
+import { AppError } from '@velchat/common';
 
 export type OriginationClass = 'mobile' | 'voip' | 'sip-gateway' | 'landline' | 'unknown';
 export type AttestationVerdict = 'genuine' | 'unevaluated' | 'failed';

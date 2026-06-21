@@ -6,7 +6,7 @@ import {
   InfraLifecycle,
   type ServiceMetrics,
   type ManagedResource,
-} from '@velchat/shared-utils';
+} from '@velchat/common';
 import { createEventBus } from '@velchat/event-bus';
 import { createStorage } from '@velchat/storage';
 import { PostgresClient } from '@velchat/database';

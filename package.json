@@ -10,9 +10,9 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
-    "setup": "pnpm install && pnpm build",
+    "setup": "pnpm install && pnpm build && turbo run build --filter=\"./libs/*\"",
     "build": "turbo run build",
-    "build:libs": "turbo run build --filter=\"./libs/*\"",
+    "build:libs": "pnpm install && turbo run build --filter=\"./libs/*\"",
     "build:services": "turbo run build --filter=\"./apps/*\"",
     "test": "turbo run test",
     "test:int": "turbo run test:int",

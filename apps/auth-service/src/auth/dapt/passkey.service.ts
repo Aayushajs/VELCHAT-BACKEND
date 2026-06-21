@@ -5,7 +5,7 @@ import {
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
 import type { Redis } from 'ioredis';
-import { UnauthorizedError } from '@velchat/shared-utils';
+import { UnauthorizedError } from '@velchat/common';
 
 export interface PasskeyRp {
   rpID: string;
