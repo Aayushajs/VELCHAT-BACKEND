@@ -6,7 +6,7 @@ import {
   UnauthorizedError,
   ConflictError,
   RateLimitError,
-} from '@velchat/shared-utils';
+} from '@velchat/common';
 import { AuthRepository, type DeviceRow } from './auth.repository';
 import { TokenService } from './tokens/token.service';
 import { ReverseOtpService, type InboundProof } from './reverse-otp/reverse-otp.service';

@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { Redis } from 'ioredis';
-import { UnauthorizedError } from '@velchat/shared-utils';
+import { UnauthorizedError } from '@velchat/common';
 import type { Mailer } from '@velchat/mail';
 
 /** What we provision once the emailed link is clicked (limited tier — email-only, §B2.4 fallback). */

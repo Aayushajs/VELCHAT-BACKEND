@@ -1,4 +1,4 @@
-import type { EventEnvelope, ManagedResource } from '@velchat/shared-utils';
+import type { EventEnvelope, ManagedResource } from '@velchat/common';
 
 export type EventHandler<T = unknown> = (envelope: EventEnvelope<T>) => Promise<void>;
 

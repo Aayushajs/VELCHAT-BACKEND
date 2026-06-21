@@ -1,5 +1,5 @@
 import { Client } from '@opensearch-project/opensearch';
-import { currentTenantId, type Logger, type ManagedResource } from '@velchat/shared-utils';
+import { currentTenantId, type Logger, type ManagedResource } from '@velchat/common';
 
 /** OpenSearch connection + health + the §G6-3 tenant-filter guardrail. Shared self-host client. */
 export class OpenSearchClient implements ManagedResource {

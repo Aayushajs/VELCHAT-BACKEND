@@ -5,7 +5,7 @@ package velchat.common.v1;
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 
-// Standard Kafka event envelope (§G7-3 / §G6-4). Mirrors @velchat/shared-utils EventEnvelope.
+// Standard Kafka event envelope (§G7-3 / §G6-4). Mirrors @velchat/common EventEnvelope.
 // Evolution rule: additive-only fields; registry enforces FULL_TRANSITIVE (§G7-1).
 message EventEnvelope {
   string event_type = 1;

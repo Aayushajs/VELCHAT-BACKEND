@@ -5,7 +5,7 @@ import {
   runWithTenant,
   IdempotencyStore,
   type EventEnvelope,
-} from '@velchat/shared-utils';
+} from '@velchat/common';
 import type { EventBus, EventHandler } from '../event-bus.port';
 
 interface Subscription {

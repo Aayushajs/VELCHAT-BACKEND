@@ -1,5 +1,5 @@
 import Redis from 'ioredis';
-import type { Logger, ManagedResource } from '@velchat/shared-utils';
+import type { Logger, ManagedResource } from '@velchat/common';
 
 /** Valkey/Redis client — connection + health. Shared by every service (no per-service copy). */
 export class ValkeyClient implements ManagedResource {

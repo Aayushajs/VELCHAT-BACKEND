@@ -1,5 +1,5 @@
 import { AuthService } from '../../src/auth/auth.service';
-import { ConflictError, RateLimitError } from '@velchat/shared-utils';
+import { ConflictError, RateLimitError } from '@velchat/common';
 
 /**
  * Orchestration unit tests for AuthService — every dependency is a light fake (jest.fn), so we

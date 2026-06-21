@@ -1,4 +1,4 @@
-import type { ManagedResource } from '@velchat/shared-utils';
+import type { ManagedResource } from '@velchat/common';
 
 export interface SearchDoc {
   id: string;

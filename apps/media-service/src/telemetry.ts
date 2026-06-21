@@ -1,5 +1,5 @@
 // MUST be imported first (before any instrumented client) so OTel can patch http/grpc/redis/db.
-import { startTelemetry } from '@velchat/shared-utils';
+import { startTelemetry } from '@velchat/common';
 
 function parseHeaders(raw: string | undefined): Record<string, string> {
   if (!raw) return {};

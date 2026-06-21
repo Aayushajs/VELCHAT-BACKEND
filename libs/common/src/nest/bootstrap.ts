@@ -29,7 +29,7 @@ export async function bootstrapService(
 
   // OpenAPI/Swagger docs for every service — UI at /docs, JSON at /docs-json. Scans all
   // registered controllers, so each module's routes show up automatically every run (§A8).
-  // Loaded lazily so importing @velchat/shared-utils in tests doesn't pull the Swagger graph.
+  // Loaded lazily so importing @velchat/common in tests doesn't pull the Swagger graph.
   const { DocumentBuilder, SwaggerModule } = await import('@nestjs/swagger');
   const openapi = new DocumentBuilder()
     .setTitle(`VelChat — ${opts.config.SERVICE_NAME}`)

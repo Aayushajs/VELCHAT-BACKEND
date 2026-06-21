@@ -1,4 +1,4 @@
-import { runWithTenant, TenantContextMissingError } from '@velchat/shared-utils';
+import { runWithTenant, TenantContextMissingError } from '@velchat/common';
 import { PostgresClient } from './postgres.client';
 
 /**

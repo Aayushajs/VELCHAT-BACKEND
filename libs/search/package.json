@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@velchat/config": "workspace:*",
-    "@velchat/shared-utils": "workspace:*",
+    "@velchat/common": "workspace:*",
     "@opensearch-project/opensearch": "^2.13.0",
     "mongoose": "^8.9.3"
   }

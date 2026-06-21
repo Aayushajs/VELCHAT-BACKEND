@@ -11,7 +11,7 @@ let sdk: { shutdown: () => Promise<void> } | undefined;
 
 /**
  * Bootstrap OpenTelemetry. OTel packages are loaded LAZILY (dynamic import) only when an OTLP
- * endpoint is configured — so importing @velchat/shared-utils stays light and tests/services that
+ * endpoint is configured — so importing @velchat/common stays light and tests/services that
  * don't enable tracing never touch the instrumentation graph. No-op without an endpoint.
  */
 export async function startTelemetry(cfg: TelemetryConfig): Promise<void> {

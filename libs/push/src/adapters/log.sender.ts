@@ -1,4 +1,4 @@
-import type { Logger } from '@velchat/shared-utils';
+import type { Logger } from '@velchat/common';
 import type { PushSender, PushTarget, PushPayload } from '../push.port';
 
 /** Dev push sender — logs instead of sending (no transport configured). */

@@ -1,5 +1,5 @@
 import type { AppConfig } from '@velchat/config';
-import type { Logger } from '@velchat/shared-utils';
+import type { Logger } from '@velchat/common';
 import type { PushSender } from './push.port';
 import { WebPushSender } from './adapters/webpush.sender';
 import { LogPushSender } from './adapters/log.sender';

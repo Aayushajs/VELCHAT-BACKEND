@@ -26,7 +26,7 @@ module.exports = {
         // packages
         'proto',
         'shared-types',
-        'shared-utils',
+        'common',
         'crypto',
         'config',
         // cross-cutting

@@ -13,7 +13,7 @@
     "clean": "rimraf dist .turbo coverage"
   },
   "dependencies": {
-    "@velchat/shared-utils": "workspace:*",
+    "@velchat/common": "workspace:*",
     "drizzle-orm": "^0.38.3",
     "mongoose": "^8.9.5",
     "pg": "^8.13.1"

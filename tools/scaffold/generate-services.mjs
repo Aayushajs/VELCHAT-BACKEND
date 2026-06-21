@@ -80,7 +80,7 @@ function write(rel, content) {
 const CLIENT_FILES = {
   postgres: `import { Pool, type PoolClient } from 'pg';
 import type { Logger } from 'pino';
-import { requireTenant, type ManagedResource } from '@velchat/shared-utils';
+import { requireTenant, type ManagedResource } from '@velchat/common';
 
 /** Postgres client + the §G6 RLS guardrail (set 'app.tenant' GUC per transaction). */
 export class PostgresClient implements ManagedResource {
@@ -134,7 +134,7 @@ export class PostgresClient implements ManagedResource {
 `,
   valkey: `import Redis from 'ioredis';
 import type { Logger } from 'pino';
-import type { ManagedResource } from '@velchat/shared-utils';
+import type { ManagedResource } from '@velchat/common';
 
 export class ValkeyClient implements ManagedResource {
   readonly name = 'valkey';
@@ -168,7 +168,7 @@ export class ValkeyClient implements ManagedResource {
 `,
   mongo: `import mongoose, { type Connection } from 'mongoose';
 import type { Logger } from 'pino';
-import type { ManagedResource } from '@velchat/shared-utils';
+import type { ManagedResource } from '@velchat/common';
 
 export class MongoClient implements ManagedResource {
   readonly name = 'mongo';
@@ -197,7 +197,7 @@ export class MongoClient implements ManagedResource {
 `,
   opensearch: `import { Client } from '@opensearch-project/opensearch';
 import type { Logger } from 'pino';
-import { currentTenantId, type ManagedResource } from '@velchat/shared-utils';
+import { currentTenantId, type ManagedResource } from '@velchat/common';
 
 export class OpenSearchClient implements ManagedResource {
   readonly name = 'opensearch';
@@ -242,7 +242,7 @@ export class OpenSearchClient implements ManagedResource {
 `,
   s3: `import { S3Client, HeadBucketCommand } from '@aws-sdk/client-s3';
 import type { Logger } from 'pino';
-import type { ManagedResource } from '@velchat/shared-utils';
+import type { ManagedResource } from '@velchat/common';
 
 export class ObjectStoreClient implements ManagedResource {
   readonly name = 's3';
@@ -420,7 +420,7 @@ function buildAppModule(svc) {
   return `import { Module, type DynamicModule } from '@nestjs/common';
 ${configImport}
 import type { Logger } from 'pino';
-import { ${sharedImports.join(', ')} } from '@velchat/shared-utils';
+import { ${sharedImports.join(', ')} } from '@velchat/common';
 ${providerImports.join('\n')}
 ${clientImports.join('\n')}
 
@@ -469,7 +469,7 @@ ${blocks.join('\n\n')}
 function buildPackageJson(svc) {
   const deps = {
     '@velchat/config': 'workspace:*',
-    '@velchat/shared-utils': 'workspace:*',
+    '@velchat/common': 'workspace:*',
     '@velchat/shared-types': 'workspace:*',
     '@velchat/event-bus': 'workspace:*',
     '@nestjs/common': '^10.4.15',
@@ -526,7 +526,7 @@ const jestConfig = `module.exports = { ...require('../../jest.preset.cjs') };
 `;
 
 const telemetry = `// MUST be imported first (before any instrumented client) so OTel can patch http/grpc/redis/db.
-import { startTelemetry } from '@velchat/shared-utils';
+import { startTelemetry } from '@velchat/common';
 
 function parseHeaders(raw: string | undefined): Record<string, string> {
   if (!raw) return {};
@@ -549,7 +549,7 @@ void startTelemetry({
 const mainTs = `import './telemetry';
 import 'reflect-metadata';
 import { loadConfig } from '@velchat/config';
-import { createLogger, createMetrics, bootstrapService } from '@velchat/shared-utils';
+import { createLogger, createMetrics, bootstrapService } from '@velchat/common';
 import { AppModule } from './app.module';
 
 async function main(): Promise<void> {
@@ -566,7 +566,7 @@ void main().catch((err) => {
 `;
 
 function healthSpec(svc) {
-  return `import { HealthController, createMetrics, type ObservabilityOptions } from '@velchat/shared-utils';
+  return `import { HealthController, createMetrics, type ObservabilityOptions } from '@velchat/common';
 
 describe('${svc.name} health', () => {
   const opts: ObservabilityOptions = {
@@ -590,7 +590,7 @@ describe('${svc.name} health', () => {
 }
 
 function securitySpec(svc) {
-  return `import { requireTenant, TenantContextMissingError } from '@velchat/shared-utils';
+  return `import { requireTenant, TenantContextMissingError } from '@velchat/common';
 
 /**
  * Security regression for ${svc.name} (§D4 threat model + §G6 isolation).

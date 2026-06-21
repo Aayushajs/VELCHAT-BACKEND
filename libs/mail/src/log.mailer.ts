@@ -1,4 +1,4 @@
-import type { Logger } from '@velchat/shared-utils';
+import type { Logger } from '@velchat/common';
 import type { Mailer, MailMessage } from './mailer.port';
 
 /** Dev mailer — logs the email instead of sending. Never logs secret content in production. */

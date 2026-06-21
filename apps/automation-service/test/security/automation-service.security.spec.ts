@@ -1,4 +1,4 @@
-import { requireTenant, TenantContextMissingError } from '@velchat/shared-utils';
+import { requireTenant, TenantContextMissingError } from '@velchat/common';
 
 /**
  * Security regression for automation-service (§D4 threat model + §G6 isolation).

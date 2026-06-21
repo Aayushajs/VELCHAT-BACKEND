@@ -1,5 +1,5 @@
 import type { AppConfig } from '@velchat/config';
-import type { Logger } from '@velchat/shared-utils';
+import type { Logger } from '@velchat/common';
 import type { Mailer } from './mailer.port';
 import { LogMailer } from './log.mailer';
 import { SmtpMailer } from './smtp.mailer';

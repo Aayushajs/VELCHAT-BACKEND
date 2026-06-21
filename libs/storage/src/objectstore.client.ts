@@ -1,5 +1,5 @@
 import { S3Client, HeadBucketCommand } from '@aws-sdk/client-s3';
-import type { Logger, ManagedResource } from '@velchat/shared-utils';
+import type { Logger, ManagedResource } from '@velchat/common';
 
 /** Raw S3/MinIO client + health (self-host object storage). Shared. */
 export class ObjectStoreClient implements ManagedResource {

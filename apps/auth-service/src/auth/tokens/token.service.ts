@@ -1,6 +1,6 @@
 import jwt, { type JwtPayload } from 'jsonwebtoken';
 import { createHash, createPublicKey, randomBytes, randomUUID } from 'node:crypto';
-import { UnauthorizedError } from '@velchat/shared-utils';
+import { UnauthorizedError } from '@velchat/common';
 import type { SigningKeyPair } from './keys';
 
 export interface AccessClaims {
