@@ -9,7 +9,7 @@
  * A single Ctrl+C stops everything — children are direct node processes, so the kill is reliable
  * (SIGTERM, then SIGKILL for stragglers). Cross-platform (Windows / macOS / Linux).
  */
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { get } from 'node:http';
 import { dirname, join } from 'node:path';
@@ -80,37 +80,68 @@ function httpOk(port, path = '/health', timeoutMs = 2000) {
   });
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function waitFor(port, attempts = 40) {
   for (let i = 0; i < attempts; i += 1) {
     if (await httpOk(port)) return true;
-    await new Promise((r) => setTimeout(r, 750));
+    await sleep(750);
   }
   return false;
+}
+
+/** Poll every service until healthy (Nest takes a few seconds to boot) — returns the up-set. */
+async function readiness(rounds = 40) {
+  const up = new Set();
+  for (let r = 0; r < rounds && up.size < services.length; r += 1) {
+    await Promise.all(
+      services.map(async (s) => {
+        if (!up.has(s.name) && (await httpOk(s.http))) up.add(s.name);
+      }),
+    );
+    if (up.size < services.length) await sleep(1000);
+  }
+  return up;
+}
+
+/** Force-kill the child's whole process tree — reliable on Windows (Ctrl+C must truly stop all). */
+function killChild(child) {
+  if (!child.pid) return;
+  if (process.platform === 'win32') {
+    try {
+      spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+    } catch {
+      /* already gone */
+    }
+  } else {
+    try {
+      child.kill('SIGKILL');
+    } catch {
+      /* already gone */
+    }
+  }
+}
+
+/** Windows backstop: kill anything still listening on our ports (catches orphaned grandchildren). */
+function killByPorts() {
+  if (process.platform !== 'win32') return;
+  const ports = [...services.map((s) => s.http), GATEWAY_PORT].join(',');
+  const ps = `$ports=@(${ports}); foreach($p in $ports){ Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue } }`;
+  try {
+    spawnSync('powershell', ['-NoProfile', '-Command', ps], { stdio: 'ignore' });
+  } catch {
+    /* best effort */
+  }
 }
 
 function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
   process.stdout.write(color('\n\nStopping all services...\n', C.yellow));
-  for (const { child } of children) {
-    try {
-      child.kill('SIGTERM');
-    } catch {
-      /* already gone */
-    }
-  }
-  // Force-kill anything that ignored SIGTERM, then exit.
-  setTimeout(() => {
-    for (const { child } of children) {
-      try {
-        if (!child.killed) child.kill('SIGKILL');
-      } catch {
-        /* ignore */
-      }
-    }
-    process.stdout.write(color('Stopped.\n', C.green));
-    process.exit(0);
-  }, 1500);
+  for (const { child } of children) killChild(child); // force-kill each child's tree
+  killByPorts(); // + sweep any orphan still holding a port (reliable on Windows)
+  process.stdout.write(color('Stopped.\n', C.green));
+  process.exit(0);
 }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
@@ -130,15 +161,15 @@ async function main() {
   );
   start('gateway', ['tools/gateway/dev-gateway.mjs'], { GATEWAY_PORT: String(GATEWAY_PORT) }, 97);
 
-  process.stdout.write(color(`  waiting for the gateway on :${GATEWAY_PORT}...\n`, C.gray));
+  process.stdout.write(color('  waiting for services to boot...\n', C.gray));
   await waitFor(GATEWAY_PORT);
+  const up = await readiness(); // poll each service until healthy (Nest needs a few seconds)
 
   // Health summary (one line per service).
   process.stdout.write(color('\nHealth:\n', C.cyan));
   for (const s of services) {
-    const ok = await httpOk(s.http);
     process.stdout.write(
-      ok
+      up.has(s.name)
         ? color(`  OK   ${s.name} (:${s.http})\n`, C.green)
         : color(`  DOWN ${s.name} (:${s.http})\n`, C.red),
     );
