@@ -5,7 +5,7 @@ import type { Logger } from 'pino';
 import type { AppConfig } from '@velchat/config';
 import { TenantInterceptor } from './tenant.interceptor';
 import { AllExceptionsFilter } from './all-exceptions.filter';
-import { shutdownTelemetry } from '../tracer';
+import { shutdownTelemetry } from '../observability/tracer';
 
 export interface BootstrapOptions {
   config: AppConfig;

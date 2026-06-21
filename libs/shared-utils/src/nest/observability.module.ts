@@ -1,5 +1,5 @@
 import { Controller, Get, Header, Inject, Module, type DynamicModule } from '@nestjs/common';
-import type { ServiceMetrics } from '../metrics';
+import type { ServiceMetrics } from '../observability/metrics';
 
 export const OBSERVABILITY_OPTIONS = Symbol('OBSERVABILITY_OPTIONS');
 

@@ -7,7 +7,7 @@ import {
   assertResourceTenant,
   systemScope,
 } from './tenant-context';
-import { TenantContextMissingError, CrossTenantAccessError } from './errors';
+import { TenantContextMissingError, CrossTenantAccessError } from '../errors/errors';
 
 describe('tenant-context (§G6 fail-closed)', () => {
   it('has no context outside runWithTenant', () => {

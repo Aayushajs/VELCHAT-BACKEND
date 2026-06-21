@@ -1,25 +1,25 @@
 // Errors
-export * from './errors';
+export * from './errors/errors';
 
 // IDs
 export { uuidv7 } from './ids';
 
 // Tenant context (§G6)
-export * from './tenant-context';
+export * from './tenant/tenant-context';
 
 // Observability
-export { createLogger, type Logger, type LogConfig } from './logger';
-export { startTelemetry, shutdownTelemetry, type TelemetryConfig } from './tracer';
-export { createMetrics, type ServiceMetrics } from './metrics';
+export { createLogger, type Logger, type LogConfig } from './observability/logger';
+export { startTelemetry, shutdownTelemetry, type TelemetryConfig } from './observability/tracer';
+export { createMetrics, type ServiceMetrics } from './observability/metrics';
 
 // Eventing (§A11, §G7)
-export * from './event-envelope';
-export { createKafka, EventPublisher } from './kafka-client';
-export { IdempotencyStore } from './idempotency';
-export { BaseEventConsumer, type ConsumerDeps } from './kafka-consumer.base';
+export * from './eventing/event-envelope';
+export { createKafka, EventPublisher } from './eventing/kafka-client';
+export { IdempotencyStore } from './eventing/idempotency';
+export { BaseEventConsumer, type ConsumerDeps } from './eventing/kafka-consumer.base';
 
 // Authz
-export * from './authz';
+export * from './tenant/authz';
 
 // NestJS building blocks
 export {

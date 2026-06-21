@@ -5,7 +5,7 @@ import {
   type CallHandler,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
-import { runWithTenant, type TenantContext } from '../tenant-context';
+import { runWithTenant, type TenantContext } from '../tenant/tenant-context';
 
 /**
  * Establishes request-scoped tenant context (§G6-1.2) from request metadata for HTTP routes.

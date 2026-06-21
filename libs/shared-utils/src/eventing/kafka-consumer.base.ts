@@ -3,7 +3,7 @@ import type { Logger } from 'pino';
 import { EventPublisher } from './kafka-client';
 import { IdempotencyStore } from './idempotency';
 import { parseEnvelope, type EventEnvelope } from './event-envelope';
-import { runWithTenant } from './tenant-context';
+import { runWithTenant } from '../tenant/tenant-context';
 
 export interface ConsumerDeps {
   kafka: Kafka;

@@ -1,6 +1,6 @@
 import pino, { type Logger, type LoggerOptions } from 'pino';
 import type { AppConfig } from '@velchat/config';
-import { getTenantContext } from './tenant-context';
+import { getTenantContext } from '../tenant/tenant-context';
 
 /**
  * Paths redacted from every log line. CLAUDE.md §7: structured logs carry NO PII and

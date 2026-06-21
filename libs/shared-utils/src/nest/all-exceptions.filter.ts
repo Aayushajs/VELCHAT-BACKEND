@@ -1,6 +1,6 @@
 import { Catch, HttpException, type ArgumentsHost, type ExceptionFilter } from '@nestjs/common';
 import type { Logger } from 'pino';
-import { isAppError } from '../errors';
+import { isAppError } from '../errors/errors';
 
 interface MinimalResponse {
   status(code: number): { json(body: unknown): unknown };

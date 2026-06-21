@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { TenantContextMissingError, CrossTenantAccessError } from './errors';
+import { TenantContextMissingError, CrossTenantAccessError } from '../errors/errors';
 
 /**
  * Request/event/job-scoped tenant context (§G6-1.2).
