@@ -80,12 +80,23 @@ export class ChannelsService {
     }
     await this.repo.addMember(conversationId, userId, role);
     await this.events.memberAdded(conversationId, userId, role, null);
+    await this.rotateEpoch(conversationId, 'member.added');
   }
 
   async removeMember(conversationId: string, actorId: string, userId: string): Promise<void> {
     await this.assertAdmin(conversationId, actorId);
     await this.repo.removeMember(conversationId, userId);
     await this.events.memberRemoved(conversationId, userId, null);
+    await this.rotateEpoch(conversationId, 'member.removed');
+  }
+
+  /** Rotate the Sender-Key epoch on a group membership change (§G1-2); no-op for non-groups. */
+  private async rotateEpoch(
+    conversationId: string,
+    reason: 'member.added' | 'member.removed',
+  ): Promise<void> {
+    const epoch = await this.repo.bumpSenderKeyEpochIfGroup(conversationId);
+    if (epoch !== null) await this.events.groupEpochChanged(conversationId, epoch, reason);
   }
 
   async members(conversationId: string): Promise<string[]> {

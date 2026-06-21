@@ -1,6 +1,10 @@
 import { buildEnvelope } from '@velchat/common';
 import type { EventBus } from '@velchat/event-bus';
-import type { ChannelMemberPayload, ConversationCreatedPayload } from '@velchat/shared-types';
+import type {
+  ChannelMemberPayload,
+  ConversationCreatedPayload,
+  GroupEpochChangedPayload,
+} from '@velchat/shared-types';
 import type { ConversationType, MemberRole } from './conversation.types';
 
 /** Membership events (§A11) → consumed by realtime (fan-out), notification, search, cache. */
@@ -67,6 +71,29 @@ export class ChannelsEvents {
           user_id: userId,
           role: 'member',
           tenant_id: tenantId,
+        },
+      }),
+    );
+  }
+
+  /** Sender-Key epoch rotated (§G1-2) — members redistribute keys, ciphertext binds to the epoch. */
+  async groupEpochChanged(
+    conversationId: string,
+    epoch: number,
+    reason: 'member.added' | 'member.removed',
+  ): Promise<void> {
+    await this.bus.publish<GroupEpochChangedPayload>(
+      'group.epoch.changed',
+      buildEnvelope({
+        eventType: 'group.epoch.changed',
+        key: conversationId,
+        producer: 'group-channel-service',
+        tenantId: null,
+        payload: {
+          conversation_id: conversationId,
+          epoch,
+          reason,
+          changed_at: new Date().toISOString(),
         },
       }),
     );

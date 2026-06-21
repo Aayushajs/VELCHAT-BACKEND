@@ -55,6 +55,15 @@ export interface ChannelMemberPayload {
   tenant_id: TenantId | null;
 }
 
+/** Group Sender-Key epoch rotated on a membership change (§G1-2) — clients redistribute keys. */
+export interface GroupEpochChangedPayload {
+  conversation_id: ConversationId;
+  epoch: number;
+  /** Why the epoch rotated — drives client UX/telemetry. */
+  reason: 'member.added' | 'member.removed';
+  changed_at: Iso8601;
+}
+
 export interface MessageSentPayload {
   conversation_id: ConversationId;
   message_id: string;
@@ -90,6 +99,7 @@ export interface EventPayloads {
   'conversation.created': ConversationCreatedPayload;
   'channel.member.added': ChannelMemberPayload;
   'channel.member.removed': ChannelMemberPayload;
+  'group.epoch.changed': GroupEpochChangedPayload;
   'message.sent': MessageSentPayload;
   'message.delivered': MessageReceiptPayload;
   'message.read': MessageReceiptPayload;
