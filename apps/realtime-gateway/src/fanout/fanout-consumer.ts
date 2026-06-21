@@ -3,6 +3,7 @@ import type { EventBus } from '@velchat/event-bus';
 import type {
   ChannelMemberPayload,
   ConversationCreatedPayload,
+  MessageReceiptPayload,
   MessageSentPayload,
 } from '@velchat/shared-types';
 import type { EventRouter } from '../fabric/event-router';
@@ -40,6 +41,20 @@ export class FanoutConsumer {
     this.bus.subscribe<MessageSentPayload>('message.sent', GROUP, async (e) => {
       await this.onMessageSent(e.payload);
     });
+    // Ticks: deliver the receipt to conversation members so the sender's UI updates (§B4.4).
+    this.bus.subscribe<MessageReceiptPayload>('message.delivered', GROUP, async (e) => {
+      await this.onReceipt('receipt', e.payload);
+    });
+    this.bus.subscribe<MessageReceiptPayload>('message.read', GROUP, async (e) => {
+      await this.onReceipt('receipt', e.payload);
+    });
+  }
+
+  private async onReceipt(type: 'receipt', r: MessageReceiptPayload): Promise<void> {
+    const members = await this.projection.members(r.conversation_id);
+    if (members.length === 0) return;
+    // Ephemeral frame: a coalescible UI cue, never a durable message (the receipt is stored separately).
+    await this.router.route(members, { kind: 'ephemeral', type, data: r });
   }
 
   private async onMessageSent(m: MessageSentPayload): Promise<void> {

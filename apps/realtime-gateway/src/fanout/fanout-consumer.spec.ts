@@ -31,14 +31,27 @@ describe('FanoutConsumer (§B9.2)', () => {
     return { handlers, bus, projection, router };
   }
 
-  it('subscribes to membership + message topics', () => {
+  it('subscribes to membership + message + receipt topics', () => {
     const { handlers } = setup([]);
     expect([...handlers.keys()].sort()).toEqual([
       'channel.member.added',
       'channel.member.removed',
       'conversation.created',
+      'message.delivered',
+      'message.read',
       'message.sent',
     ]);
+  });
+
+  it('fans a read receipt to members as an ephemeral cue', async () => {
+    const { handlers, router } = setup(['a', 'b']);
+    await handlers.get('message.read')!(
+      envelope({ conversation_id: 'c1', up_to_seq: 9, user_id: 'b', state: 'read', at: 'now' }),
+    );
+    expect(router.route).toHaveBeenCalledWith(
+      ['a', 'b'],
+      expect.objectContaining({ kind: 'ephemeral', type: 'receipt' }),
+    );
   });
 
   it('routes a message to every resolved member', async () => {

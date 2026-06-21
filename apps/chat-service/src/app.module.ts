@@ -12,6 +12,8 @@ import { MongoClient } from '@velchat/database';
 import { ValkeyClient } from '@velchat/cache';
 import { ChatModule } from './chat/chat.module';
 import { ChatRepository } from './chat/chat.repository';
+import { ReceiptsRepository } from './chat/receipts.repository';
+import { ReceiptsConsumer } from './chat/receipts.consumer';
 
 export interface AppDeps {
   config: AppConfig;
@@ -33,14 +35,28 @@ export class AppModule {
       const mongo = new MongoClient(requireMongoUrl(deps.config), deps.logger);
       const valkey = new ValkeyClient(requireValkeyUrl(deps.config), deps.logger);
       const eventBus = createEventBus(deps.config, deps.logger);
+      const receipts = new ReceiptsRepository(mongo);
       // Create the §A10.2 indexes once Mongo is connected (runs after mongo in array order).
       const indexInit: ManagedResource = {
         name: 'chat-indexes',
-        connect: () => new ChatRepository(mongo).ensureIndexes(),
+        connect: async () => {
+          await new ChatRepository(mongo).ensureIndexes();
+          await receipts.ensureIndexes();
+        },
         ping: async () => true,
         close: async () => undefined,
       };
-      managed.push(mongo, valkey, eventBus, indexInit);
+      // Register receipt consumers, then start the bus (runs after eventBus.connect in array order).
+      const consumerInit: ManagedResource = {
+        name: 'chat-consumers',
+        connect: async () => {
+          new ReceiptsConsumer(eventBus, receipts, deps.logger).register();
+          await eventBus.start();
+        },
+        ping: async () => true,
+        close: async () => undefined,
+      };
+      managed.push(mongo, valkey, eventBus, indexInit, consumerInit);
       imports.push(ChatModule.forRoot({ logger: deps.logger, mongo, valkey, eventBus }));
     }
 

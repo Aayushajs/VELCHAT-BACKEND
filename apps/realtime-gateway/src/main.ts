@@ -12,6 +12,7 @@ import { WsFabric } from './fabric/ws-fabric';
 import { MembershipProjection } from './fanout/membership-projection';
 import { ValkeyPodPublisher } from './fanout/valkey-pod-publisher';
 import { FanoutConsumer } from './fanout/fanout-consumer';
+import { ReceiptPublisher } from './fanout/receipt-publisher';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -27,14 +28,17 @@ async function main(): Promise<void> {
     const valkey = new ValkeyClient(requireValkeyUrl(config), logger);
     await valkey.connect();
     const registry = new ConnectionRegistry(valkey.redis);
+    const bus = app.get<EventBus>(EVENT_BUS, { strict: false });
+
     const fabric = new WsFabric(app.getHttpServer(), valkey.redis, registry, logger, {
       podId: process.env.POD_ID ?? hostname(),
       jwtPublicKey: process.env.JWT_PUBLIC_KEY,
+      // Inbound delivered/read acks → durable receipt events (§B4.4).
+      sink: bus ? new ReceiptPublisher(bus) : undefined,
     });
     await fabric.start();
 
     // §B9.2 fan-out: consume durable events → resolve members → push to online sockets.
-    const bus = app.get<EventBus>(EVENT_BUS, { strict: false });
     if (bus) {
       const router = new EventRouter(registry, new ValkeyPodPublisher(valkey.redis));
       const projection = new MembershipProjection(valkey.redis);
