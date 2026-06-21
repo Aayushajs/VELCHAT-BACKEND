@@ -124,24 +124,31 @@ function killChild(child) {
 
 /** Kill anything listening on our ports — used both to pre-clean a stale run and on shutdown. */
 function killByPorts() {
-  const ports = [...services.map((s) => s.http), GATEWAY_PORT];
+  const portSet = new Set([...services.map((s) => s.http), GATEWAY_PORT].map(Number));
   if (process.platform === 'win32') {
-    const ps = `$ports=@(${ports.join(',')}); foreach($p in $ports){ Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue } }`;
-    try {
-      spawnSync('powershell', ['-NoProfile', '-Command', ps], { stdio: 'ignore' });
-    } catch {
-      /* best effort */
+    // netstat → PIDs listening on our ports → taskkill /F (no slow PowerShell cmdlets).
+    const res = spawnSync('netstat', ['-ano'], { encoding: 'utf8' });
+    const pids = new Set();
+    for (const raw of (res.stdout ?? '').split('\n')) {
+      const f = raw.trim().split(/\s+/);
+      if (f.length >= 5 && f[3] === 'LISTENING' && portSet.has(Number(f[1].split(':').pop()))) {
+        pids.add(f[4]);
+      }
+    }
+    for (const pid of pids) {
+      try {
+        spawnSync('taskkill', ['/F', '/PID', pid], { stdio: 'ignore' });
+      } catch {
+        /* best effort */
+      }
     }
   } else {
     // POSIX best-effort: free each port via lsof if available.
+    const ports = [...portSet].join(' ');
     try {
-      spawnSync(
-        'sh',
-        ['-c', `for p in ${ports.join(' ')}; do lsof -ti tcp:$p | xargs -r kill -9; done`],
-        {
-          stdio: 'ignore',
-        },
-      );
+      spawnSync('sh', ['-c', `for p in ${ports}; do lsof -ti tcp:$p | xargs -r kill -9; done`], {
+        stdio: 'ignore',
+      });
     } catch {
       /* best effort */
     }
