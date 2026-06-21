@@ -122,15 +122,29 @@ function killChild(child) {
   }
 }
 
-/** Windows backstop: kill anything still listening on our ports (catches orphaned grandchildren). */
+/** Kill anything listening on our ports — used both to pre-clean a stale run and on shutdown. */
 function killByPorts() {
-  if (process.platform !== 'win32') return;
-  const ports = [...services.map((s) => s.http), GATEWAY_PORT].join(',');
-  const ps = `$ports=@(${ports}); foreach($p in $ports){ Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue } }`;
-  try {
-    spawnSync('powershell', ['-NoProfile', '-Command', ps], { stdio: 'ignore' });
-  } catch {
-    /* best effort */
+  const ports = [...services.map((s) => s.http), GATEWAY_PORT];
+  if (process.platform === 'win32') {
+    const ps = `$ports=@(${ports.join(',')}); foreach($p in $ports){ Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue } }`;
+    try {
+      spawnSync('powershell', ['-NoProfile', '-Command', ps], { stdio: 'ignore' });
+    } catch {
+      /* best effort */
+    }
+  } else {
+    // POSIX best-effort: free each port via lsof if available.
+    try {
+      spawnSync(
+        'sh',
+        ['-c', `for p in ${ports.join(' ')}; do lsof -ti tcp:$p | xargs -r kill -9; done`],
+        {
+          stdio: 'ignore',
+        },
+      );
+    } catch {
+      /* best effort */
+    }
   }
 }
 
@@ -150,6 +164,12 @@ async function main() {
   process.stdout.write(
     color('\nVelChat - starting backend services + gateway...\n\n', C.cyan + C.bold),
   );
+
+  // Pre-clean: a previous run may still hold these ports → kill it first, then start fresh
+  // (avoids EADDRINUSE). Wait until the gateway port is actually free before spawning.
+  process.stdout.write(color('  cleaning up any previous run...\n', C.gray));
+  killByPorts();
+  for (let i = 0; i < 20 && (await httpOk(GATEWAY_PORT, '/health', 500)); i += 1) await sleep(300);
 
   services.forEach((s, i) =>
     start(
