@@ -97,6 +97,16 @@ export interface FileUploadedPayload {
   uploaded_at: Iso8601;
 }
 
+/** A status/story was posted (§B8/§C11) → realtime rings only the audience members. */
+export interface StatusPostedPayload {
+  status_id: string;
+  user_id: AccountId;
+  kind: 'text' | 'image' | 'video' | 'voice';
+  /** Audience account_ids the post is visible to (resolved server-side from the audience rule). */
+  audience: AccountId[];
+  expires_at: Iso8601;
+}
+
 export interface PresenceChangedPayload {
   account_id: AccountId;
   status: 'online' | 'offline' | 'away';
@@ -117,6 +127,7 @@ export interface EventPayloads {
   'message.delivered': MessageReceiptPayload;
   'message.read': MessageReceiptPayload;
   'file.uploaded': FileUploadedPayload;
+  'status.posted': StatusPostedPayload;
   'presence.changed': PresenceChangedPayload;
 }
 
