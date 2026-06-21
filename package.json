@@ -21,6 +21,7 @@
     "dev": "turbo run dev --parallel",
     "start:all": "node tools/gateway/start-all.mjs",
     "gateway": "node tools/gateway/dev-gateway.mjs",
+    "docs": "node tools/print-docs.mjs",
     "dev:api-gateway": "pnpm --filter @velchat/api-gateway dev",
     "dev:realtime": "pnpm --filter @velchat/realtime-gateway dev",
     "dev:auth": "pnpm --filter @velchat/auth-service dev",

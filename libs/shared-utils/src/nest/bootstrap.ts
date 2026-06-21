@@ -27,6 +27,20 @@ export async function bootstrapService(
   app.useGlobalFilters(new AllExceptionsFilter(opts.logger));
   app.enableShutdownHooks();
 
+  // OpenAPI/Swagger docs for every service — UI at /docs, JSON at /docs-json. Scans all
+  // registered controllers, so each module's routes show up automatically every run (§A8).
+  // Loaded lazily so importing @velchat/shared-utils in tests doesn't pull the Swagger graph.
+  const { DocumentBuilder, SwaggerModule } = await import('@nestjs/swagger');
+  const openapi = new DocumentBuilder()
+    .setTitle(`VelChat — ${opts.config.SERVICE_NAME}`)
+    .setDescription(`API documentation for ${opts.config.SERVICE_NAME}.`)
+    .setVersion(opts.config.SERVICE_VERSION)
+    .addBearerAuth()
+    .build();
+  SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, openapi), {
+    jsonDocumentUrl: 'docs-json',
+  });
+
   // Graceful drain: stop accepting, let in-flight finish, flush telemetry (§B9).
   const shutdown = async (signal: string): Promise<void> => {
     opts.logger.info({ signal }, 'shutting down');
