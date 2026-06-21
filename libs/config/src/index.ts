@@ -71,6 +71,16 @@ export const envSchema = z.object({
   // Auth
   JWT_ISSUER: z.string().optional(),
   JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+
+  // Mail (self-hosted Postfix SMTP). Unset → mail is logged only (dev).
+  SMTP_URL: z.string().optional(),
+  MAIL_FROM: z.string().default('VelChat <no-reply@velchat.local>'),
+
+  // Push (Web Push VAPID + FCM). Unset → no-op/log transport.
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().default('mailto:admin@velchat.local'),
+  FCM_PROJECT_ID: z.string().optional(),
 });
 
 export type AppConfig = Readonly<z.infer<typeof envSchema>>;

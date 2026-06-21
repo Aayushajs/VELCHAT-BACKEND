@@ -1,4 +1,4 @@
-import { RateLimiter } from '../../src/auth/rate-limiter';
+import { RateLimiter } from '../../src/auth/abuse/rate-limiter';
 
 function fakeRedis() {
   const counts = new Map<string, number>();

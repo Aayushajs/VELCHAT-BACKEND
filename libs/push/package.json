@@ -1,0 +1,22 @@
+{
+  "name": "@velchat/push",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Push notifications (shared) — Web Push (VAPID) + FCM port/adapters. §B10: E2EE payloads carry no content.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "clean": "rimraf dist .turbo coverage"
+  },
+  "dependencies": {
+    "@velchat/config": "workspace:*",
+    "@velchat/shared-utils": "workspace:*",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@types/web-push": "^3.6.4"
+  }
+}

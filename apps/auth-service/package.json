@@ -25,6 +25,7 @@
     "@velchat/config": "workspace:*",
     "@velchat/database": "workspace:*",
     "@velchat/event-bus": "workspace:*",
+    "@velchat/mail": "workspace:*",
     "@velchat/shared-types": "workspace:*",
     "@velchat/shared-utils": "workspace:*",
     "axios": "^1.7.9",

@@ -1,4 +1,8 @@
-import { generateBackupCodes, verifyBackupCode, hashCode } from '../../src/auth/backup-codes';
+import {
+  generateBackupCodes,
+  verifyBackupCode,
+  hashCode,
+} from '../../src/auth/recovery/backup-codes';
 
 describe('backup codes (§B2.7)', () => {
   it('generates codes whose hashes verify', () => {

@@ -1,4 +1,4 @@
-import { RecoveryService } from '../../src/auth/recovery.service';
+import { RecoveryService } from '../../src/auth/recovery/recovery.service';
 
 function fakeRedis() {
   const map = new Map<string, string>();
