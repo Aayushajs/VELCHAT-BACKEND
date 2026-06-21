@@ -7,9 +7,10 @@ import {
   type ServiceMetrics,
   type ManagedResource,
 } from '@velchat/common';
-import { createEventBus } from '@velchat/event-bus';
-import { createStorage } from '@velchat/storage';
+import { createEventBus, type EventBus } from '@velchat/event-bus';
+import { createStorage, type ObjectStorage } from '@velchat/storage';
 import { PostgresClient } from '@velchat/database';
+import { MediaModule } from './media/media.module';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const PG_CLIENT = Symbol('PG_CLIENT');
@@ -22,19 +23,23 @@ export interface AppDeps {
 }
 
 /**
- * Resumable uploads (Cloudinary/S3), AV scan, transcode, thumbnails (§B11).
- *
- * BOOT-0 skeleton: edge surface (health/ready/metrics, OTel, tenant context) + wired DB/Kafka
- * clients only. Business logic arrives in the phase prompts (see VelChat-ClaudeCode-Prompts.md).
+ * media-service (§B11 / §A16): content-addressed upload + dedup, signed download, file.uploaded.
+ * Blobs in object storage (Cloudinary/MinIO); metadata in Postgres. Personal media is ciphertext —
+ * the server stores it opaquely and never transcodes/inspects it.
  */
 @Module({})
 export class AppModule {
   static forRoot(deps: AppDeps): DynamicModule {
     const managed: ManagedResource[] = [];
     const providers: Array<{ provide: symbol; useValue: unknown }> = [];
+    const imports: DynamicModule[] = [];
+
+    let pg: PostgresClient | undefined;
+    let storage: ObjectStorage | undefined;
+    let eventBus: EventBus | undefined;
 
     if (deps.config.POSTGRES_URL) {
-      const pg = new PostgresClient(
+      pg = new PostgresClient(
         requirePostgresUrl(deps.config),
         deps.config.POSTGRES_MAX_POOL,
         deps.logger,
@@ -44,7 +49,7 @@ export class AppModule {
     }
 
     if (deps.config.EVENT_BUS === 'kafka' ? deps.config.KAFKA_BROKERS : deps.config.VALKEY_URL) {
-      const eventBus = createEventBus(deps.config, deps.logger);
+      eventBus = createEventBus(deps.config, deps.logger);
       managed.push(eventBus);
       providers.push({ provide: EVENT_BUS, useValue: eventBus });
     }
@@ -52,7 +57,13 @@ export class AppModule {
     if (
       deps.config.STORAGE_PROVIDER === 's3' ? deps.config.S3_ENDPOINT : deps.config.CLOUDINARY_URL
     ) {
-      providers.push({ provide: STORAGE, useValue: createStorage(deps.config) });
+      storage = createStorage(deps.config);
+      providers.push({ provide: STORAGE, useValue: storage });
+    }
+
+    // Wire the media feature only when all three backends are present (else stays a bare skeleton).
+    if (pg && storage && eventBus) {
+      imports.push(MediaModule.forRoot({ logger: deps.logger, pg, storage, eventBus }));
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);
@@ -66,6 +77,7 @@ export class AppModule {
           metrics: deps.metrics,
           readiness: () => lifecycle.isReady(),
         }),
+        ...imports,
       ],
       providers: [{ provide: InfraLifecycle, useValue: lifecycle }, ...providers],
       exports: providers.map((p) => p.provide),

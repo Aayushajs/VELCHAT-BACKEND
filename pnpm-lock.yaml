@@ -680,6 +680,9 @@ importers:
       '@velchat/config':
         specifier: workspace:*
         version: link:../../libs/config
+      '@velchat/database':
+        specifier: workspace:*
+        version: link:../../libs/database
       '@velchat/event-bus':
         specifier: workspace:*
         version: link:../../libs/event-bus
