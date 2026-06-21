@@ -10,10 +10,8 @@ import {
 import { createEventBus } from '@velchat/event-bus';
 import { MongoClient } from '@velchat/database';
 import { ValkeyClient } from '@velchat/cache';
-
-export const EVENT_BUS = Symbol('EVENT_BUS');
-export const MONGO_CLIENT = Symbol('MONGO_CLIENT');
-export const VALKEY_CLIENT = Symbol('VALKEY_CLIENT');
+import { ChatModule } from './chat/chat.module';
+import { ChatRepository } from './chat/chat.repository';
 
 export interface AppDeps {
   config: AppConfig;
@@ -22,33 +20,28 @@ export interface AppDeps {
 }
 
 /**
- * Messages, delivery, receipts, ordering via per-conversation seq (§B4).
- *
- * BOOT-0 skeleton: edge surface (health/ready/metrics, OTel, tenant context) + wired DB/Kafka
- * clients only. Business logic arrives in the phase prompts (see VelChat-ClaudeCode-Prompts.md).
+ * chat-service (§B4): messages, ordering (seq), receipts. Mongo for documents (@velchat/database),
+ * Valkey for the per-conversation seq counter (@velchat/cache), Kafka for message.* events.
  */
 @Module({})
 export class AppModule {
   static forRoot(deps: AppDeps): DynamicModule {
     const managed: ManagedResource[] = [];
-    const providers: Array<{ provide: symbol; useValue: unknown }> = [];
+    const imports: DynamicModule[] = [];
 
-    if (deps.config.MONGO_URL) {
+    if (deps.config.MONGO_URL && deps.config.VALKEY_URL) {
       const mongo = new MongoClient(requireMongoUrl(deps.config), deps.logger);
-      managed.push(mongo);
-      providers.push({ provide: MONGO_CLIENT, useValue: mongo });
-    }
-
-    if (deps.config.VALKEY_URL) {
       const valkey = new ValkeyClient(requireValkeyUrl(deps.config), deps.logger);
-      managed.push(valkey);
-      providers.push({ provide: VALKEY_CLIENT, useValue: valkey });
-    }
-
-    if (deps.config.EVENT_BUS === 'kafka' ? deps.config.KAFKA_BROKERS : deps.config.VALKEY_URL) {
       const eventBus = createEventBus(deps.config, deps.logger);
-      managed.push(eventBus);
-      providers.push({ provide: EVENT_BUS, useValue: eventBus });
+      // Create the §A10.2 indexes once Mongo is connected (runs after mongo in array order).
+      const indexInit: ManagedResource = {
+        name: 'chat-indexes',
+        connect: () => new ChatRepository(mongo).ensureIndexes(),
+        ping: async () => true,
+        close: async () => undefined,
+      };
+      managed.push(mongo, valkey, eventBus, indexInit);
+      imports.push(ChatModule.forRoot({ logger: deps.logger, mongo, valkey, eventBus }));
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);
@@ -62,9 +55,9 @@ export class AppModule {
           metrics: deps.metrics,
           readiness: () => lifecycle.isReady(),
         }),
+        ...imports,
       ],
-      providers: [{ provide: InfraLifecycle, useValue: lifecycle }, ...providers],
-      exports: providers.map((p) => p.provide),
+      providers: [{ provide: InfraLifecycle, useValue: lifecycle }],
     };
   }
 }
