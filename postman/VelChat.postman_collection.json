@@ -1,59 +1,124 @@
 {
   "info": {
-    "name": "VelChat — Backend",
-    "description": "VelChat backend API collection. Hit the local dev gateway ({{gateway}} = http://localhost:8080, `pnpm gateway`) which routes by path prefix to each service, or call a service directly on its port. Set {{tenant}} for tenant-scoped routes.",
+    "name": "VelChat — Backend API",
+    "description": "VelChat backend (WhatsApp + Teams + Slack hybrid). Each request targets a per-service base-URL variable (authUrl, chatUrl, groupChannelUrl, ...). Import an environment: **VelChat — Local** points every URL at the dev gateway http://localhost:8080 (run `pnpm start:all`), **VelChat — Production** points each at its Render URL. Set {{accessToken}} after login for the authenticated routes; {{tenant}} for tenant-scoped ones.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "gateway", "value": "http://localhost:8080" },
-    { "key": "tenant", "value": "org-demo" },
-    { "key": "accessToken", "value": "" }
+    { "key": "authUrl", "value": "http://localhost:8080" },
+    { "key": "userUrl", "value": "http://localhost:8080" },
+    { "key": "chatUrl", "value": "http://localhost:8080" },
+    { "key": "groupChannelUrl", "value": "http://localhost:8080" },
+    { "key": "presenceUrl", "value": "http://localhost:8080" },
+    { "key": "realtimeUrl", "value": "http://localhost:8080" },
+    { "key": "apiGatewayUrl", "value": "http://localhost:8080" },
+    { "key": "accessToken", "value": "" },
+    { "key": "tenant", "value": "org-demo" }
   ],
   "item": [
     {
       "name": "Health",
       "item": [
-        { "name": "Gateway /health", "request": { "method": "GET", "url": "{{gateway}}/health" } },
         {
-          "name": "api-gateway :3000/health",
-          "request": { "method": "GET", "url": "http://localhost:3000/health" }
+          "name": "api-gateway /health",
+          "request": { "method": "GET", "url": "{{apiGatewayUrl}}/health" }
+        },
+        { "name": "auth /health", "request": { "method": "GET", "url": "{{authUrl}}/health" } },
+        { "name": "user /health", "request": { "method": "GET", "url": "{{userUrl}}/health" } },
+        { "name": "chat /health", "request": { "method": "GET", "url": "{{chatUrl}}/health" } },
+        {
+          "name": "group-channel /health",
+          "request": { "method": "GET", "url": "{{groupChannelUrl}}/health" }
         },
         {
-          "name": "auth :3002/health",
-          "request": { "method": "GET", "url": "http://localhost:3002/health" }
+          "name": "presence /health",
+          "request": { "method": "GET", "url": "{{presenceUrl}}/health" }
         },
         {
-          "name": "chat :3004/health",
-          "request": { "method": "GET", "url": "http://localhost:3004/health" }
+          "name": "realtime /health",
+          "request": { "method": "GET", "url": "{{realtimeUrl}}/health" }
         },
-        {
-          "name": "auth :3002/metrics",
-          "request": { "method": "GET", "url": "http://localhost:3002/metrics" }
-        }
+        { "name": "auth /ready", "request": { "method": "GET", "url": "{{authUrl}}/ready" } },
+        { "name": "auth /metrics", "request": { "method": "GET", "url": "{{authUrl}}/metrics" } }
       ]
     },
     {
-      "name": "Auth (P1 — §B2)",
-      "description": "Endpoints land in P1. Routed via the gateway: /auth/* → auth-service.",
+      "name": "Auth (§B2)",
+      "description": "DAPT auth: Reverse-OTP cold start, device-key + passkey login, rotating refresh, recovery.",
       "item": [
         {
-          "name": "Register (cold-start, Reverse-OTP)",
+          "name": "Register (cold-start → Reverse-OTP)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "try { const j = pm.response.json(); if (j.sessionId) pm.collectionVariables.set('sessionId', j.sessionId); } catch (e) {}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{gateway}}/auth/register",
-            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"+919999999999\"\n}" }
+            "url": "{{authUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+919999999999\",\n  \"platform\": \"android\",\n  \"devicePubkeyBase64\": \"<base64 SPKI DER device public key>\"\n}"
+            }
           }
         },
         {
-          "name": "Verify (Reverse-OTP session)",
+          "name": "Session (fetch provisioned tokens)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "try { const j = pm.response.json(); if (j.accessToken) pm.collectionVariables.set('accessToken', j.accessToken); } catch (e) {}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{gateway}}/auth/verify",
+            "url": "{{authUrl}}/auth/session",
+            "body": { "mode": "raw", "raw": "{\n  \"sessionId\": \"{{sessionId}}\"\n}" }
+          }
+        },
+        {
+          "name": "Reverse-OTP webhook (SIP gateway → server)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{authUrl}}/auth/revotp/webhook",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sessionId\": \"<from register>\",\n  \"token\": \"<token>\"\n}"
+              "raw": "{\n  \"sessionId\": \"{{sessionId}}\",\n  \"callerId\": \"+919999999999\",\n  \"token\": \"<token>\",\n  \"origination\": \"mobile\",\n  \"attestationOk\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Challenge (device-key login step 1)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{authUrl}}/auth/challenge",
+            "body": { "mode": "raw", "raw": "{\n  \"deviceId\": \"<device uuid>\"\n}" }
+          }
+        },
+        {
+          "name": "Login with device-key (step 2)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{authUrl}}/auth/login/device-key",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deviceId\": \"<device uuid>\",\n  \"signature\": \"<base64 signature of the nonce>\"\n}"
             }
           }
         },
@@ -62,14 +127,265 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{gateway}}/auth/token/refresh",
-            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"<opaque>\"\n}" }
+            "url": "{{authUrl}}/auth/token/refresh",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"<opaque refresh token>\",\n  \"cnfJkt\": \"<DPoP key thumbprint (optional)>\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List devices",
+          "request": { "method": "GET", "url": "{{authUrl}}/auth/devices?accountId=<account uuid>" }
+        },
+        {
+          "name": "Magic-link begin (email)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{authUrl}}/auth/magic/begin",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"platform\": \"web\",\n  \"devicePubkeyBase64\": \"<base64>\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Magic-link verify",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{authUrl}}/auth/magic/verify",
+            "body": { "mode": "raw", "raw": "{\n  \"token\": \"<magic token>\"\n}" }
+          }
+        },
+        {
+          "name": "Link new device — request (QR)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{authUrl}}/auth/link/request",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"devicePubkeyBase64\": \"<base64>\",\n  \"platform\": \"desktop\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Link new device — approve (trusted device)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{authUrl}}/auth/link/approve",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"linkId\": \"<from request>\",\n  \"approverDeviceId\": \"<trusted device uuid>\",\n  \"signature\": \"<base64 signature>\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Link new device — poll",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{authUrl}}/auth/link/poll",
+            "body": { "mode": "raw", "raw": "{\n  \"linkId\": \"<from request>\"\n}" }
+          }
+        },
+        {
+          "name": "Passkey register — options",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{authUrl}}/auth/passkey/register/options",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountId\": \"<account uuid>\",\n  \"userName\": \"alice\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Passkey register — verify",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{authUrl}}/auth/passkey/register/verify",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountId\": \"<account uuid>\",\n  \"response\": { }\n}"
+            }
+          }
+        },
+        {
+          "name": "Passkey login — options",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{authUrl}}/auth/passkey/login/options",
+            "body": { "mode": "raw", "raw": "{\n  \"accountId\": \"<account uuid>\"\n}" }
+          }
+        },
+        {
+          "name": "Passkey login — verify",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{authUrl}}/auth/passkey/login/verify",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountId\": \"<account uuid>\",\n  \"deviceId\": \"<device uuid>\",\n  \"response\": { }\n}"
+            }
+          }
+        },
+        {
+          "name": "Number change — begin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{authUrl}}/auth/number-change/begin",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountId\": \"<account uuid>\",\n  \"newPhone\": \"+919888888888\",\n  \"trustedDeviceId\": \"<device uuid>\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Recovery — begin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{authUrl}}/auth/recovery/begin",
+            "body": { "mode": "raw", "raw": "{\n  \"accountId\": \"<account uuid>\"\n}" }
+          }
+        },
+        {
+          "name": "Recovery — add factor",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{authUrl}}/auth/recovery/factor",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recoveryId\": \"<from begin>\",\n  \"factor\": \"email\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Recovery — backup code",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{authUrl}}/auth/recovery/backup-code",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recoveryId\": \"<from begin>\",\n  \"accountId\": \"<account uuid>\",\n  \"code\": \"<backup code>\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Recovery — complete",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{authUrl}}/auth/recovery/complete",
+            "body": { "mode": "raw", "raw": "{\n  \"recoveryId\": \"<from begin>\"\n}" }
+          }
+        },
+        {
+          "name": "Backup codes — issue",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{authUrl}}/auth/backup-codes/issue",
+            "body": { "mode": "raw", "raw": "{\n  \"accountId\": \"<account uuid>\"\n}" }
+          }
+        },
+        {
+          "name": "JWKS (public verify keys)",
+          "request": { "method": "GET", "url": "{{authUrl}}/.well-known/jwks.json" }
+        }
+      ]
+    },
+    {
+      "name": "Channels / Groups (§B7)",
+      "item": [
+        {
+          "name": "Create / open DM (dedupe)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "try { const j = pm.response.json(); if (j.conversationId) pm.collectionVariables.set('conversationId', j.conversationId); } catch (e) {}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{groupChannelUrl}}/conversations/dm",
+            "body": { "mode": "raw", "raw": "{\n  \"a\": \"alice\",\n  \"b\": \"bob\"\n}" }
+          }
+        },
+        {
+          "name": "Create group",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{groupChannelUrl}}/groups",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"creator\": \"alice\",\n  \"name\": \"Weekend Trip\",\n  \"members\": [\"bob\", \"carol\"]\n}"
+            }
+          }
+        },
+        {
+          "name": "Create channel (tenant)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-tenant-id", "value": "{{tenant}}" }
+            ],
+            "url": "{{groupChannelUrl}}/channels",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenantId\": \"{{tenant}}\",\n  \"creator\": \"alice\",\n  \"name\": \"engineering\",\n  \"visibility\": \"public\",\n  \"isAnnouncement\": false\n}"
+            }
+          }
+        },
+        {
+          "name": "Add member (owner/admin only)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{groupChannelUrl}}/conversations/{{conversationId}}/members",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"actorId\": \"alice\",\n  \"userId\": \"dave\",\n  \"role\": \"member\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Remove member",
+          "request": {
+            "method": "DELETE",
+            "url": "{{groupChannelUrl}}/conversations/{{conversationId}}/members/dave?actorId=alice"
+          }
+        },
+        {
+          "name": "List members",
+          "request": {
+            "method": "GET",
+            "url": "{{groupChannelUrl}}/conversations/{{conversationId}}/members"
           }
         }
       ]
     },
     {
-      "name": "Chat (P2 — §B4)",
+      "name": "Chat (§B4)",
       "item": [
         {
           "name": "Send message",
@@ -80,12 +396,41 @@
               { "key": "Authorization", "value": "Bearer {{accessToken}}" },
               { "key": "x-tenant-id", "value": "{{tenant}}" }
             ],
-            "url": "{{gateway}}/chat/messages",
+            "url": "{{chatUrl}}/chat/messages",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"conversationId\": \"<id>\",\n  \"clientMsgId\": \"<uuid>\",\n  \"ciphertext\": \"<base64>\"\n}"
+              "raw": "{\n  \"conversationId\": \"{{conversationId}}\",\n  \"senderId\": \"alice\",\n  \"clientMsgId\": \"00000000-0000-0000-0000-000000000001\",\n  \"type\": \"text\",\n  \"content\": \"hello from postman\"\n}"
             }
           }
+        },
+        {
+          "name": "Message history (cursor by seq)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{chatUrl}}/chat/conversations/{{conversationId}}/messages?afterSeq=0&limit=50"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Realtime (§B9) — WebSocket",
+      "description": "Connect a Postman WebSocket request to {{realtimeUrl}}/ws?token=<accessToken> (use wss:// for production). Inbound frames: ping, sync, delivered, read, skdm, skdm-request. Server pushes message / receipt / skdm frames.",
+      "item": [
+        {
+          "name": "realtime /health",
+          "request": { "method": "GET", "url": "{{realtimeUrl}}/health" }
+        }
+      ]
+    },
+    {
+      "name": "Docs (Swagger per service)",
+      "item": [
+        { "name": "auth /docs", "request": { "method": "GET", "url": "{{authUrl}}/docs" } },
+        { "name": "chat /docs", "request": { "method": "GET", "url": "{{chatUrl}}/docs" } },
+        {
+          "name": "group-channel /docs",
+          "request": { "method": "GET", "url": "{{groupChannelUrl}}/docs" }
         }
       ]
     }

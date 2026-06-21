@@ -84,6 +84,19 @@ export interface MessageReceiptPayload {
   at: Iso8601;
 }
 
+/** Emitted when a media blob is stored (§B11). For personal media the bytes are ciphertext. */
+export interface FileUploadedPayload {
+  media_id: string;
+  owner_id: AccountId;
+  conversation_id: string | null;
+  tenant_id: TenantId | null;
+  mime: string | null;
+  size: number | null;
+  content_hash: string;
+  encrypted: boolean;
+  uploaded_at: Iso8601;
+}
+
 export interface PresenceChangedPayload {
   account_id: AccountId;
   status: 'online' | 'offline' | 'away';
@@ -103,6 +116,7 @@ export interface EventPayloads {
   'message.sent': MessageSentPayload;
   'message.delivered': MessageReceiptPayload;
   'message.read': MessageReceiptPayload;
+  'file.uploaded': FileUploadedPayload;
   'presence.changed': PresenceChangedPayload;
 }
 
