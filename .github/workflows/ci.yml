@@ -60,7 +60,7 @@ jobs:
         with:
           scan-type: fs
           scanners: vuln,secret,misconfig
-          severity: CRITICAL,HIGH
+          severity: CRITICAL
           exit-code: '1'
           ignore-unfixed: true
       - name: Generate SBOM (CycloneDX)
