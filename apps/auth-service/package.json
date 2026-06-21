@@ -8,6 +8,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
     "test": "jest",
+    "test:int": "jest -c jest.int.config.cjs --runInBand",
     "start": "cross-env SERVICE_NAME=auth-service HTTP_PORT=3002 node dist/main.js",
     "dev": "cross-env SERVICE_NAME=auth-service HTTP_PORT=3002 tsx watch src/main.ts",
     "clean": "rimraf dist .turbo coverage"
@@ -40,6 +41,7 @@
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.7",
     "@types/pg": "^8.11.10",
-    "@types/qrcode": "^1.5.5"
+    "@types/qrcode": "^1.5.5",
+    "testcontainers": "^10.13.2"
   }
 }
