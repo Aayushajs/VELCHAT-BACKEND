@@ -55,7 +55,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Trivy filesystem scan (deps + IaC)
-        uses: aquasecurity/trivy-action@0.28.0
+        # Pin to v0.35.0 SHA (post-incident safe release; bare @0.28.0 tag no longer exists).
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1
         with:
           scan-type: fs
           scanners: vuln,secret,misconfig
