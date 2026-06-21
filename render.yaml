@@ -1,236 +1,111 @@
 # Render Blueprint — VelChat backend on the FREE tier (₹0 MVP).
+# Docs: https://render.com/docs/blueprint-spec   ·   Deploy guide: deploy/RENDER.md
 #
-# Managed free services (set the secrets in the dashboard, never in git):
-#   Postgres → Neon · Mongo → Atlas · Redis/Streams → Upstash · Media → Cloudinary
-#   Search   → Atlas Search · Traces/metrics → Grafana Cloud (OTLP)
+# Managed free datastores (set the secrets in the dashboard, never in git):
+#   Postgres → Neon · Mongo → Atlas · Redis + Streams → Upstash · Media → Cloudinary
+#   Traces/metrics → Grafana Cloud (OTLP)
 #
-# Free-tier note: Render's free plan spins services down when idle and limits how many run at
-# once. For a first deploy, keep the core set (api-gateway, auth, user, chat, realtime, presence,
-# notification) and comment the rest until you upgrade. Each service builds from its own Dockerfile
-# with the repo root as build context.
+# Each service builds from its own Dockerfile with the repo root as context and listens on the
+# port Render injects (config maps PORT → HTTP_PORT). Render free web services sleep when idle.
+#
+# This blueprint deploys the BUILT CORE (auth, chat, realtime, group-channel, user, presence) plus
+# api-gateway. The remaining scaffolded services (notification, media, search, call, automation, ai)
+# are listed-but-commented at the bottom — uncomment them as each phase lands / you upgrade the plan.
 
 envVarGroups:
   - name: velchat-shared
     envVars:
-      - key: NODE_ENV
-        value: production
-      - key: LOG_LEVEL
-        value: info
-      # Free-tier provider selection
-      - key: EVENT_BUS
-        value: redis-streams
-      - key: STORAGE_PROVIDER
-        value: cloudinary
-      - key: SEARCH_PROVIDER
-        value: atlas
-      # Secrets — set these in the Render dashboard (sync:false keeps them out of git)
-      - key: POSTGRES_URL # Neon connection string (sslmode=require)
-        sync: false
-      - key: MONGO_URL # MongoDB Atlas SRV string
-        sync: false
-      - key: VALKEY_URL # Upstash Redis URL (rediss://...) — cache + Redis Streams event bus
-        sync: false
-      - key: CLOUDINARY_URL # cloudinary://key:secret@cloud
-        sync: false
-      - key: OTEL_EXPORTER_OTLP_ENDPOINT # https://otlp-gateway-<region>.grafana.net/otlp
-        sync: false
-      - key: OTEL_EXPORTER_OTLP_HEADERS # Authorization=Basic <base64 instanceID:token>
-        sync: false
+      - { key: NODE_ENV, value: production }
+      - { key: LOG_LEVEL, value: info }
+      # Free-tier provider selection (port + adapter)
+      - { key: EVENT_BUS, value: redis-streams }
+      - { key: STORAGE_PROVIDER, value: cloudinary }
+      - { key: SEARCH_PROVIDER, value: atlas }
+      # Secrets — set in the Render dashboard (sync:false keeps them out of git)
+      - { key: POSTGRES_URL, sync: false } # Neon (sslmode=require)
+      - { key: MONGO_URL, sync: false } # MongoDB Atlas SRV
+      - { key: VALKEY_URL, sync: false } # Upstash (rediss://…) — cache + event bus
+      - { key: CLOUDINARY_URL, sync: false } # cloudinary://key:secret@cloud
+      - { key: OTEL_EXPORTER_OTLP_ENDPOINT, sync: false } # https://otlp-gateway-<region>.grafana.net/otlp
+      - { key: OTEL_EXPORTER_OTLP_HEADERS, sync: false } # Authorization=Basic <base64 id:token>
 
 services:
-  - {
-      type: web,
-      name: velchat-api-gateway,
-      runtime: docker,
-      plan: free,
-      dockerfilePath: ./docker/api-gateway.Dockerfile,
-      dockerContext: .,
-      healthCheckPath: /health,
-      envVars:
-        [
-          { fromGroup: velchat-shared },
-          { key: SERVICE_NAME, value: api-gateway },
-          { key: HTTP_PORT, value: 10000 },
-        ],
-    }
-  - {
-      type: web,
-      name: velchat-auth-service,
-      runtime: docker,
-      plan: free,
-      dockerfilePath: ./docker/auth-service.Dockerfile,
-      dockerContext: .,
-      healthCheckPath: /health,
-      envVars:
-        [
-          { fromGroup: velchat-shared },
-          { key: SERVICE_NAME, value: auth-service },
-          { key: HTTP_PORT, value: 10000 },
-        ],
-    }
-  - {
-      type: web,
-      name: velchat-user-service,
-      runtime: docker,
-      plan: free,
-      dockerfilePath: ./docker/user-service.Dockerfile,
-      dockerContext: .,
-      healthCheckPath: /health,
-      envVars:
-        [
-          { fromGroup: velchat-shared },
-          { key: SERVICE_NAME, value: user-service },
-          { key: HTTP_PORT, value: 10000 },
-        ],
-    }
-  - {
-      type: web,
-      name: velchat-chat-service,
-      runtime: docker,
-      plan: free,
-      dockerfilePath: ./docker/chat-service.Dockerfile,
-      dockerContext: .,
-      healthCheckPath: /health,
-      envVars:
-        [
-          { fromGroup: velchat-shared },
-          { key: SERVICE_NAME, value: chat-service },
-          { key: HTTP_PORT, value: 10000 },
-        ],
-    }
-  - {
-      type: web,
-      name: velchat-realtime-gateway,
-      runtime: docker,
-      plan: free,
-      dockerfilePath: ./docker/realtime-gateway.Dockerfile,
-      dockerContext: .,
-      healthCheckPath: /health,
-      envVars:
-        [
-          { fromGroup: velchat-shared },
-          { key: SERVICE_NAME, value: realtime-gateway },
-          { key: HTTP_PORT, value: 10000 },
-        ],
-    }
-  - {
-      type: web,
-      name: velchat-presence-service,
-      runtime: docker,
-      plan: free,
-      dockerfilePath: ./docker/presence-service.Dockerfile,
-      dockerContext: .,
-      healthCheckPath: /health,
-      envVars:
-        [
-          { fromGroup: velchat-shared },
-          { key: SERVICE_NAME, value: presence-service },
-          { key: HTTP_PORT, value: 10000 },
-        ],
-    }
-  - {
-      type: web,
-      name: velchat-notification-service,
-      runtime: docker,
-      plan: free,
-      dockerfilePath: ./docker/notification-service.Dockerfile,
-      dockerContext: .,
-      healthCheckPath: /health,
-      envVars:
-        [
-          { fromGroup: velchat-shared },
-          { key: SERVICE_NAME, value: notification-service },
-          { key: HTTP_PORT, value: 10000 },
-        ],
-    }
-  # ── Upgrade beyond the free MVP to enable the rest ──
-  - {
-      type: web,
-      name: velchat-group-channel-service,
-      runtime: docker,
-      plan: free,
-      dockerfilePath: ./docker/group-channel-service.Dockerfile,
-      dockerContext: .,
-      healthCheckPath: /health,
-      envVars:
-        [
-          { fromGroup: velchat-shared },
-          { key: SERVICE_NAME, value: group-channel-service },
-          { key: HTTP_PORT, value: 10000 },
-        ],
-    }
-  - {
-      type: web,
-      name: velchat-media-service,
-      runtime: docker,
-      plan: free,
-      dockerfilePath: ./docker/media-service.Dockerfile,
-      dockerContext: .,
-      healthCheckPath: /health,
-      envVars:
-        [
-          { fromGroup: velchat-shared },
-          { key: SERVICE_NAME, value: media-service },
-          { key: HTTP_PORT, value: 10000 },
-        ],
-    }
-  - {
-      type: web,
-      name: velchat-search-service,
-      runtime: docker,
-      plan: free,
-      dockerfilePath: ./docker/search-service.Dockerfile,
-      dockerContext: .,
-      healthCheckPath: /health,
-      envVars:
-        [
-          { fromGroup: velchat-shared },
-          { key: SERVICE_NAME, value: search-service },
-          { key: HTTP_PORT, value: 10000 },
-        ],
-    }
-  - {
-      type: web,
-      name: velchat-call-service,
-      runtime: docker,
-      plan: free,
-      dockerfilePath: ./docker/call-service.Dockerfile,
-      dockerContext: .,
-      healthCheckPath: /health,
-      envVars:
-        [
-          { fromGroup: velchat-shared },
-          { key: SERVICE_NAME, value: call-service },
-          { key: HTTP_PORT, value: 10000 },
-        ],
-    }
-  - {
-      type: web,
-      name: velchat-automation-service,
-      runtime: docker,
-      plan: free,
-      dockerfilePath: ./docker/automation-service.Dockerfile,
-      dockerContext: .,
-      healthCheckPath: /health,
-      envVars:
-        [
-          { fromGroup: velchat-shared },
-          { key: SERVICE_NAME, value: automation-service },
-          { key: HTTP_PORT, value: 10000 },
-        ],
-    }
-  - {
-      type: web,
-      name: velchat-ai-service,
-      runtime: docker,
-      plan: free,
-      dockerfilePath: ./docker/ai-service.Dockerfile,
-      dockerContext: .,
-      healthCheckPath: /health,
-      envVars:
-        [
-          { fromGroup: velchat-shared },
-          { key: SERVICE_NAME, value: ai-service },
-          { key: HTTP_PORT, value: 10000 },
-        ],
-    }
+  - type: web
+    name: velchat-api-gateway
+    runtime: docker
+    plan: free
+    dockerfilePath: ./docker/api-gateway.Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - { fromGroup: velchat-shared }
+      - { key: SERVICE_NAME, value: api-gateway }
+
+  - type: web
+    name: velchat-auth-service
+    runtime: docker
+    plan: free
+    dockerfilePath: ./docker/auth-service.Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - { fromGroup: velchat-shared }
+      - { key: SERVICE_NAME, value: auth-service }
+
+  - type: web
+    name: velchat-user-service
+    runtime: docker
+    plan: free
+    dockerfilePath: ./docker/user-service.Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - { fromGroup: velchat-shared }
+      - { key: SERVICE_NAME, value: user-service }
+
+  - type: web
+    name: velchat-chat-service
+    runtime: docker
+    plan: free
+    dockerfilePath: ./docker/chat-service.Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - { fromGroup: velchat-shared }
+      - { key: SERVICE_NAME, value: chat-service }
+
+  - type: web
+    name: velchat-realtime-gateway
+    runtime: docker
+    plan: free
+    dockerfilePath: ./docker/realtime-gateway.Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - { fromGroup: velchat-shared }
+      - { key: SERVICE_NAME, value: realtime-gateway }
+
+  - type: web
+    name: velchat-group-channel-service
+    runtime: docker
+    plan: free
+    dockerfilePath: ./docker/group-channel-service.Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - { fromGroup: velchat-shared }
+      - { key: SERVICE_NAME, value: group-channel-service }
+
+  - type: web
+    name: velchat-presence-service
+    runtime: docker
+    plan: free
+    dockerfilePath: ./docker/presence-service.Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - { fromGroup: velchat-shared }
+      - { key: SERVICE_NAME, value: presence-service }
+# ── Enable the rest as each phase lands (or upgrade beyond the free tier). Copy a block above and
+#    swap SERVICE_NAME + dockerfilePath for: notification-service, media-service, search-service,
+#    call-service, automation-service, ai-service. Their Dockerfiles already exist in ./docker/.
