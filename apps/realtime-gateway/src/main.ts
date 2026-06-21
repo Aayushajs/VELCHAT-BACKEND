@@ -4,9 +4,14 @@ import { hostname } from 'node:os';
 import { loadConfig, requireValkeyUrl } from '@velchat/config';
 import { createLogger, createMetrics, bootstrapService } from '@velchat/common';
 import { ValkeyClient } from '@velchat/cache';
-import { AppModule } from './app.module';
+import type { EventBus } from '@velchat/event-bus';
+import { AppModule, EVENT_BUS } from './app.module';
 import { ConnectionRegistry } from './fabric/connection-registry';
+import { EventRouter } from './fabric/event-router';
 import { WsFabric } from './fabric/ws-fabric';
+import { MembershipProjection } from './fanout/membership-projection';
+import { ValkeyPodPublisher } from './fanout/valkey-pod-publisher';
+import { FanoutConsumer } from './fanout/fanout-consumer';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -27,6 +32,18 @@ async function main(): Promise<void> {
       jwtPublicKey: process.env.JWT_PUBLIC_KEY,
     });
     await fabric.start();
+
+    // §B9.2 fan-out: consume durable events → resolve members → push to online sockets.
+    const bus = app.get<EventBus>(EVENT_BUS, { strict: false });
+    if (bus) {
+      const router = new EventRouter(registry, new ValkeyPodPublisher(valkey.redis));
+      const projection = new MembershipProjection(valkey.redis);
+      const fanout = new FanoutConsumer(bus, projection, router, logger);
+      fanout.register();
+      await bus.start();
+      logger.info('realtime fan-out consumer started');
+    }
+
     app.enableShutdownHooks();
     process.on('SIGTERM', () => void fabric.stop());
   }

@@ -8,10 +8,10 @@ describe('EventRouter (§B9.2 fan-out)', () => {
       podsFor: async (u: string) => podsByUser[u] ?? [],
     } as unknown as ConnectionRegistry;
 
-    const published: Array<{ podId: string }> = [];
+    const published: Array<{ podId: string; userId: string }> = [];
     const pub: PodPublisher = {
-      async publishToPod(podId) {
-        published.push({ podId });
+      async publishToPod(podId, env) {
+        published.push({ podId, userId: env.userId });
       },
     };
 
@@ -20,6 +20,8 @@ describe('EventRouter (§B9.2 fan-out)', () => {
 
     expect(deliveries).toBe(3); // u1→pod-A, u2→pod-A, u2→pod-B
     expect(published.map((p) => p.podId).sort()).toEqual(['pod-A', 'pod-A', 'pod-B']);
+    // each delivery carries the recipient so the owning pod routes to the right socket
+    expect(published.filter((p) => p.userId === 'u2').length).toBe(2);
   });
 
   it('skips offline recipients (no pods)', async () => {
