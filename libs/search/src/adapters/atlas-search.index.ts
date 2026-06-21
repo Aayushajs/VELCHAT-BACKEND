@@ -1,5 +1,5 @@
 import mongoose, { type Connection } from 'mongoose';
-import type { SearchIndex, SearchDoc, SearchHit } from './search.port';
+import type { SearchIndex, SearchDoc, SearchHit } from '../search.port';
 
 /**
  * MongoDB Atlas Search adapter (free tier). Documents live in `search_<indexName>` collections;

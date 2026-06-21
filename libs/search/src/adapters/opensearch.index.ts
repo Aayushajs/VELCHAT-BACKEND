@@ -1,5 +1,5 @@
 import { Client } from '@opensearch-project/opensearch';
-import type { SearchIndex, SearchDoc, SearchHit } from './search.port';
+import type { SearchIndex, SearchDoc, SearchHit } from '../search.port';
 
 /** Self-hosted OpenSearch adapter. Tenant filter injected on every query (§G6-3). */
 export class OpenSearchIndex implements SearchIndex {

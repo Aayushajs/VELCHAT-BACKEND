@@ -7,7 +7,7 @@ import {
   IdempotencyStore,
   type EventEnvelope,
 } from '@velchat/shared-utils';
-import type { EventBus, EventHandler } from './event-bus.port';
+import type { EventBus, EventHandler } from '../event-bus.port';
 
 export interface KafkaEventBusOptions {
   clientId: string;

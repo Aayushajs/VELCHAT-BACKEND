@@ -1,7 +1,7 @@
 import { loadConfig } from '@velchat/config';
 import { createEventBus } from './create-event-bus';
-import { RedisStreamsEventBus } from './redis-streams.bus';
-import { KafkaEventBus } from './kafka.bus';
+import { RedisStreamsEventBus } from './adapters/redis-streams.bus';
+import { KafkaEventBus } from './adapters/kafka.bus';
 
 const logger = { error() {}, warn() {}, info() {}, debug() {}, fatal() {} } as never;
 

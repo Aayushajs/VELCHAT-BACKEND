@@ -1,7 +1,7 @@
 import { requireCloudinaryUrl, requireS3Endpoint, type AppConfig } from '@velchat/config';
 import type { ObjectStorage } from './storage.port';
-import { CloudinaryStorage } from './cloudinary.storage';
-import { S3Storage } from './s3.storage';
+import { CloudinaryStorage } from './adapters/cloudinary.storage';
+import { S3Storage } from './adapters/s3.storage';
 
 /** Selects the storage adapter from config. Default `cloudinary` (free); `s3` for MinIO/AWS. */
 export function createStorage(config: AppConfig): ObjectStorage {

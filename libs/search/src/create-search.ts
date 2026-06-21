@@ -1,7 +1,7 @@
 import { requireMongoUrl, requireOpenSearchNode, type AppConfig } from '@velchat/config';
 import type { SearchIndex } from './search.port';
-import { AtlasSearchIndex } from './atlas-search.index';
-import { OpenSearchIndex } from './opensearch.index';
+import { AtlasSearchIndex } from './adapters/atlas-search.index';
+import { OpenSearchIndex } from './adapters/opensearch.index';
 
 /** Selects the search adapter from config. Default `atlas` (free); `opensearch` self-hosted. */
 export function createSearchIndex(config: AppConfig): SearchIndex {

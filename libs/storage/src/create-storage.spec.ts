@@ -1,7 +1,7 @@
 import { loadConfig } from '@velchat/config';
 import { createStorage } from './create-storage';
-import { CloudinaryStorage } from './cloudinary.storage';
-import { S3Storage } from './s3.storage';
+import { CloudinaryStorage } from './adapters/cloudinary.storage';
+import { S3Storage } from './adapters/s3.storage';
 
 describe('createStorage (provider selection)', () => {
   it('defaults to cloudinary (free tier)', () => {

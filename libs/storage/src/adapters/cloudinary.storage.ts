@@ -1,5 +1,5 @@
 import { v2 as cloudinary } from 'cloudinary';
-import type { ObjectStorage, PutObjectInput, PutObjectResult } from './storage.port';
+import type { ObjectStorage, PutObjectInput, PutObjectResult } from '../storage.port';
 
 /** Cloudinary object storage (free tier). Configured from a `cloudinary://key:secret@cloud` URL. */
 export class CloudinaryStorage implements ObjectStorage {

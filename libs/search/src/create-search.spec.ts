@@ -1,7 +1,7 @@
 import { loadConfig } from '@velchat/config';
 import { createSearchIndex } from './create-search';
-import { AtlasSearchIndex } from './atlas-search.index';
-import { OpenSearchIndex } from './opensearch.index';
+import { AtlasSearchIndex } from './adapters/atlas-search.index';
+import { OpenSearchIndex } from './adapters/opensearch.index';
 
 describe('createSearchIndex (provider selection)', () => {
   it('defaults to atlas (free tier)', () => {

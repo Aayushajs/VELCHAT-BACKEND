@@ -1,8 +1,8 @@
 import type { Logger } from 'pino';
 import { kafkaBrokers, requireValkeyUrl, type AppConfig } from '@velchat/config';
 import type { EventBus } from './event-bus.port';
-import { RedisStreamsEventBus } from './redis-streams.bus';
-import { KafkaEventBus } from './kafka.bus';
+import { RedisStreamsEventBus } from './adapters/redis-streams.bus';
+import { KafkaEventBus } from './adapters/kafka.bus';
 
 /**
  * Selects the event-bus adapter from config. Default `redis-streams` (Upstash free tier);
