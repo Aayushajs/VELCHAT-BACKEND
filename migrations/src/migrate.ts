@@ -6,16 +6,34 @@
  *   POSTGRES_URL=... pnpm --filter @velchat/migrations migrate          # apply pending
  *   POSTGRES_URL=... pnpm --filter @velchat/migrations migrate:status   # list state
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { Client } from 'pg';
 
 const sqlDir = join(__dirname, 'sql');
 
+/**
+ * Load the repo-root `.env` so `pnpm db:migrate` works without exporting POSTGRES_URL first
+ * (services already load it via @velchat/common). Dependency-free; never overrides a real env var.
+ */
+function loadRootEnv(): void {
+  if (process.env.POSTGRES_URL) return;
+  const envPath = join(__dirname, '..', '..', '.env');
+  if (!existsSync(envPath)) return;
+  for (const line of readFileSync(envPath, 'utf8').split('\n')) {
+    const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line);
+    if (!m) continue;
+    const key = m[1];
+    const value = m[2] ?? '';
+    if (key && process.env[key] === undefined) process.env[key] = value.replace(/^["']|["']$/g, '');
+  }
+}
+
 async function main(): Promise<void> {
+  loadRootEnv();
   const url = process.env.POSTGRES_URL;
   if (!url) {
-    console.error('POSTGRES_URL is required');
+    console.error('POSTGRES_URL is required (set it in env or the repo-root .env)');
     process.exit(1);
   }
   const command = process.argv[2] ?? 'up';

@@ -29,4 +29,21 @@ describe('EventRouter (§B9.2 fan-out)', () => {
     const router = new EventRouter(registry, { async publishToPod() {} });
     expect(await router.route(['offline-user'], {})).toBe(0);
   });
+
+  it('routes per-device with the deviceId tag (§B5.3 / §G1-2)', async () => {
+    const registry = {
+      podsForDevice: async (u: string, d: string) => (u === 'u1' && d === 'devA' ? ['pod-A'] : []),
+    } as unknown as ConnectionRegistry;
+    const sent: Array<{ podId: string; userId: string; deviceId?: string }> = [];
+    const router = new EventRouter(registry, {
+      async publishToPod(podId, env) {
+        sent.push({ podId, userId: env.userId, deviceId: env.deviceId });
+      },
+    });
+
+    expect(await router.routeToDevice('u1', 'devA', { kind: 'durable', type: 'skdm' })).toBe(1);
+    expect(sent).toEqual([{ podId: 'pod-A', userId: 'u1', deviceId: 'devA' }]);
+    // a device that isn't connected gets nothing
+    expect(await router.routeToDevice('u1', 'devGhost', {})).toBe(0);
+  });
 });

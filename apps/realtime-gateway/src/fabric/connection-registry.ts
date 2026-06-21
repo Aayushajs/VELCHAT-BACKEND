@@ -48,6 +48,12 @@ export class ConnectionRegistry {
     return [...new Set(conns.map((c) => c.podId))];
   }
 
+  /** Distinct pods holding a specific device's sockets — per-device routing (§B5.3 / §G1-2). */
+  async podsForDevice(userId: string, deviceId: string): Promise<string[]> {
+    const conns = await this.connectionsFor(userId);
+    return [...new Set(conns.filter((c) => c.deviceId === deviceId).map((c) => c.podId))];
+  }
+
   async isOnline(userId: string): Promise<boolean> {
     return (await this.redis.scard(this.key(userId))) > 0;
   }

@@ -11,11 +11,13 @@ function makeChannels() {
     getMemberRole: jest.fn(async (): Promise<MemberRole | null> => 'owner'),
     memberCount: jest.fn(async () => 2),
     updateLastRead: jest.fn(async () => undefined),
+    bumpSenderKeyEpochIfGroup: jest.fn(async (): Promise<number | null> => 2),
   };
   const events = {
     conversationCreated: jest.fn(async () => undefined),
     memberAdded: jest.fn(async () => undefined),
     memberRemoved: jest.fn(async () => undefined),
+    groupEpochChanged: jest.fn(async () => undefined),
   };
   const svc = new ChannelsService(repo as never, events as never);
   return { svc, repo, events };
@@ -69,5 +71,19 @@ describe('ChannelsService (§B7)', () => {
     await svc.addMember('conv-1', 'actor', 'newbie');
     expect(repo.addMember).toHaveBeenCalledWith('conv-1', 'newbie', 'member');
     expect(events.memberAdded).toHaveBeenCalled();
+  });
+
+  it('rotates the sender-key epoch on member removal (§G1-2)', async () => {
+    const { svc, repo, events } = makeChannels();
+    await svc.removeMember('conv-1', 'owner', 'bob');
+    expect(repo.bumpSenderKeyEpochIfGroup).toHaveBeenCalledWith('conv-1');
+    expect(events.groupEpochChanged).toHaveBeenCalledWith('conv-1', 2, 'member.removed');
+  });
+
+  it('does not emit an epoch change for a non-group (bump returns null)', async () => {
+    const { svc, repo, events } = makeChannels();
+    repo.bumpSenderKeyEpochIfGroup.mockResolvedValueOnce(null); // a channel, not a group
+    await svc.addMember('chan-1', 'owner', 'newbie');
+    expect(events.groupEpochChanged).not.toHaveBeenCalled();
   });
 });

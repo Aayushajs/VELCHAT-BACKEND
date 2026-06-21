@@ -73,4 +73,17 @@ export class ChannelsRepository {
       [conversationId, userId, seq],
     );
   }
+
+  /**
+   * Rotate the Sender-Key epoch on a membership change (§G1-2) — only for personal groups, which
+   * are the conversations that use Sender Keys. Returns the new epoch, or null if not a group.
+   */
+  async bumpSenderKeyEpochIfGroup(conversationId: string): Promise<number | null> {
+    const res = await this.pg.pool.query(
+      "UPDATE conversations SET sender_key_epoch = sender_key_epoch + 1 WHERE conversation_id = $1 AND type = 'group' RETURNING sender_key_epoch",
+      [conversationId],
+    );
+    const row = res.rows[0] as { sender_key_epoch: string } | undefined;
+    return row ? Number(row.sender_key_epoch) : null;
+  }
 }
