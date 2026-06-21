@@ -1,7 +1,7 @@
 import { Controller, Post, Get, Body, Query, HttpCode } from '@nestjs/common';
 import { AuthService, type RegisterInput } from './auth.service';
-import type { InboundProof } from './reverse-otp.service';
-import type { RecoveryFactor } from './recovery.service';
+import type { InboundProof } from './reverse-otp/reverse-otp.service';
+import type { RecoveryFactor } from './recovery/recovery.service';
 
 /** REST surface for auth (§B2 / flow C1). gRPC contract lives in libs/proto (P-later). */
 @Controller('auth')

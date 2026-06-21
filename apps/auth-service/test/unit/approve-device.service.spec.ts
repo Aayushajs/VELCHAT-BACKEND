@@ -1,5 +1,5 @@
 import { generateKeyPairSync, sign } from 'node:crypto';
-import { ApproveDeviceService } from '../../src/auth/approve-device.service';
+import { ApproveDeviceService } from '../../src/auth/dapt/approve-device.service';
 
 function fakeRedis() {
   const map = new Map<string, string>();

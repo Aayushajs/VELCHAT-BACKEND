@@ -8,15 +8,15 @@ import {
   RateLimitError,
 } from '@velchat/shared-utils';
 import { AuthRepository, type DeviceRow } from './auth.repository';
-import { TokenService } from './token.service';
-import { ReverseOtpService, type InboundProof } from './reverse-otp.service';
-import { DeviceKeyService } from './device-key.service';
-import { MagicLinkService } from './magic-link.service';
-import { ApproveDeviceService } from './approve-device.service';
-import { PasskeyService } from './passkey.service';
-import { RecoveryService, type RecoveryFactor } from './recovery.service';
-import { RateLimiter } from './rate-limiter';
-import { generateBackupCodes, hashCode } from './backup-codes';
+import { TokenService } from './tokens/token.service';
+import { ReverseOtpService, type InboundProof } from './reverse-otp/reverse-otp.service';
+import { DeviceKeyService } from './dapt/device-key.service';
+import { MagicLinkService } from './dapt/magic-link.service';
+import { ApproveDeviceService } from './dapt/approve-device.service';
+import { PasskeyService } from './dapt/passkey.service';
+import { RecoveryService, type RecoveryFactor } from './recovery/recovery.service';
+import { RateLimiter } from './abuse/rate-limiter';
+import { generateBackupCodes, hashCode } from './recovery/backup-codes';
 import { AuthEvents } from './auth.events';
 
 export interface RegisterInput {

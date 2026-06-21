@@ -4,8 +4,8 @@ import pino from 'pino';
 import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainers';
 import { PostgresClient } from '@velchat/database';
 import { AuthRepository } from '../../src/auth/auth.repository';
-import { TokenService } from '../../src/auth/token.service';
-import { loadOrGenerateKeyPair } from '../../src/auth/keys';
+import { TokenService } from '../../src/auth/tokens/token.service';
+import { loadOrGenerateKeyPair } from '../../src/auth/tokens/keys';
 
 /**
  * P1.7 — auth integration against a REAL Postgres (testcontainers). Exercises the DB layer that

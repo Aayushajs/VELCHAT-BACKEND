@@ -1,5 +1,9 @@
-import { TokenService, type RefreshRecord, type RefreshStore } from '../../src/auth/token.service';
-import { loadOrGenerateKeyPair } from '../../src/auth/keys';
+import {
+  TokenService,
+  type RefreshRecord,
+  type RefreshStore,
+} from '../../src/auth/tokens/token.service';
+import { loadOrGenerateKeyPair } from '../../src/auth/tokens/keys';
 
 class MemoryRefreshStore implements RefreshStore {
   private byId = new Map<string, RefreshRecord>();

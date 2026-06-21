@@ -1,0 +1,22 @@
+{
+  "name": "@velchat/mail",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Transactional email (shared) — Mailer port + self-hosted Postfix SMTP / dev log.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "clean": "rimraf dist .turbo coverage"
+  },
+  "dependencies": {
+    "@velchat/config": "workspace:*",
+    "@velchat/shared-utils": "workspace:*",
+    "nodemailer": "^6.9.16"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^6.4.17"
+  }
+}

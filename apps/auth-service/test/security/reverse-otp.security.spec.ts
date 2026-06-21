@@ -4,7 +4,7 @@ import {
   type InboundProof,
   type ReverseOtpSession,
   type ReverseOtpStore,
-} from '../../src/auth/reverse-otp.service';
+} from '../../src/auth/reverse-otp/reverse-otp.service';
 
 class MemoryStore implements ReverseOtpStore {
   private map = new Map<string, ReverseOtpSession>();

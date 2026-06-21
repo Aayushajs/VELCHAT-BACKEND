@@ -1,4 +1,4 @@
-import { PasskeyService } from '../../src/auth/passkey.service';
+import { PasskeyService } from '../../src/auth/dapt/passkey.service';
 
 function fakeRedis() {
   const map = new Map<string, string>();
