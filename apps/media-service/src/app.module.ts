@@ -11,6 +11,7 @@ import { createEventBus, type EventBus } from '@velchat/event-bus';
 import { createStorage, type ObjectStorage } from '@velchat/storage';
 import { PostgresClient } from '@velchat/database';
 import { MediaModule } from './media/media.module';
+import { BackupModule } from './backup/backup.module';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const PG_CLIENT = Symbol('PG_CLIENT');
@@ -64,6 +65,10 @@ export class AppModule {
     // Wire the media feature only when all three backends are present (else stays a bare skeleton).
     if (pg && storage && eventBus) {
       imports.push(MediaModule.forRoot({ logger: deps.logger, pg, storage, eventBus }));
+    }
+    // E2EE chat backup (§C21) — needs only Postgres + storage (no event bus).
+    if (pg && storage) {
+      imports.push(BackupModule.forRoot({ pg, storage }));
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);
