@@ -33,6 +33,26 @@ export interface IdentifierChangedPayload {
   changed_at: Iso8601;
 }
 
+/** A tenant scope (org/workspace/team). */
+export type ScopeType = 'org' | 'workspace' | 'team';
+export type TenantRole = 'owner' | 'admin' | 'member' | 'guest' | 'bot';
+
+export interface OrgCreatedPayload {
+  org_id: TenantId;
+  name: string;
+  created_by: AccountId;
+  created_at: Iso8601;
+}
+
+/** A user was added to a tenant scope (§B3) → notification, search (directory), cache. */
+export interface MemberAddedPayload {
+  scope_type: ScopeType;
+  scope_id: TenantId;
+  user_id: AccountId;
+  role: TenantRole;
+  added_at: Iso8601;
+}
+
 /** Emitted whenever the account's device list changes (§G1-3) so senders re-fetch + re-fan-out. */
 export interface DeviceListChangedPayload {
   account_id: AccountId;
@@ -128,6 +148,8 @@ export interface EventPayloads {
   'message.read': MessageReceiptPayload;
   'file.uploaded': FileUploadedPayload;
   'status.posted': StatusPostedPayload;
+  'org.created': OrgCreatedPayload;
+  'member.added': MemberAddedPayload;
   'presence.changed': PresenceChangedPayload;
 }
 
