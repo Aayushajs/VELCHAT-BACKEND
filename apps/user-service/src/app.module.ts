@@ -7,9 +7,10 @@ import {
   type ServiceMetrics,
   type ManagedResource,
 } from '@velchat/common';
-import { createEventBus } from '@velchat/event-bus';
+import { createEventBus, type EventBus } from '@velchat/event-bus';
 import { PostgresClient } from '@velchat/database';
 import { ValkeyClient } from '@velchat/cache';
+import { TenancyModule } from './tenancy/tenancy.module';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const PG_CLIENT = Symbol('PG_CLIENT');
@@ -22,19 +23,21 @@ export interface AppDeps {
 }
 
 /**
- * Orgs/workspaces/teams, memberships, roles, authorize API (§B3).
- *
- * BOOT-0 skeleton: edge surface (health/ready/metrics, OTel, tenant context) + wired DB/Kafka
- * clients only. Business logic arrives in the phase prompts (see VelChat-ClaudeCode-Prompts.md).
+ * Directory & tenancy (§B3 / §A13): orgs, workspaces, teams, memberships, per-tenant RBAC + the
+ * authorize API. Profiles/contacts (hashed discovery) land in a later increment.
  */
 @Module({})
 export class AppModule {
   static forRoot(deps: AppDeps): DynamicModule {
     const managed: ManagedResource[] = [];
     const providers: Array<{ provide: symbol; useValue: unknown }> = [];
+    const imports: DynamicModule[] = [];
+
+    let pg: PostgresClient | undefined;
+    let eventBus: EventBus | undefined;
 
     if (deps.config.POSTGRES_URL) {
-      const pg = new PostgresClient(
+      pg = new PostgresClient(
         requirePostgresUrl(deps.config),
         deps.config.POSTGRES_MAX_POOL,
         deps.logger,
@@ -50,9 +53,13 @@ export class AppModule {
     }
 
     if (deps.config.EVENT_BUS === 'kafka' ? deps.config.KAFKA_BROKERS : deps.config.VALKEY_URL) {
-      const eventBus = createEventBus(deps.config, deps.logger);
+      eventBus = createEventBus(deps.config, deps.logger);
       managed.push(eventBus);
       providers.push({ provide: EVENT_BUS, useValue: eventBus });
+    }
+
+    if (pg && eventBus) {
+      imports.push(TenancyModule.forRoot({ logger: deps.logger, pg, eventBus }));
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);
@@ -66,6 +73,7 @@ export class AppModule {
           metrics: deps.metrics,
           readiness: () => lifecycle.isReady(),
         }),
+        ...imports,
       ],
       providers: [{ provide: InfraLifecycle, useValue: lifecycle }, ...providers],
       exports: providers.map((p) => p.provide),

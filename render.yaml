@@ -106,6 +106,17 @@ services:
     envVars:
       - { fromGroup: velchat-shared }
       - { key: SERVICE_NAME, value: presence-service }
+
+  - type: web
+    name: velchat-media-service
+    runtime: docker
+    plan: free
+    dockerfilePath: ./docker/media-service.Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - { fromGroup: velchat-shared }
+      - { key: SERVICE_NAME, value: media-service }
 # ── Enable the rest as each phase lands (or upgrade beyond the free tier). Copy a block above and
-#    swap SERVICE_NAME + dockerfilePath for: notification-service, media-service, search-service,
-#    call-service, automation-service, ai-service. Their Dockerfiles already exist in ./docker/.
+#    swap SERVICE_NAME + dockerfilePath for: notification-service, search-service, call-service,
+#    automation-service, ai-service. Their Dockerfiles already exist in ./docker/.
