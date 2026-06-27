@@ -12,6 +12,7 @@ import { PostgresClient } from '@velchat/database';
 import { ValkeyClient } from '@velchat/cache';
 import { TenancyModule } from './tenancy/tenancy.module';
 import { DirectoryModule } from './directory/directory.module';
+import { AdminModule } from './admin/admin.module';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const PG_CLIENT = Symbol('PG_CLIENT');
@@ -62,6 +63,7 @@ export class AppModule {
     if (pg && eventBus) {
       imports.push(TenancyModule.forRoot({ logger: deps.logger, pg, eventBus }));
       imports.push(DirectoryModule.forRoot({ pg, eventBus }));
+      imports.push(AdminModule.forRoot({ pg }));
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);
