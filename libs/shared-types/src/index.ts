@@ -33,6 +33,13 @@ export interface IdentifierChangedPayload {
   changed_at: Iso8601;
 }
 
+/** A contact was added to a user's list (§B3) → search (personal contact index). */
+export interface ContactAddedPayload {
+  user_id: AccountId;
+  contact_user_id: AccountId;
+  added_at: Iso8601;
+}
+
 /** A tenant scope (org/workspace/team). */
 export type ScopeType = 'org' | 'workspace' | 'team';
 export type TenantRole = 'owner' | 'admin' | 'member' | 'guest' | 'bot';
@@ -150,6 +157,7 @@ export interface EventPayloads {
   'status.posted': StatusPostedPayload;
   'org.created': OrgCreatedPayload;
   'member.added': MemberAddedPayload;
+  'contact.added': ContactAddedPayload;
   'presence.changed': PresenceChangedPayload;
 }
 
