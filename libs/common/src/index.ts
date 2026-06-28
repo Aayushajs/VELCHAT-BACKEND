@@ -30,6 +30,7 @@ export {
   type ObservabilityOptions,
 } from './nest/observability.module';
 export { TenantInterceptor } from './nest/tenant.interceptor';
+export { ResponseInterceptor } from './nest/response.interceptor';
 export { AllExceptionsFilter } from './nest/all-exceptions.filter';
 export { bootstrapService, type BootstrapOptions } from './nest/bootstrap';
 export { InfraLifecycle, type ManagedResource } from './nest/infra-lifecycle';

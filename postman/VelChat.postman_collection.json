@@ -53,7 +53,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "try { const j = pm.response.json(); if (j.sessionId) pm.collectionVariables.set('sessionId', j.sessionId); } catch (e) {}"
+                  "try { const j = pm.response.json(); const d = j.data ?? j; if (d.sessionId) pm.collectionVariables.set('sessionId', d.sessionId); } catch (e) {}"
                 ],
                 "type": "text/javascript"
               }
@@ -76,7 +76,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "try { const j = pm.response.json(); if (j.accessToken) pm.collectionVariables.set('accessToken', j.accessToken); } catch (e) {}"
+                  "try { const j = pm.response.json(); const d = j.data ?? j; if (d.accessToken) pm.collectionVariables.set('accessToken', d.accessToken); } catch (e) {}"
                 ],
                 "type": "text/javascript"
               }
@@ -316,7 +316,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "try { const j = pm.response.json(); if (j.conversationId) pm.collectionVariables.set('conversationId', j.conversationId); } catch (e) {}"
+                  "try { const j = pm.response.json(); const d = j.data ?? j; if (d.conversationId) pm.collectionVariables.set('conversationId', d.conversationId); } catch (e) {}"
                 ],
                 "type": "text/javascript"
               }

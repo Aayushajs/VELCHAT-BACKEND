@@ -7,7 +7,8 @@ interface MinimalResponse {
 }
 
 /**
- * Maps every thrown error to a consistent `{ error: { code, message } }` body.
+ * Maps every thrown error to a consistent `{ statusCode, error: { code, message } }` body, so the
+ * HTTP status is always present in the payload (mirrors the success envelope in ResponseInterceptor).
  * Internal (500) messages are NOT leaked to clients (no secrets/PII); the full error is logged.
  */
 @Catch()
@@ -36,6 +37,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
       'request failed',
     );
 
-    res.status(status).json({ error: { code, message } });
+    res.status(status).json({ statusCode: status, error: { code, message } });
   }
 }

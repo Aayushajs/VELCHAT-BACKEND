@@ -5,6 +5,7 @@ import type { DynamicModule, Type } from '@nestjs/common';
 import type { Logger } from 'pino';
 import type { AppConfig } from '@velchat/config';
 import { TenantInterceptor } from './tenant.interceptor';
+import { ResponseInterceptor } from './response.interceptor';
 import { AllExceptionsFilter } from './all-exceptions.filter';
 import { shutdownTelemetry } from '../observability/tracer';
 
@@ -24,7 +25,7 @@ export async function bootstrapService(
 ): Promise<INestApplication> {
   const app = await NestFactory.create(appModule, { bufferLogs: false });
 
-  app.useGlobalInterceptors(new TenantInterceptor());
+  app.useGlobalInterceptors(new TenantInterceptor(), new ResponseInterceptor());
   app.useGlobalFilters(new AllExceptionsFilter(opts.logger));
   // Global input validation for every service (§A14.5). `whitelist` strips unknown props
   // (anti mass-assignment); `transform` coerces payloads to the DTO types. Endpoints with a
