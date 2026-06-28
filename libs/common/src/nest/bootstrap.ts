@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import type { INestApplication } from '@nestjs/common';
 import type { DynamicModule, Type } from '@nestjs/common';
 import type { Logger } from 'pino';
@@ -25,6 +26,17 @@ export async function bootstrapService(
 
   app.useGlobalInterceptors(new TenantInterceptor());
   app.useGlobalFilters(new AllExceptionsFilter(opts.logger));
+  // Global input validation for every service (§A14.5). `whitelist` strips unknown props
+  // (anti mass-assignment); `transform` coerces payloads to the DTO types. Endpoints with a
+  // DTO class + class-validator decorators are validated; inline/native body types pass through.
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: false },
+    }),
+  );
   app.enableShutdownHooks();
 
   // OpenAPI/Swagger docs for every service — UI at /docs, JSON at /docs-json. Scans all
