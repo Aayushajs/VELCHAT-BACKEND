@@ -43,31 +43,44 @@ export async function bootstrapService(
   // OpenAPI/Swagger docs for every service — UI at /docs, JSON at /docs-json. Scans all
   // registered controllers, so each module's routes show up automatically every run (§A8).
   // Loaded lazily so importing @velchat/common in tests doesn't pull the Swagger graph.
-  const { DocumentBuilder, SwaggerModule } = await import('@nestjs/swagger');
-  const openapi = new DocumentBuilder()
-    .setTitle(`VelChat — ${opts.config.SERVICE_NAME}`)
-    .setDescription(
-      [
-        `REST API for the VelChat **${opts.config.SERVICE_NAME}**.`,
-        '',
-        'A free, self-hostable WhatsApp + Teams + Slack hybrid. Personal content is E2EE (the',
-        'server stores only ciphertext); enterprise/workspace content is server-readable.',
-        '',
-        'Auth: send `Authorization: Bearer <access JWT>` (DAPT, device-bound).',
-        'Index of every service: http://localhost:8080/docs',
-      ].join('\n'),
-    )
-    .setVersion(opts.config.SERVICE_VERSION)
-    .setLicense('AGPL-3.0 / OSS', 'https://www.gnu.org/licenses/agpl-3.0.html')
-    .addServer(`http://localhost:${opts.config.HTTP_PORT}`, 'direct (this service)')
-    .addServer('http://localhost:8080', 'dev gateway (unified)')
-    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
-    .build();
-  SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, openapi), {
-    jsonDocumentUrl: 'docs-json',
-    customSiteTitle: `VelChat ${opts.config.SERVICE_NAME} API`,
-    swaggerOptions: { persistAuthorization: true, displayRequestDuration: true },
-  });
+  //
+  // Wrapped in try/catch on purpose: docs are a dev convenience and must NEVER stop a service from
+  // starting. Notably, running via `tsx` (the `pnpm dev:*` scripts) uses esbuild, which cannot emit
+  // `emitDecoratorMetadata` — so @nestjs/swagger's parameter accessor sees undefined param types and
+  // throws. Under `tsc` (the built `dist`, e.g. `pnpm start:all` / `start-all.ps1`) metadata is
+  // complete and docs are full. Either way the service boots.
+  try {
+    const { DocumentBuilder, SwaggerModule } = await import('@nestjs/swagger');
+    const openapi = new DocumentBuilder()
+      .setTitle(`VelChat — ${opts.config.SERVICE_NAME}`)
+      .setDescription(
+        [
+          `REST API for the VelChat **${opts.config.SERVICE_NAME}**.`,
+          '',
+          'A free, self-hostable WhatsApp + Teams + Slack hybrid. Personal content is E2EE (the',
+          'server stores only ciphertext); enterprise/workspace content is server-readable.',
+          '',
+          'Auth: send `Authorization: Bearer <access JWT>` (DAPT, device-bound).',
+          'Index of every service: http://localhost:8080/docs',
+        ].join('\n'),
+      )
+      .setVersion(opts.config.SERVICE_VERSION)
+      .setLicense('AGPL-3.0 / OSS', 'https://www.gnu.org/licenses/agpl-3.0.html')
+      .addServer(`http://localhost:${opts.config.HTTP_PORT}`, 'direct (this service)')
+      .addServer('http://localhost:8080', 'dev gateway (unified)')
+      .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
+      .build();
+    SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, openapi), {
+      jsonDocumentUrl: 'docs-json',
+      customSiteTitle: `VelChat ${opts.config.SERVICE_NAME} API`,
+      swaggerOptions: { persistAuthorization: true, displayRequestDuration: true },
+    });
+  } catch (err) {
+    opts.logger.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      'swagger doc generation skipped — run the built dist (tsc) for full /docs; service continues',
+    );
+  }
 
   // Graceful drain: stop accepting, let in-flight finish, flush telemetry (§B9).
   const shutdown = async (signal: string): Promise<void> => {
