@@ -21,22 +21,27 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const http = host.switchToHttp();
     const res = http.getResponse<MinimalResponse>();
     const req = http.getRequest<{ url?: string; method?: string }>();
+    // In non-production, surface the real 5xx message (+ stack) so developers can see what broke;
+    // production stays generic so we never leak internals/secrets to clients (CLAUDE.md §7).
+    const isProd = process.env.NODE_ENV === 'production';
+    const rawMessage = exception instanceof Error ? exception.message : String(exception);
 
     let status = 500;
     let code = 'INTERNAL';
-    let message = 'Internal server error';
+    // Default (unmatched/raw error, e.g. a node crypto throw) = 500: generic in prod, real in dev.
+    let message = isProd ? 'Internal server error' : rawMessage;
     let details: unknown;
 
     if (isAppError(exception)) {
       status = exception.httpStatus;
       code = exception.code;
-      message = status >= 500 ? 'Internal server error' : exception.message;
+      message = status >= 500 ? (isProd ? 'Internal server error' : rawMessage) : exception.message;
       if (status < 500) details = exception.details;
     } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       code = `HTTP_${status}`;
       if (status >= 500) {
-        message = 'Internal server error';
+        message = isProd ? 'Internal server error' : rawMessage;
       } else {
         // Surface useful messages — esp. ValidationPipe field errors, which live in
         // getResponse().message (a string[]), not the generic exception.message.

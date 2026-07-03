@@ -24,8 +24,15 @@ export class DeviceKeyService {
   async verify(deviceId: string, signatureB64: string, devicePubkeyDer: Buffer): Promise<void> {
     const nonce = await this.redis.get(`devchal:${deviceId}`);
     if (!nonce) throw new UnauthorizedError('No active device-key challenge');
-    const publicKey = createPublicKey({ key: devicePubkeyDer, format: 'der', type: 'spki' });
-    const ok = verify(null, Buffer.from(nonce), publicKey, Buffer.from(signatureB64, 'base64'));
+    // A malformed stored key or signature makes node crypto throw "Failed to read asymmetric key";
+    // that's a client/data problem, not a server fault → surface a clean 401, never a 500.
+    let ok: boolean;
+    try {
+      const publicKey = createPublicKey({ key: devicePubkeyDer, format: 'der', type: 'spki' });
+      ok = verify(null, Buffer.from(nonce), publicKey, Buffer.from(signatureB64, 'base64'));
+    } catch {
+      throw new UnauthorizedError('Device public key or signature is invalid (expected Ed25519)');
+    }
     if (!ok) throw new UnauthorizedError('Device-key signature invalid');
     await this.redis.del(`devchal:${deviceId}`);
   }

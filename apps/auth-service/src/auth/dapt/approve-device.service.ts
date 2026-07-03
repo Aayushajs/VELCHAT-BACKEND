@@ -42,8 +42,14 @@ export class ApproveDeviceService {
 
   /** Verify the trusted device signed the link challenge. */
   verifyApproval(challenge: string, approverPubkeyDer: Buffer, signatureB64: string): void {
-    const key = createPublicKey({ key: approverPubkeyDer, format: 'der', type: 'spki' });
-    const ok = verify(null, Buffer.from(challenge), key, Buffer.from(signatureB64, 'base64'));
+    // Malformed key/signature → clean 401, not a raw crypto 500 ("Failed to read asymmetric key").
+    let ok: boolean;
+    try {
+      const key = createPublicKey({ key: approverPubkeyDer, format: 'der', type: 'spki' });
+      ok = verify(null, Buffer.from(challenge), key, Buffer.from(signatureB64, 'base64'));
+    } catch {
+      throw new UnauthorizedError('Approver public key or signature is invalid (expected Ed25519)');
+    }
     if (!ok) throw new UnauthorizedError('Approver device-key signature invalid');
   }
 
