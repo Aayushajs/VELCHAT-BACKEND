@@ -11,6 +11,7 @@ import { createEventBus, type EventBus } from '@velchat/event-bus';
 import { ValkeyClient } from '@velchat/cache';
 import { PostgresClient } from '@velchat/database';
 import { StatusModule } from './status/status.module';
+import { PresenceModule } from './presence/presence.module';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const VALKEY_CLIENT = Symbol('VALKEY_CLIENT');
@@ -36,9 +37,10 @@ export class AppModule {
 
     let pg: PostgresClient | undefined;
     let eventBus: EventBus | undefined;
+    let valkey: ValkeyClient | undefined;
 
     if (deps.config.VALKEY_URL) {
-      const valkey = new ValkeyClient(requireValkeyUrl(deps.config), deps.logger);
+      valkey = new ValkeyClient(requireValkeyUrl(deps.config), deps.logger);
       managed.push(valkey);
       providers.push({ provide: VALKEY_CLIENT, useValue: valkey });
     }
@@ -61,6 +63,9 @@ export class AppModule {
 
     if (pg && eventBus) {
       imports.push(StatusModule.forRoot({ logger: deps.logger, pg, eventBus }));
+    }
+    if (valkey && eventBus) {
+      imports.push(PresenceModule.forRoot({ redis: valkey.redis, eventBus }));
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);

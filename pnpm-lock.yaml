@@ -1063,10 +1063,16 @@ importers:
       '@velchat/config':
         specifier: workspace:*
         version: link:../config
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.3
       web-push:
         specifier: ^3.6.7
         version: 3.6.7
     devDependencies:
+      '@types/jsonwebtoken':
+        specifier: ^9.0.7
+        version: 9.0.10
       '@types/web-push':
         specifier: ^3.6.4
         version: 3.6.4

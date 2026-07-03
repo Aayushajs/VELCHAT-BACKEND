@@ -169,7 +169,10 @@ export const envSchema = z.object({
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().default('mailto:admin@velchat.local'),
+  // FCM (Android/iOS) via HTTP v1. Provide the service-account creds via ENV — NEVER commit the JSON.
   FCM_PROJECT_ID: z.string().optional(),
+  FCM_CLIENT_EMAIL: z.string().optional(),
+  FCM_PRIVATE_KEY: z.string().optional(), // PEM; escaped \n allowed (unescaped at use)
 
   // Calls & meetings — LiveKit SFU (§A17). Unset → call-service runs but can't mint join tokens.
   LIVEKIT_URL: z.string().optional(), // wss://<host> the client connects to

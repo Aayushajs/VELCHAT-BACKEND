@@ -14,9 +14,11 @@
   "dependencies": {
     "@velchat/config": "workspace:*",
     "@velchat/common": "workspace:*",
+    "jsonwebtoken": "^9.0.2",
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.7",
     "@types/web-push": "^3.6.4"
   }
 }

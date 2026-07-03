@@ -10,7 +10,7 @@ import {
 import { createEventBus, type EventBus } from '@velchat/event-bus';
 import { PostgresClient } from '@velchat/database';
 import { ValkeyClient } from '@velchat/cache';
-import { createWebPush } from '@velchat/push';
+import { createPushRouter } from '@velchat/push';
 import { NotificationModule } from './notify/notification.module';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
@@ -65,7 +65,7 @@ export class AppModule {
         pg,
         redis: valkey.redis,
         eventBus,
-        push: createWebPush(deps.config, deps.logger),
+        push: createPushRouter(deps.config, deps.logger),
       });
       imports.push(module);
       // After infra connects: register consumers, start the bus, and start the outbox worker.
