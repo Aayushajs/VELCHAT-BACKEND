@@ -21,6 +21,12 @@ coverage/
 *.key
 *.crt
 secrets/
+# cloud service-account keys (Firebase/FCM, GCP) — configure via env, never commit the JSON
+*firebase*adminsdk*.json
+*-service-account*.json
+*.serviceaccount.json
+gcp-*.json
+google-credentials*.json
 
 # logs
 *.log
