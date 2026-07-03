@@ -124,6 +124,38 @@ export interface FileUploadedPayload {
   uploaded_at: Iso8601;
 }
 
+/** Call/room started (§B12) → notification (ring), audit, ai (transcribe when enterprise). */
+export interface CallStartedPayload {
+  call_id: string;
+  type: 'dm' | 'group' | 'meeting' | 'huddle';
+  conversation_id: string | null;
+  host_id: AccountId;
+  room_name: string;
+  started_at: Iso8601;
+}
+
+export interface CallEndedPayload {
+  call_id: string;
+  ended_at: Iso8601;
+}
+
+/** A participant joined or left a call (§B12) → realtime fan-out to the room. */
+export interface CallParticipantPayload {
+  call_id: string;
+  user_id: AccountId;
+  role: 'host' | 'cohost' | 'attendee';
+  at: Iso8601;
+}
+
+/** A meeting was scheduled (§A17.3) → notification + iCal invite with a join link. */
+export interface MeetingScheduledPayload {
+  meeting_id: string;
+  call_id: string;
+  organizer_id: AccountId;
+  scheduled_at: Iso8601 | null;
+  invitees: AccountId[];
+}
+
 /** A status/story was posted (§B8/§C11) → realtime rings only the audience members. */
 export interface StatusPostedPayload {
   status_id: string;
@@ -158,6 +190,11 @@ export interface EventPayloads {
   'org.created': OrgCreatedPayload;
   'member.added': MemberAddedPayload;
   'contact.added': ContactAddedPayload;
+  'call.started': CallStartedPayload;
+  'call.ended': CallEndedPayload;
+  'call.participant.joined': CallParticipantPayload;
+  'call.participant.left': CallParticipantPayload;
+  'meeting.scheduled': MeetingScheduledPayload;
   'presence.changed': PresenceChangedPayload;
 }
 

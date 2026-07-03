@@ -373,6 +373,9 @@ importers:
       drizzle-orm:
         specifier: ^0.38.3
         version: 0.38.4(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(pg@8.22.0)
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.3
       pg:
         specifier: ^8.13.1
         version: 8.22.0
@@ -386,6 +389,9 @@ importers:
         specifier: ^7.8.1
         version: 7.8.2
     devDependencies:
+      '@types/jsonwebtoken':
+        specifier: ^9.0.7
+        version: 9.0.10
       '@types/pg':
         specifier: ^8.11.10
         version: 8.20.0
