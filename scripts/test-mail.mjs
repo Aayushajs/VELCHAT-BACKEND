@@ -4,12 +4,21 @@
 //
 //   node scripts/test-mail.mjs [recipient@example.com]
 import { boot, ui, done } from './_shared.mjs';
-import { createMailer } from '@velchat/mail';
+import { createMailer, welcomeEmail, verificationCodeEmail, magicLinkEmail } from '@velchat/mail';
 
 const { config, logger } = boot('test-mail');
 const to = process.argv[2] || config.MAIL_FROM || 'test@example.com';
+// Which branded template to preview: welcome (default) | verify | magic
+const which = (process.argv[3] || 'welcome').toLowerCase();
+const template =
+  which === 'verify'
+    ? verificationCodeEmail({ code: '481920', expiresMinutes: 10 })
+    : which === 'magic'
+      ? magicLinkEmail({ url: 'https://velchat.app/auth/magic/verify?token=demo', expiresMinutes: 15 })
+      : welcomeEmail({ name: 'there' });
 
 ui.title('Mail (@velchat/mail)');
+ui.info(`template: ${which}  ·  subject: "${template.subject}"`);
 const mode = config.SMTP_URL ? 'SMTP (real send)' : 'LogMailer (dev — logs only)';
 ui.info(`transport: ${mode}  →  to: ${to}`);
 
@@ -25,12 +34,7 @@ try {
 }
 
 try {
-  await mailer.send({
-    to,
-    subject: 'VelChat integration test',
-    text: 'This is a VelChat integration test email. If you received this, SMTP is wired correctly.',
-    html: '<p>This is a <b>VelChat</b> integration test email. If you received this, SMTP is wired correctly.</p>',
-  });
+  await mailer.send({ to, ...template });
   if (config.SMTP_URL) {
     ui.ok(`Sent via SMTP — check the inbox for ${to}.`);
   } else {

@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import type { Redis } from 'ioredis';
 import { UnauthorizedError } from '@velchat/common';
-import type { Mailer } from '@velchat/mail';
+import { magicLinkEmail, type Mailer } from '@velchat/mail';
 
 /** What we provision once the emailed link is clicked (limited tier — email-only, §B2.4 fallback). */
 export interface MagicLinkPending {
@@ -25,8 +25,7 @@ export class MagicLinkService {
     const link = `${this.baseUrl}/auth/magic/verify?token=${token}`;
     await this.mailer.send({
       to: input.email,
-      subject: 'Your VelChat sign-in link',
-      text: `Sign in to VelChat: ${link}\n\nThis link expires shortly and can be used once.`,
+      ...magicLinkEmail({ url: link, expiresMinutes: Math.round(this.ttlSec / 60) }),
     });
     return { sent: true };
   }

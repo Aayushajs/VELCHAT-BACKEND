@@ -28,6 +28,25 @@ envVarGroups:
       - { key: CLOUDINARY_URL, sync: false } # cloudinary://key:secret@cloud
       - { key: OTEL_EXPORTER_OTLP_ENDPOINT, sync: false } # https://otlp-gateway-<region>.grafana.net/otlp
       - { key: OTEL_EXPORTER_OTLP_HEADERS, sync: false } # Authorization=Basic <base64 id:token>
+      # ── Feature integrations (all OPTIONAL — unset ⇒ safe dev fallback; verify with scripts/) ──
+      # Mail (auth magic-link/welcome + notification digests). Brevo/Postfix: smtp://user:pass@host:587
+      - { key: SMTP_URL, sync: false } # URL-encode @/: in user+pass (@ → %40)
+      - { key: MAIL_FROM, sync: false } # a VERIFIED sender (else the relay blocks it)
+      # Reverse-OTP (₹0 verification, §B2.2) — Asterisk/FreeSWITCH webhook
+      - { key: REVOTP_WEBHOOK_SECRET, sync: false }
+      - { key: REVOTP_DID, sync: false } # owned inbound number users missed-call / SMS
+      # Web Push (VAPID) — npx web-push generate-vapid-keys
+      - { key: VAPID_PUBLIC_KEY, sync: false }
+      - { key: VAPID_PRIVATE_KEY, sync: false }
+      - { key: VAPID_SUBJECT, sync: false } # mailto:ops@yourdomain or a URL
+      # Mobile Push (FCM HTTP v1) — from the service-account JSON (keep \n escapes in the key)
+      - { key: FCM_PROJECT_ID, sync: false }
+      - { key: FCM_CLIENT_EMAIL, sync: false }
+      - { key: FCM_PRIVATE_KEY, sync: false }
+      # Calls (LiveKit SFU) — from your LiveKit server/cloud
+      - { key: LIVEKIT_URL, sync: false } # wss://…
+      - { key: LIVEKIT_API_KEY, sync: false }
+      - { key: LIVEKIT_API_SECRET, sync: false }
 
 services:
   - type: web
