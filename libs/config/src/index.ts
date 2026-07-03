@@ -1,8 +1,97 @@
-// Load a local `.env` in development. No-op when the file is absent (prod/K8s/Render inject env via
-// the platform / Sealed Secrets). dotenv never overrides already-set process.env, so cross-env and
-// platform values always win over the file.
-import 'dotenv/config';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { config as loadEnv } from 'dotenv';
 import { z } from 'zod';
+
+/**
+ * Load the nearest `.env` walking up from the current working directory to the repo root. This makes
+ * a single service work the SAME whether started from the repo root (`start-all`) or from its own
+ * package dir (`pnpm dev:auth`) — otherwise the per-service run finds no `.env`, the datastore URLs
+ * are missing, feature modules don't wire, and routes 404. No-op in prod/K8s/Render where env is
+ * injected by the platform. dotenv never overrides already-set process.env (platform values win).
+ */
+function loadEnvFromRoot(): void {
+  let dir = process.cwd();
+  for (let i = 0; i < 10; i += 1) {
+    const candidate = join(dir, '.env');
+    if (existsSync(candidate)) {
+      loadEnv({ path: candidate });
+      return;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  loadEnv(); // fall back to dotenv's default (cwd) behaviour
+}
+loadEnvFromRoot();
+
+/** Walk up from cwd to the monorepo root (the dir holding pnpm-workspace.yaml). */
+function findRepoRoot(): string {
+  let dir = process.cwd();
+  for (let i = 0; i < 10; i += 1) {
+    if (existsSync(join(dir, 'pnpm-workspace.yaml'))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return process.cwd();
+}
+
+/** Short git SHA from a platform env (Render/CI) or the local .git — no shell spawn. */
+function gitShortSha(root: string): string | null {
+  const fromEnv =
+    process.env.GIT_SHA ?? process.env.BUILD_SHA ?? process.env.RENDER_GIT_COMMIT ?? null;
+  if (fromEnv) return fromEnv.slice(0, 7);
+  try {
+    const head = readFileSync(join(root, '.git', 'HEAD'), 'utf8').trim();
+    if (!head.startsWith('ref:')) return head.slice(0, 7); // detached HEAD = raw sha
+    const ref = head.slice(4).trim();
+    const refFile = join(root, '.git', ref);
+    if (existsSync(refFile)) return readFileSync(refFile, 'utf8').trim().slice(0, 7);
+    const packed = join(root, '.git', 'packed-refs');
+    if (existsSync(packed)) {
+      for (const line of readFileSync(packed, 'utf8').split('\n')) {
+        const [sha, name] = line.split(' ');
+        if (name === ref && sha) return sha.slice(0, 7);
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** The owning service's package.json version, resolved by SERVICE_NAME regardless of cwd. */
+function packageVersion(root: string): string {
+  const name = process.env.SERVICE_NAME;
+  const candidates = [
+    ...(name ? [join(root, 'apps', name, 'package.json')] : []),
+    join(root, 'package.json'),
+  ];
+  for (const p of candidates) {
+    try {
+      const v = (JSON.parse(readFileSync(p, 'utf8')) as { version?: string }).version;
+      if (v) return v;
+    } catch {
+      /* keep looking */
+    }
+  }
+  return '0.1.0';
+}
+
+/**
+ * Stamp SERVICE_VERSION so it is meaningful and auto-updates on every change: `<pkgVersion>+<sha>`
+ * (e.g. `0.1.0+419f7f4`). An explicit SERVICE_VERSION env always wins (CI can pin it).
+ */
+function stampVersion(): void {
+  if (process.env.SERVICE_VERSION) return;
+  const root = findRepoRoot();
+  const sha = gitShortSha(root);
+  const base = packageVersion(root);
+  process.env.SERVICE_VERSION = sha ? `${base}+${sha}` : base;
+}
+stampVersion();
 
 /**
  * Environment schema (zod). Validated once at service boot.

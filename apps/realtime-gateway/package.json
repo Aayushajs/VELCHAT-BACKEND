@@ -9,7 +9,7 @@
     "lint": "eslint src",
     "test": "jest",
     "start": "cross-env SERVICE_NAME=realtime-gateway HTTP_PORT=3001 node dist/main.js",
-    "dev": "cross-env SERVICE_NAME=realtime-gateway HTTP_PORT=3001 tsx watch src/main.ts",
+    "dev": "cross-env SERVICE_NAME=realtime-gateway HTTP_PORT=3001 TS_NODE_TRANSPILE_ONLY=true TS_NODE_PROJECT=../../tsconfig.base.json node --watch -r ts-node/register src/main.ts",
     "clean": "rimraf dist .turbo coverage"
   },
   "dependencies": {

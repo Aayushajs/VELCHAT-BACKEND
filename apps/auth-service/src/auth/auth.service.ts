@@ -192,6 +192,12 @@ export class AuthService {
     if (!input.phone || !input.platform || !input.devicePubkeyBase64) {
       throw new ValidationError('phone, platform and devicePubkeyBase64 are required');
     }
+    try {
+      // Fail-fast if the provided key is not valid base64. This prevents a 500 error later in the webhook.
+      Buffer.from(input.devicePubkeyBase64, 'base64');
+    } catch {
+      throw new ValidationError('devicePubkeyBase64 must be a valid base64 string');
+    }
     // §B2.8: anti-pumping / Sybil — cap registration attempts per number.
     if (!(await this.rateLimiter.allow(`register:${input.phone}`, 5, 3600))) {
       throw new RateLimitError('Too many registration attempts for this number');

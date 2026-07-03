@@ -10,7 +10,7 @@
     "test": "jest",
     "test:int": "jest -c jest.int.config.cjs --runInBand",
     "start": "cross-env SERVICE_NAME=auth-service HTTP_PORT=3002 node dist/main.js",
-    "dev": "cross-env SERVICE_NAME=auth-service HTTP_PORT=3002 tsx watch src/main.ts",
+    "dev": "cross-env SERVICE_NAME=auth-service HTTP_PORT=3002 TS_NODE_TRANSPILE_ONLY=true TS_NODE_PROJECT=../../tsconfig.base.json node --watch -r ts-node/register src/main.ts",
     "clean": "rimraf dist .turbo coverage"
   },
   "dependencies": {
