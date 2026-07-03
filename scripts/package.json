@@ -1,0 +1,22 @@
+{
+  "name": "@velchat/scripts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Operational check scripts — verify env-driven integrations (mail, push/FCM, calls/LiveKit, OTP) actually work with the keys in .env.",
+  "scripts": {
+    "check": "node check-integrations.mjs",
+    "test:mail": "node test-mail.mjs",
+    "test:push": "node test-push.mjs",
+    "test:livekit": "node test-livekit.mjs",
+    "test:otp": "node test-otp.mjs",
+    "test:all": "node check-integrations.mjs && node test-mail.mjs && node test-push.mjs && node test-livekit.mjs"
+  },
+  "dependencies": {
+    "@velchat/common": "workspace:*",
+    "@velchat/config": "workspace:*",
+    "@velchat/mail": "workspace:*",
+    "@velchat/push": "workspace:*",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

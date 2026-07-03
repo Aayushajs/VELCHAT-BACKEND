@@ -1122,6 +1122,24 @@ importers:
         specifier: ^8.11.10
         version: 8.20.0
 
+  scripts:
+    dependencies:
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../libs/common
+      '@velchat/config':
+        specifier: workspace:*
+        version: link:../libs/config
+      '@velchat/mail':
+        specifier: workspace:*
+        version: link:../libs/mail
+      '@velchat/push':
+        specifier: workspace:*
+        version: link:../libs/push
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.3
+
 packages:
 
   '@aws-crypto/crc32@5.2.0':
