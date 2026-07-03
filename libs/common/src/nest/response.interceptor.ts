@@ -15,10 +15,12 @@ interface MinimalHttpResponse {
 const SKIP_PREFIXES = ['/metrics', '/docs', '/health', '/ready', '/.well-known'];
 
 /**
- * Wraps every successful JSON response in a consistent envelope `{ statusCode, data }` so the HTTP
- * status is always present in the body (the error path does the same via AllExceptionsFilter).
- * Skips infra/doc routes and non-JSON payloads (strings/buffers), and passes through anything that
- * already carries its own `statusCode` (idempotent).
+ * Wraps every successful JSON response in a consistent envelope
+ * `{ success: true, statusCode, message, data }` so the outcome is always self-describing (the error
+ * path mirrors this via AllExceptionsFilter → `{ success: false, statusCode, message, error }`).
+ * A handler may set its own message by returning `{ message, ...rest }` — the message is hoisted to
+ * the envelope and the rest becomes `data`. Skips infra/doc routes and non-JSON payloads, and passes
+ * through anything already enveloped (idempotent).
  */
 @Injectable()
 export class ResponseInterceptor implements NestInterceptor {
@@ -32,11 +34,23 @@ export class ResponseInterceptor implements NestInterceptor {
     );
 
     return next.handle().pipe(
-      map((data: unknown) => {
-        if (skip) return data;
-        if (typeof data === 'string' || Buffer.isBuffer(data)) return data; // text/binary endpoints
-        if (data && typeof data === 'object' && 'statusCode' in data) return data; // already enveloped
-        return { statusCode: res.statusCode ?? 200, data: data ?? null };
+      map((payload: unknown) => {
+        if (skip) return payload;
+        if (typeof payload === 'string' || Buffer.isBuffer(payload)) return payload; // text/binary
+        if (payload && typeof payload === 'object' && 'success' in payload) return payload; // enveloped
+
+        const statusCode = res.statusCode ?? 200;
+        let message = statusCode === 201 ? 'Created' : 'OK';
+        let data: unknown = payload ?? null;
+        // Let a handler override the message by returning { message, ...rest }.
+        if (payload && typeof payload === 'object' && 'message' in payload) {
+          const { message: m, ...rest } = payload as Record<string, unknown>;
+          if (typeof m === 'string') {
+            message = m;
+            data = rest;
+          }
+        }
+        return { success: true, statusCode, message, data };
       }),
     );
   }
