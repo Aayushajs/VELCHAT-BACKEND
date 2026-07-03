@@ -170,6 +170,16 @@ export const envSchema = z.object({
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().default('mailto:admin@velchat.local'),
   FCM_PROJECT_ID: z.string().optional(),
+
+  // Calls & meetings — LiveKit SFU (§A17). Unset → call-service runs but can't mint join tokens.
+  LIVEKIT_URL: z.string().optional(), // wss://<host> the client connects to
+  LIVEKIT_API_KEY: z.string().optional(),
+  LIVEKIT_API_SECRET: z.string().optional(),
+  LIVEKIT_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
+
+  // Reverse-OTP gateway (§B2.2) — Asterisk/FreeSWITCH webhook shared secret + owned DID.
+  REVOTP_WEBHOOK_SECRET: z.string().optional(),
+  REVOTP_DID: z.string().optional(), // the inbound number users missed-call / SMS
 });
 
 export type AppConfig = Readonly<z.infer<typeof envSchema>>;
@@ -215,6 +225,8 @@ export const requireValkeyUrl = (cfg: AppConfig): string => require_(cfg, 'VALKE
 export const requireOpenSearchNode = (cfg: AppConfig): string => require_(cfg, 'OPENSEARCH_NODE');
 export const requireS3Endpoint = (cfg: AppConfig): string => require_(cfg, 'S3_ENDPOINT');
 export const requireCloudinaryUrl = (cfg: AppConfig): string => require_(cfg, 'CLOUDINARY_URL');
+export const requireLivekitKey = (cfg: AppConfig): string => require_(cfg, 'LIVEKIT_API_KEY');
+export const requireLivekitSecret = (cfg: AppConfig): string => require_(cfg, 'LIVEKIT_API_SECRET');
 
 export const isProduction = (cfg: AppConfig): boolean => cfg.NODE_ENV === 'production';
 

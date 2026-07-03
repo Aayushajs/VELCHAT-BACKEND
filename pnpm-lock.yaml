@@ -373,6 +373,9 @@ importers:
       drizzle-orm:
         specifier: ^0.38.3
         version: 0.38.4(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(pg@8.22.0)
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.3
       pg:
         specifier: ^8.13.1
         version: 8.22.0
@@ -386,6 +389,9 @@ importers:
         specifier: ^7.8.1
         version: 7.8.2
     devDependencies:
+      '@types/jsonwebtoken':
+        specifier: ^9.0.7
+        version: 9.0.10
       '@types/pg':
         specifier: ^8.11.10
         version: 8.20.0
@@ -610,6 +616,9 @@ importers:
       '@nestjs/swagger':
         specifier: ^7.4.2
         version: 7.4.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@velchat/cache':
+        specifier: workspace:*
+        version: link:../../libs/cache
       '@velchat/common':
         specifier: workspace:*
         version: link:../../libs/common
@@ -622,6 +631,9 @@ importers:
       '@velchat/event-bus':
         specifier: workspace:*
         version: link:../../libs/event-bus
+      '@velchat/push':
+        specifier: workspace:*
+        version: link:../../libs/push
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
@@ -637,6 +649,9 @@ importers:
       drizzle-orm:
         specifier: ^0.38.3
         version: 0.38.4(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(pg@8.22.0)
+      ioredis:
+        specifier: ^5.4.2
+        version: 5.11.1
       pg:
         specifier: ^8.13.1
         version: 8.22.0

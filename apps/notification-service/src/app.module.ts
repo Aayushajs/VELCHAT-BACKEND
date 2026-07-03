@@ -1,5 +1,5 @@
 import { Module, type DynamicModule } from '@nestjs/common';
-import { requirePostgresUrl, type AppConfig } from '@velchat/config';
+import { requirePostgresUrl, requireValkeyUrl, type AppConfig } from '@velchat/config';
 import type { Logger } from 'pino';
 import {
   ObservabilityModule,
@@ -7,8 +7,11 @@ import {
   type ServiceMetrics,
   type ManagedResource,
 } from '@velchat/common';
-import { createEventBus } from '@velchat/event-bus';
+import { createEventBus, type EventBus } from '@velchat/event-bus';
 import { PostgresClient } from '@velchat/database';
+import { ValkeyClient } from '@velchat/cache';
+import { createWebPush } from '@velchat/push';
+import { NotificationModule } from './notify/notification.module';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const PG_CLIENT = Symbol('PG_CLIENT');
@@ -20,19 +23,23 @@ export interface AppDeps {
 }
 
 /**
- * Durable outbox, push routing (APNs/FCM/WebPush), idempotent dispatch (§B10).
- *
- * BOOT-0 skeleton: edge surface (health/ready/metrics, OTel, tenant context) + wired DB/Kafka
- * clients only. Business logic arrives in the phase prompts (see VelChat-ClaudeCode-Prompts.md).
+ * notification-service (§B10 / §A19 / §G4): resolve recipients → apply prefs/presence → enqueue a
+ * NO-CONTENT push into a durable, idempotent, DLQ-backed outbox → deliver with retry/backoff. Push is
+ * a best-effort hint; unread/badge truth is cursor sync. E2EE payloads carry ids only.
  */
 @Module({})
 export class AppModule {
   static forRoot(deps: AppDeps): DynamicModule {
     const managed: ManagedResource[] = [];
     const providers: Array<{ provide: symbol; useValue: unknown }> = [];
+    const imports: DynamicModule[] = [];
+
+    let pg: PostgresClient | undefined;
+    let valkey: ValkeyClient | undefined;
+    let eventBus: EventBus | undefined;
 
     if (deps.config.POSTGRES_URL) {
-      const pg = new PostgresClient(
+      pg = new PostgresClient(
         requirePostgresUrl(deps.config),
         deps.config.POSTGRES_MAX_POOL,
         deps.logger,
@@ -41,10 +48,38 @@ export class AppModule {
       providers.push({ provide: PG_CLIENT, useValue: pg });
     }
 
+    if (deps.config.VALKEY_URL) {
+      valkey = new ValkeyClient(requireValkeyUrl(deps.config), deps.logger);
+      managed.push(valkey);
+    }
+
     if (deps.config.EVENT_BUS === 'kafka' ? deps.config.KAFKA_BROKERS : deps.config.VALKEY_URL) {
-      const eventBus = createEventBus(deps.config, deps.logger);
+      eventBus = createEventBus(deps.config, deps.logger);
       managed.push(eventBus);
       providers.push({ provide: EVENT_BUS, useValue: eventBus });
+    }
+
+    if (pg && valkey && eventBus) {
+      const { module, wiring } = NotificationModule.forRoot({
+        logger: deps.logger,
+        pg,
+        redis: valkey.redis,
+        eventBus,
+        push: createWebPush(deps.config, deps.logger),
+      });
+      imports.push(module);
+      // After infra connects: register consumers, start the bus, and start the outbox worker.
+      const bus = eventBus;
+      managed.push({
+        name: 'notification-pipeline',
+        connect: async () => {
+          wiring.consumer.register();
+          await bus.start();
+          wiring.worker.start();
+        },
+        ping: async () => true,
+        close: async () => wiring.worker.stop(),
+      });
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);
@@ -58,6 +93,7 @@ export class AppModule {
           metrics: deps.metrics,
           readiness: () => lifecycle.isReady(),
         }),
+        ...imports,
       ],
       providers: [{ provide: InfraLifecycle, useValue: lifecycle }, ...providers],
       exports: providers.map((p) => p.provide),
