@@ -85,7 +85,7 @@ Run on **2026-07-04**, env `development`, against the current `.env`:
 | Event bus | ✅ redis-streams | via Valkey |
 | **Calls (LiveKit)** | ✅ **works** | token mint + verify round-trip OK (`wss://…livekit.cloud`) |
 | **OTP / auth (e2e)** | ✅ **works** | full Reverse-OTP + device-key login passes end to end |
-| **Mail (SMTP → Brevo)** | ⚠️ **code OK, creds rejected** | URL now parses + reaches Brevo; Brevo returns `535 Authentication failed` — see §5 |
+| **Mail (SMTP → Brevo)** | ✅ **works** | sends via Brevo relay once the SMTP **key** (not the account password) is set — see §5 |
 | **Push / FCM** | ⚠️ **not configured** | `FCM_CLIENT_EMAIL` / `FCM_PRIVATE_KEY` not set → falls back to log; add creds to go live |
 | Web Push (VAPID) | ⚠️ not set | web push logged; generate keys to enable |
 | OpenSearch | ⚠️ not set | search disabled (optional) |
@@ -98,9 +98,10 @@ Run on **2026-07-04**, env `development`, against the current `.env`:
 
 ### Mail (Brevo / any SMTP)
 - Format: `SMTP_URL=smtp://USER:PASS@host:587`. **URL-encode** `@`/`:` in USER or PASS (`@` → `%40`).
-- **Brevo gotcha (current 535):** the SMTP password must be the **generated SMTP key** from Brevo →
-  *SMTP & API → SMTP*, **not** your account login password. Replace `PASS` with that key and re-run
-  `test:mail`. Login is usually your `xxxxxxxx@smtp-brevo.com` value.
+- **Brevo gotcha (this bit us — `535 Authentication failed`):** the SMTP password must be the
+  **generated SMTP key** from Brevo → *SMTP & API → SMTP* (looks like `xsmtpsib-…`), **not** your
+  account login password. Login is your `xxxxxxxx@smtp-brevo.com` value. With the key set, `test:mail`
+  delivers. If mail still doesn't arrive, verify the `MAIL_FROM` sender under Brevo → *Senders*.
 - Port `587` = STARTTLS (`smtp://`); port `465` = TLS-on-connect (`smtps://`).
 
 ### Push / FCM (mobile)
