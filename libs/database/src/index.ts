@@ -11,3 +11,10 @@ export type {
   CallType,
   ParticipantRole,
 } from './entities/call.schema';
+export * as notificationSchema from './entities/notification.schema';
+export type {
+  NotificationPrefRow,
+  PushEndpointRow,
+  OutboxRow,
+  NotifyLevel,
+} from './entities/notification.schema';
