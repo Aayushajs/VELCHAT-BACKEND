@@ -29,3 +29,12 @@ export type {
 } from './entities/mail-campaign.schema';
 export * as aiSchema from './entities/ai.schema';
 export type { UserLanguageRow, ChatTranslatePrefRow, TranslateMode } from './entities/ai.schema';
+export * as automationSchema from './entities/automation.schema';
+export type {
+  BotRow,
+  SlashCommandRow,
+  WorkflowRow,
+  WebhookOutboundRow,
+  AutomationJobRow,
+  JobKind,
+} from './entities/automation.schema';
