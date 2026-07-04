@@ -1,19 +1,18 @@
 name: release
 
-# Automated versioning + changelog + GitHub Release via semantic-release (Conventional Commits).
-# Runs only on push to main, after building + testing on the same commit. Separate from ci.yml
-# (which stays untouched). No npm publish — packages are private; this only tags + releases the repo.
+# Automated versioning for the monorepo via Changesets — versions ONLY the packages that changed.
+# On push to main: if unreleased changesets exist, opens a "Version Packages" PR; when that PR
+# merges, creates git tags + GitHub Releases. No npm publish (packages are private). ci.yml is
+# untouched; this workflow only handles versioning/releases.
 
 on:
   push:
     branches: [main]
 
-# semantic-release needs to create tags/releases and push the CHANGELOG commit back to main.
+# changesets/action needs to open the version PR + create tags/releases.
 permissions:
   contents: write
-  issues: write
   pull-requests: write
-  id-token: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -21,13 +20,12 @@ concurrency:
 
 jobs:
   release:
-    name: semantic-release
+    name: changesets
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # full history + tags so semantic-release can find the last version
-          persist-credentials: true
+          fetch-depth: 0 # full history + tags so Changesets computes bumps correctly
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.0
@@ -36,10 +34,13 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Release only on a green build + tests (same gates as ci.yml, self-contained here).
-      - run: pnpm build
-      - run: pnpm test
-      - name: Release
+      - name: Create Version PR / tag + release
+        uses: changesets/action@v1
+        with:
+          version: pnpm changeset:version
+          # Private monorepo → no npm publish; tag packages so the action cuts GitHub Releases.
+          publish: pnpm changeset:tag
+          commit: 'chore(release): version packages'
+          title: 'chore(release): version packages'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm release
