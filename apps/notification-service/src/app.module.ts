@@ -11,7 +11,9 @@ import { createEventBus, type EventBus } from '@velchat/event-bus';
 import { PostgresClient } from '@velchat/database';
 import { ValkeyClient } from '@velchat/cache';
 import { createPushRouter } from '@velchat/push';
+import { createMailer } from '@velchat/mail';
 import { NotificationModule } from './notify/notification.module';
+import { CampaignModule } from './campaigns/campaign.module';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const PG_CLIENT = Symbol('PG_CLIENT');
@@ -79,6 +81,20 @@ export class AppModule {
         },
         ping: async () => true,
         close: async () => wiring.worker.stop(),
+      });
+
+      // Bulk mail campaigns + scheduler (uses the shared @velchat/mail mailer from config).
+      const campaigns = CampaignModule.forRoot({
+        logger: deps.logger,
+        pg,
+        mailer: createMailer(deps.config, deps.logger),
+      });
+      imports.push(campaigns.module);
+      managed.push({
+        name: 'campaign-scheduler',
+        connect: async () => campaigns.wiring.worker.start(),
+        ping: async () => true,
+        close: async () => campaigns.wiring.worker.stop(),
       });
     }
 

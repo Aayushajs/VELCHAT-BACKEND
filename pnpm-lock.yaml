@@ -631,6 +631,9 @@ importers:
       '@velchat/event-bus':
         specifier: workspace:*
         version: link:../../libs/event-bus
+      '@velchat/mail':
+        specifier: workspace:*
+        version: link:../../libs/mail
       '@velchat/push':
         specifier: workspace:*
         version: link:../../libs/push
@@ -1136,6 +1139,9 @@ importers:
       '@velchat/push':
         specifier: workspace:*
         version: link:../libs/push
+      '@velchat/storage':
+        specifier: workspace:*
+        version: link:../libs/storage
       jsonwebtoken:
         specifier: ^9.0.2
         version: 9.0.3

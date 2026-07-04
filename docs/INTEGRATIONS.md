@@ -29,6 +29,15 @@ Or directly: `node scripts/check-integrations.mjs`, etc. Set `NO_COLOR=1` for pl
 **Exit code:** `0` = pass or safe dev-fallback (integration intentionally not configured). `1` = a
 **configured** integration failed (e.g. SMTP creds rejected) — so these are CI-gate-able.
 
+The mail test takes an optional template arg (`welcome` default | `verify` | `magic`):
+
+```bash
+pnpm --filter @velchat/scripts test:mail you@example.com          # welcome
+pnpm --filter @velchat/scripts test:mail you@example.com verify   # OTP code
+pnpm --filter @velchat/scripts test:mail you@example.com magic    # sign-in link
+pnpm --filter @velchat/scripts upload:logo ./assets/logo.png      # host logo → MAIL_LOGO_URL
+```
+
 ---
 
 ## 2. What each script verifies

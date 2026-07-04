@@ -164,6 +164,8 @@ export const envSchema = z.object({
   // Mail (self-hosted Postfix SMTP). Unset → mail is logged only (dev).
   SMTP_URL: z.string().optional(),
   MAIL_FROM: z.string().default('VelChat <no-reply@velchat.local>'),
+  // Public URL of the logo shown at the top of emails. Unset → text "VelChat" wordmark.
+  MAIL_LOGO_URL: z.string().optional(),
 
   // Push (Web Push VAPID + FCM). Unset → no-op/log transport.
   VAPID_PUBLIC_KEY: z.string().optional(),

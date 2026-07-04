@@ -18,3 +18,12 @@ export type {
   OutboxRow,
   NotifyLevel,
 } from './entities/notification.schema';
+export * as mailCampaignSchema from './entities/mail-campaign.schema';
+export type {
+  MailCampaignRow,
+  MailCampaignSendRow,
+  CampaignMode,
+  CampaignStatus,
+  CampaignTemplate,
+  CampaignRecurrence,
+} from './entities/mail-campaign.schema';
