@@ -1,8 +1,8 @@
 import type { Redis } from 'ioredis';
 
 /**
- * Fixed-window rate limiter (Valkey). §B2.8 anti-pumping / Sybil defense — gate auth-sensitive
- * actions (and any server-sent SMS fallback) per IP / device / number-prefix.
+ * Fixed-window rate limiter (Valkey). Shared across services that gate sensitive actions per
+ * IP / device / account (§B2.8 auth anti-pumping, §G2 OPRF lookup throttling, etc.).
  */
 export class RateLimiter {
   constructor(private readonly redis: Redis) {}

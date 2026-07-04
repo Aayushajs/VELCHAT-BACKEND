@@ -1,4 +1,4 @@
-import { RateLimiter } from '../../src/auth/abuse/rate-limiter';
+import { RateLimiter } from './rate-limiter';
 
 function fakeRedis() {
   const counts = new Map<string, number>();
@@ -14,7 +14,7 @@ function fakeRedis() {
   } as never;
 }
 
-describe('RateLimiter (§B2.8 anti-pumping)', () => {
+describe('RateLimiter (fixed-window, Valkey)', () => {
   it('allows up to the limit then blocks', async () => {
     const rl = new RateLimiter(fakeRedis());
     expect(await rl.allow('ip:1', 3, 60)).toBe(true);

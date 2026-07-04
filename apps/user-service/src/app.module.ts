@@ -13,6 +13,7 @@ import { ValkeyClient } from '@velchat/cache';
 import { TenancyModule } from './tenancy/tenancy.module';
 import { DirectoryModule } from './directory/directory.module';
 import { AdminModule } from './admin/admin.module';
+import { OprfModule } from './discovery/oprf.module';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const PG_CLIENT = Symbol('PG_CLIENT');
@@ -26,7 +27,7 @@ export interface AppDeps {
 
 /**
  * Directory & tenancy (§B3 / §A13): orgs, workspaces, teams, memberships, per-tenant RBAC + the
- * authorize API. Profiles/contacts (hashed discovery) land in a later increment.
+ * authorize API. Profiles/contacts + OPRF-based private contact discovery (§G2).
  */
 @Module({})
 export class AppModule {
@@ -36,6 +37,7 @@ export class AppModule {
     const imports: DynamicModule[] = [];
 
     let pg: PostgresClient | undefined;
+    let valkey: ValkeyClient | undefined;
     let eventBus: EventBus | undefined;
 
     if (deps.config.POSTGRES_URL) {
@@ -49,7 +51,7 @@ export class AppModule {
     }
 
     if (deps.config.VALKEY_URL) {
-      const valkey = new ValkeyClient(requireValkeyUrl(deps.config), deps.logger);
+      valkey = new ValkeyClient(requireValkeyUrl(deps.config), deps.logger);
       managed.push(valkey);
       providers.push({ provide: VALKEY_CLIENT, useValue: valkey });
     }
@@ -64,6 +66,12 @@ export class AppModule {
       imports.push(TenancyModule.forRoot({ logger: deps.logger, pg, eventBus }));
       imports.push(DirectoryModule.forRoot({ pg, eventBus }));
       imports.push(AdminModule.forRoot({ pg }));
+    }
+
+    // Privacy-preserving contact discovery via OPRF (§G2) — needs Postgres (key + token store)
+    // and Valkey (per-account rate limiting on evaluate/match).
+    if (pg && valkey) {
+      imports.push(OprfModule.forRoot({ pg, redis: valkey.redis, logger: deps.logger }));
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);

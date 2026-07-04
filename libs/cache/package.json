@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
+    "test": "jest",
     "clean": "rimraf dist .turbo coverage"
   },
   "dependencies": {

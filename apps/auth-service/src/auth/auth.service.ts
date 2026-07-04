@@ -15,7 +15,7 @@ import { MagicLinkService } from './dapt/magic-link.service';
 import { ApproveDeviceService } from './dapt/approve-device.service';
 import { PasskeyService } from './dapt/passkey.service';
 import { RecoveryService, type RecoveryFactor } from './recovery/recovery.service';
-import { RateLimiter } from './abuse/rate-limiter';
+import { RateLimiter } from '@velchat/cache';
 import { generateBackupCodes, hashCode } from './recovery/backup-codes';
 import { AuthEvents } from './auth.events';
 
