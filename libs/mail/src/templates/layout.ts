@@ -65,6 +65,22 @@ function brandHeader(): string {
   return `<span style="font-size:20px;font-weight:800;color:${BRAND.primary};">Vel<span style="color:${BRAND.ink};">Chat</span></span>`;
 }
 
+/** Footer website + LinkedIn icons and a support link (all → the website). Env-overridable. */
+function footerLinks(): string {
+  const web = process.env.MAIL_WEBSITE_URL || 'https://velcart.netlify.app/';
+  const linkedin = process.env.MAIL_LINKEDIN_URL || 'https://www.linkedin.com/company/velcart/';
+  const support = process.env.MAIL_SUPPORT_TEXT || 'support@velcart.com';
+  return `
+  <div style="margin:0 0 12px;">
+    <a href="${esc(web)}" title="Website" style="text-decoration:none;font-size:22px;vertical-align:middle;">🌐</a>
+    &nbsp;&nbsp;
+    <a href="${esc(linkedin)}" title="LinkedIn" style="text-decoration:none;vertical-align:middle;"><span style="display:inline-block;width:26px;height:26px;line-height:26px;background:#0A66C2;color:#ffffff;border-radius:6px;font-size:13px;font-weight:700;text-align:center;font-family:${FONT};">in</span></a>
+  </div>
+  <p style="margin:0 0 12px;font-size:13px;">
+    <a href="${esc(web)}" style="color:${BRAND.muted};text-decoration:underline;">${esc(support)}</a>
+  </p>`;
+}
+
 /** Render a lean, centered HTML email (no hidden text, no VML). */
 export function renderEmail(input: EmailLayoutInput): string {
   const paras = input.paragraphs
@@ -113,6 +129,7 @@ export function renderEmail(input: EmailLayoutInput): string {
         <tr><td style="padding-top:32px;border-top:1px solid ${BRAND.border};"></td></tr>
         <tr><td style="padding-top:16px;">
           ${footerNote}
+          ${footerLinks()}
           <p style="margin:0;font-size:12px;line-height:1.6;color:${BRAND.muted};">© 2026 ${esc(BRAND.name)} — free, open-source, self-hostable messaging.<br>If this wasn't you, you can ignore this email.</p>
         </td></tr>
       </table>
@@ -130,6 +147,13 @@ export function renderText(input: EmailLayoutInput): string {
   if (input.cta) lines.push(`${input.cta.label}: ${input.cta.url}`, '');
   if (input.note) lines.push(input.note, '');
   lines.push(...input.paragraphs);
-  lines.push('', '—', `© 2026 ${BRAND.name}. If this wasn't you, ignore this email.`);
+  const web = process.env.MAIL_WEBSITE_URL || 'https://velcart.netlify.app/';
+  const support = process.env.MAIL_SUPPORT_TEXT || 'support@velcart.com';
+  lines.push(
+    '',
+    '—',
+    `${support}: ${web}`,
+    `© 2026 ${BRAND.name}. If this wasn't you, ignore this email.`,
+  );
   return lines.join('\n');
 }
