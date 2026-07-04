@@ -1,6 +1,6 @@
 {
   "name": "@velchat/cache",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Valkey/Redis cache client (shared) — connection + health as a ManagedResource.",
   "main": "dist/index.js",
@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
+    "test": "jest",
     "clean": "rimraf dist .turbo coverage"
   },
   "dependencies": {

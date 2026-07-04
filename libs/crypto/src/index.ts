@@ -65,3 +65,8 @@ export function refuseServerSidePlaintext(context: string): never {
       `Personal content is end-to-end encrypted; decryption only happens on-device (§B6).`,
   );
 }
+
+// ── OPRF-based private contact discovery (§G2) — unrelated to the Signal/E2EE boundary above,
+// but shared crypto math both the server (direct token derivation) and clients (blind/unblind)
+// need identically. See ./oprf for the RSA blind-signature OPRF protocol + doc comments.
+export * from './oprf';
