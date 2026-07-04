@@ -120,8 +120,8 @@ export function renderEmail(input: EmailLayoutInput): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:${BRAND.bg};font-family:${FONT};">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.bg};">
+<body style="margin:0;padding:0;font-family:${FONT};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
     <tr><td align="center" style="padding:44px 20px;">
       <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="width:520px;max-width:100%;text-align:center;">
         <tr><td style="padding-bottom:36px;">${brandHeader()}</td></tr>
