@@ -89,6 +89,9 @@ importers:
       '@velchat/config':
         specifier: workspace:*
         version: link:../../libs/config
+      '@velchat/database':
+        specifier: workspace:*
+        version: link:../../libs/database
       '@velchat/event-bus':
         specifier: workspace:*
         version: link:../../libs/event-bus
@@ -107,6 +110,9 @@ importers:
       ioredis:
         specifier: ^5.4.2
         version: 5.11.1
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
       pino:
         specifier: ^9.6.0
         version: 9.14.0
@@ -116,6 +122,10 @@ importers:
       rxjs:
         specifier: ^7.8.1
         version: 7.8.2
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
 
   apps/api-gateway:
     dependencies:

@@ -33,6 +33,9 @@ envVarGroups:
       - { key: SMTP_URL, sync: false } # URL-encode @/: in user+pass (@ → %40)
       - { key: MAIL_FROM, sync: false } # a VERIFIED sender (else the relay blocks it)
       - { key: MAIL_LOGO_URL, sync: false } # public logo URL for emails (optional)
+      - { key: MAIL_WEBSITE_URL, value: https://velcart.netlify.app/ } # footer website icon
+      - { key: MAIL_LINKEDIN_URL, value: https://www.linkedin.com/company/velcart/ } # footer LinkedIn
+      - { key: MAIL_SUPPORT_TEXT, value: support@velcart.com } # footer support text → website
       # Reverse-OTP (₹0 verification, §B2.2) — Asterisk/FreeSWITCH webhook
       - { key: REVOTP_WEBHOOK_SECRET, sync: false }
       - { key: REVOTP_DID, sync: false } # owned inbound number users missed-call / SMS

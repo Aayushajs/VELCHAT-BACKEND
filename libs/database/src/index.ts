@@ -27,3 +27,5 @@ export type {
   CampaignTemplate,
   CampaignRecurrence,
 } from './entities/mail-campaign.schema';
+export * as aiSchema from './entities/ai.schema';
+export type { UserLanguageRow, ChatTranslatePrefRow, TranslateMode } from './entities/ai.schema';

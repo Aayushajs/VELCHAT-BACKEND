@@ -152,6 +152,12 @@ export const envSchema = z.object({
   // Cloudinary (only when STORAGE_PROVIDER=cloudinary). cloudinary://key:secret@cloud
   CLOUDINARY_URL: z.string().optional(),
 
+  // AI / translation (self-hosted models §A25/§A26). URL points at a self-hosted LibreTranslate /
+  // NLLB / Marian server. Unset → dev echo provider (no external calls, no plaintext leaves).
+  AI_TRANSLATE_URL: z.string().url().optional(),
+  AI_TRANSLATE_API_KEY: z.string().optional(),
+  AI_DEFAULT_LANG: z.string().default('en'),
+
   // OpenTelemetry → Grafana Cloud (free). Headers carry the basic-auth token.
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
   OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),
@@ -166,6 +172,10 @@ export const envSchema = z.object({
   MAIL_FROM: z.string().default('VelChat <no-reply@velchat.local>'),
   // Public URL of the logo shown at the top of emails. Unset → text "VelChat" wordmark.
   MAIL_LOGO_URL: z.string().optional(),
+  // Email footer links (website + LinkedIn icons + support text → website). Have sensible defaults.
+  MAIL_WEBSITE_URL: z.string().optional(),
+  MAIL_LINKEDIN_URL: z.string().optional(),
+  MAIL_SUPPORT_TEXT: z.string().optional(),
 
   // Push (Web Push VAPID + FCM). Unset → no-op/log transport.
   VAPID_PUBLIC_KEY: z.string().optional(),
@@ -232,6 +242,7 @@ export const requireS3Endpoint = (cfg: AppConfig): string => require_(cfg, 'S3_E
 export const requireCloudinaryUrl = (cfg: AppConfig): string => require_(cfg, 'CLOUDINARY_URL');
 export const requireLivekitKey = (cfg: AppConfig): string => require_(cfg, 'LIVEKIT_API_KEY');
 export const requireLivekitSecret = (cfg: AppConfig): string => require_(cfg, 'LIVEKIT_API_SECRET');
+export const requireAiTranslateUrl = (cfg: AppConfig): string => require_(cfg, 'AI_TRANSLATE_URL');
 
 export const isProduction = (cfg: AppConfig): boolean => cfg.NODE_ENV === 'production';
 
