@@ -46,6 +46,7 @@
     "changeset": "changeset",
     "changeset:version": "changeset version",
     "changeset:tag": "changeset tag",
+    "changeset:publish": "changeset publish",
     "changeset:status": "changeset status --since=main",
     "prepare": "husky"
   },
