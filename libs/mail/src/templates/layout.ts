@@ -59,20 +59,27 @@ const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial
  */
 function brandHeader(): string {
   const logo = process.env.MAIL_LOGO_URL;
+  const wordmark = `<span style="font-size:22px;font-weight:800;color:${BRAND.primary};vertical-align:middle;">Vel<span style="color:${BRAND.ink};">Chat</span></span>`;
   if (logo && /^https?:\/\//.test(logo)) {
-    return `<img src="${esc(logo)}" alt="VelChat" width="56" height="56" style="display:inline-block;width:56px;height:56px;border:0;outline:none;">`;
+    // Circular logo + wordmark side by side (like ChatGPT's header). border-radius rounds the image.
+    return `<img src="${esc(logo)}" alt="VelChat" width="48" height="48" style="width:48px;height:48px;border-radius:50%;vertical-align:middle;border:0;outline:none;">&nbsp;&nbsp;${wordmark}`;
   }
-  return `<span style="font-size:20px;font-weight:800;color:${BRAND.primary};">Vel<span style="color:${BRAND.ink};">Chat</span></span>`;
+  return wordmark;
 }
 
-/** Footer website + LinkedIn icons and a support link (all → the website). Env-overridable. */
+/** Footer: a circular logo (→ website) + LinkedIn icon, and a support link (→ website). */
 function footerLinks(): string {
   const web = process.env.MAIL_WEBSITE_URL || 'https://velcart.netlify.app/';
   const linkedin = process.env.MAIL_LINKEDIN_URL || 'https://www.linkedin.com/company/velcart/';
   const support = process.env.MAIL_SUPPORT_TEXT || 'support@velcart.com';
+  const logo = process.env.MAIL_LOGO_URL;
+  const webIcon =
+    logo && /^https?:\/\//.test(logo)
+      ? `<img src="${esc(logo)}" alt="Website" width="24" height="24" style="width:24px;height:24px;border-radius:50%;vertical-align:middle;border:0;outline:none;">`
+      : `<span style="font-size:20px;vertical-align:middle;">🌐</span>`;
   return `
   <div style="margin:0 0 12px;">
-    <a href="${esc(web)}" title="Website" style="text-decoration:none;font-size:22px;vertical-align:middle;">🌐</a>
+    <a href="${esc(web)}" title="Website" style="text-decoration:none;vertical-align:middle;">${webIcon}</a>
     &nbsp;&nbsp;
     <a href="${esc(linkedin)}" title="LinkedIn" style="text-decoration:none;vertical-align:middle;"><span style="display:inline-block;width:26px;height:26px;line-height:26px;background:#0A66C2;color:#ffffff;border-radius:6px;font-size:13px;font-weight:700;text-align:center;font-family:${FONT};">in</span></a>
   </div>
