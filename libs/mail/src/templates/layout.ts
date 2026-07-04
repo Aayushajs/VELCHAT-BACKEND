@@ -52,6 +52,19 @@ function esc(s: string): string {
 
 const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
+/**
+ * Brand header: a logo <img> when MAIL_LOGO_URL is set (read at render time — .env is loaded by
+ * @velchat/config before any mail is sent), else the "VelChat" text wordmark. A single small hosted
+ * logo is deliverability-safe; a data-URI/oversized image is not, so we require a hosted URL.
+ */
+function brandHeader(): string {
+  const logo = process.env.MAIL_LOGO_URL;
+  if (logo && /^https?:\/\//.test(logo)) {
+    return `<img src="${esc(logo)}" alt="VelChat" width="56" height="56" style="display:inline-block;width:56px;height:56px;border:0;outline:none;">`;
+  }
+  return `<span style="font-size:20px;font-weight:800;color:${BRAND.primary};">Vel<span style="color:${BRAND.ink};">Chat</span></span>`;
+}
+
 /** Render a lean, centered HTML email (no hidden text, no VML). */
 export function renderEmail(input: EmailLayoutInput): string {
   const paras = input.paragraphs
@@ -88,7 +101,7 @@ export function renderEmail(input: EmailLayoutInput): string {
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.bg};">
     <tr><td align="center" style="padding:44px 20px;">
       <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="width:520px;max-width:100%;text-align:center;">
-        <tr><td style="padding-bottom:36px;font-size:20px;font-weight:800;color:${BRAND.primary};">Vel<span style="color:${BRAND.ink};">Chat</span></td></tr>
+        <tr><td style="padding-bottom:36px;">${brandHeader()}</td></tr>
         <tr><td>
           <h1 style="margin:0 0 14px;font-size:30px;line-height:1.25;font-weight:700;color:${BRAND.ink};">${esc(input.heading)}</h1>
           ${subtitle}

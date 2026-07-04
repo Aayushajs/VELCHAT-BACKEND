@@ -10,6 +10,7 @@
     "test:push": "node test-push.mjs",
     "test:livekit": "node test-livekit.mjs",
     "test:otp": "node test-otp.mjs",
+    "upload:logo": "node upload-logo.mjs",
     "test:all": "node check-integrations.mjs && node test-mail.mjs && node test-push.mjs && node test-livekit.mjs"
   },
   "dependencies": {
@@ -17,6 +18,7 @@
     "@velchat/config": "workspace:*",
     "@velchat/mail": "workspace:*",
     "@velchat/push": "workspace:*",
+    "@velchat/storage": "workspace:*",
     "jsonwebtoken": "^9.0.2"
   }
 }

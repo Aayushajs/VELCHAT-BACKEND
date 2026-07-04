@@ -32,6 +32,7 @@ envVarGroups:
       # Mail (auth magic-link/welcome + notification digests). Brevo/Postfix: smtp://user:pass@host:587
       - { key: SMTP_URL, sync: false } # URL-encode @/: in user+pass (@ → %40)
       - { key: MAIL_FROM, sync: false } # a VERIFIED sender (else the relay blocks it)
+      - { key: MAIL_LOGO_URL, sync: false } # public logo URL for emails (optional)
       # Reverse-OTP (₹0 verification, §B2.2) — Asterisk/FreeSWITCH webhook
       - { key: REVOTP_WEBHOOK_SECRET, sync: false }
       - { key: REVOTP_DID, sync: false } # owned inbound number users missed-call / SMS
