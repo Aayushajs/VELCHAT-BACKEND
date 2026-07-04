@@ -7,8 +7,9 @@ import {
   type ServiceMetrics,
   type ManagedResource,
 } from '@velchat/common';
-import { createEventBus } from '@velchat/event-bus';
+import { createEventBus, type EventBus } from '@velchat/event-bus';
 import { PostgresClient } from '@velchat/database';
+import { AutomationModule } from './automation/automation.module';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const PG_CLIENT = Symbol('PG_CLIENT');
@@ -30,9 +31,13 @@ export class AppModule {
   static forRoot(deps: AppDeps): DynamicModule {
     const managed: ManagedResource[] = [];
     const providers: Array<{ provide: symbol; useValue: unknown }> = [];
+    const imports: DynamicModule[] = [];
+
+    let pg: PostgresClient | undefined;
+    let eventBus: EventBus | undefined;
 
     if (deps.config.POSTGRES_URL) {
-      const pg = new PostgresClient(
+      pg = new PostgresClient(
         requirePostgresUrl(deps.config),
         deps.config.POSTGRES_MAX_POOL,
         deps.logger,
@@ -42,9 +47,25 @@ export class AppModule {
     }
 
     if (deps.config.EVENT_BUS === 'kafka' ? deps.config.KAFKA_BROKERS : deps.config.VALKEY_URL) {
-      const eventBus = createEventBus(deps.config, deps.logger);
+      eventBus = createEventBus(deps.config, deps.logger);
       managed.push(eventBus);
       providers.push({ provide: EVENT_BUS, useValue: eventBus });
+    }
+
+    // Automation: bots, slash commands, workflows, reminders + durable job runner (§B17).
+    if (pg && eventBus) {
+      const { module, wiring } = AutomationModule.forRoot({ logger: deps.logger, pg, eventBus });
+      imports.push(module);
+      const bus = eventBus;
+      managed.push({
+        name: 'automation-jobs',
+        connect: async () => {
+          await bus.start();
+          wiring.worker.start();
+        },
+        ping: async () => true,
+        close: async () => wiring.worker.stop(),
+      });
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);
@@ -58,6 +79,7 @@ export class AppModule {
           metrics: deps.metrics,
           readiness: () => lifecycle.isReady(),
         }),
+        ...imports,
       ],
       providers: [{ provide: InfraLifecycle, useValue: lifecycle }, ...providers],
       exports: providers.map((p) => p.provide),
