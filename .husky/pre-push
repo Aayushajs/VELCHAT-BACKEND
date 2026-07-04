@@ -1,0 +1,11 @@
+# Remind (non-blocking) to add a changeset for releasable changes.
+# Private monorepo → versioning/tags/GitHub Releases are done in CI (changesets/action) on merge to
+# main. You only need to ADD a changeset here; `changeset version`/`tag` run in CI, not before push.
+if ! pnpm changeset status --since=main >/dev/null 2>&1; then
+  echo ""
+  echo "⚠  Changeset check: you're pushing package changes with no changeset."
+  echo "   If this is a releasable change, run:  pnpm changeset   (then commit the .changeset/*.md)"
+  echo "   Docs/chore-only changes can ignore this. (Non-blocking — push continues.)"
+  echo ""
+fi
+exit 0
