@@ -1,0 +1,45 @@
+name: release
+
+# Automated versioning + changelog + GitHub Release via semantic-release (Conventional Commits).
+# Runs only on push to main, after building + testing on the same commit. Separate from ci.yml
+# (which stays untouched). No npm publish — packages are private; this only tags + releases the repo.
+
+on:
+  push:
+    branches: [main]
+
+# semantic-release needs to create tags/releases and push the CHANGELOG commit back to main.
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: semantic-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history + tags so semantic-release can find the last version
+          persist-credentials: true
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Release only on a green build + tests (same gates as ci.yml, self-contained here).
+      - run: pnpm build
+      - run: pnpm test
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm release
