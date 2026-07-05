@@ -14,9 +14,7 @@ export class ChatRepository {
   constructor(private readonly mongo: MongoClient) {}
 
   private collection() {
-    const db = this.mongo.connection?.db;
-    if (!db) throw new Error('Mongo is not connected');
-    return db.collection('messages');
+    return this.mongo.db.collection('messages');
   }
 
   /** §A10.2 indexes: history paging + client_msg_id dedupe. Run once at startup. */

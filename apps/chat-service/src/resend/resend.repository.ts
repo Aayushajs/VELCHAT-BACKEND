@@ -20,9 +20,7 @@ export class ResendRepository {
   constructor(private readonly mongo: MongoClient) {}
 
   private col() {
-    const db = this.mongo.connection?.db;
-    if (!db) throw new Error('Mongo is not connected');
-    return db.collection('resend_requests');
+    return this.mongo.db.collection('resend_requests');
   }
 
   async ensureIndexes(): Promise<void> {
@@ -34,9 +32,7 @@ export class ResendRepository {
   async findMessage(
     messageId: string,
   ): Promise<{ conversation_id: string; sender_id: string } | null> {
-    const db = this.mongo.connection?.db;
-    if (!db) throw new Error('Mongo is not connected');
-    const doc = await db
+    const doc = await this.mongo.db
       .collection('messages')
       .findOne({ _id: messageId as never }, { projection: { conversation_id: 1, sender_id: 1 } });
     return (doc as { conversation_id: string; sender_id: string } | null) ?? null;

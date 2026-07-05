@@ -34,9 +34,7 @@ export class ExtrasRepository {
   constructor(private readonly mongo: MongoClient) {}
 
   private db() {
-    const db = this.mongo.connection?.db;
-    if (!db) throw new Error('Mongo is not connected');
-    return db;
+    return this.mongo.db;
   }
 
   async ensureIndexes(): Promise<void> {
