@@ -1,5 +1,17 @@
 # @velchat/automation-service
 
+## 0.4.0
+
+### Minor Changes
+
+- eb9f1d0: Collaboration Clips + Canvas (§A4.7): post short audio/video clips to a conversation (referencing a
+  media-service upload), and create/edit collaborative canvas docs with optimistic-concurrency versioning.
+
+### Patch Changes
+
+- Updated dependencies [eb9f1d0]
+  - @velchat/database@0.2.3
+
 ## 0.3.1
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # @velchat/ai-service
 
+## 0.2.4
+
+### Patch Changes
+
+- Updated dependencies [eb9f1d0]
+  - @velchat/database@0.2.3
+
 ## 0.2.3
 
 ### Patch Changes
