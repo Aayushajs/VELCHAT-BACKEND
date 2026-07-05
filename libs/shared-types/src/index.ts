@@ -73,6 +73,26 @@ export interface ConversationCreatedPayload {
   tenant_id: TenantId | null;
   created_by: AccountId;
   member_ids: AccountId[];
+  /** Optional discovery metadata (channels/groups) so search can index without a lookup (§A18.1). */
+  name?: string | null;
+  visibility?: string | null;
+}
+
+/** Channel metadata changed (§B7) → search reindex + cache invalidation. */
+export interface ChannelUpdatedPayload {
+  conversation_id: ConversationId;
+  tenant_id?: TenantId | null;
+  name?: string | null;
+  topic?: string | null;
+  visibility?: string | null;
+  is_announcement?: boolean | null;
+}
+
+/** A media blob + metadata was removed (view-once consume / delete, §C22) → search + chat purge. */
+export interface FileDeletedPayload {
+  media_id: string;
+  conversation_id: string | null;
+  tenant_id: TenantId | null;
 }
 
 export interface ChannelMemberPayload {
@@ -179,6 +199,7 @@ export interface EventPayloads {
   'device.list.changed': DeviceListChangedPayload;
   'identifier.changed': IdentifierChangedPayload;
   'conversation.created': ConversationCreatedPayload;
+  'channel.updated': ChannelUpdatedPayload;
   'channel.member.added': ChannelMemberPayload;
   'channel.member.removed': ChannelMemberPayload;
   'group.epoch.changed': GroupEpochChangedPayload;
@@ -186,6 +207,7 @@ export interface EventPayloads {
   'message.delivered': MessageReceiptPayload;
   'message.read': MessageReceiptPayload;
   'file.uploaded': FileUploadedPayload;
+  'file.deleted': FileDeletedPayload;
   'status.posted': StatusPostedPayload;
   'org.created': OrgCreatedPayload;
   'member.added': MemberAddedPayload;

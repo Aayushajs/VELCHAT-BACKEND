@@ -42,7 +42,9 @@ export class ChannelsService {
     await this.repo.addMember(conversationId, creator, 'owner');
     for (const u of memberIds)
       if (u !== creator) await this.repo.addMember(conversationId, u, 'member');
-    await this.events.conversationCreated(conversationId, 'group', null, creator, members);
+    await this.events.conversationCreated(conversationId, 'group', null, creator, members, {
+      name,
+    });
     return { conversationId };
   }
 
@@ -64,7 +66,10 @@ export class ChannelsService {
       createdBy: creator,
     });
     await this.repo.addMember(conversationId, creator, 'owner');
-    await this.events.conversationCreated(conversationId, 'channel', tenantId, creator, [creator]);
+    await this.events.conversationCreated(conversationId, 'channel', tenantId, creator, [creator], {
+      name,
+      visibility,
+    });
     return { conversationId };
   }
 
@@ -141,7 +146,13 @@ export class ChannelsService {
     await this.assertAdmin(conversationId, actorId);
     const updated = await this.repo.updateConversation(conversationId, patch);
     if (!updated) throw new NotFoundError('conversation not found');
-    await this.events.channelUpdated(conversationId);
+    await this.events.channelUpdated(conversationId, {
+      tenantId: (updated.tenant_id as string) ?? null,
+      name: (updated.name as string) ?? null,
+      topic: (updated.topic as string) ?? null,
+      visibility: (updated.visibility as string) ?? null,
+      isAnnouncement: (updated.is_announcement as boolean) ?? null,
+    });
     return updated;
   }
 

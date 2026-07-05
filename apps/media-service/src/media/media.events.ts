@@ -1,6 +1,6 @@
 import { buildEnvelope } from '@velchat/common';
 import type { EventBus } from '@velchat/event-bus';
-import type { FileUploadedPayload } from '@velchat/shared-types';
+import type { FileUploadedPayload, FileDeletedPayload } from '@velchat/shared-types';
 import type { MediaObject } from './media.types';
 
 /** Media events (§A11) → consumed by chat (attach to message), search, ai (caption/scan). */
@@ -59,7 +59,7 @@ export class MediaEvents {
     conversationId: string | null,
     tenantId: string | null,
   ): Promise<void> {
-    await this.bus.publish(
+    await this.bus.publish<FileDeletedPayload>(
       'file.deleted',
       buildEnvelope({
         eventType: 'file.deleted',
