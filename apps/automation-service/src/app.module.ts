@@ -11,6 +11,7 @@ import { createEventBus, type EventBus } from '@velchat/event-bus';
 import { PostgresClient } from '@velchat/database';
 import { AutomationModule } from './automation/automation.module';
 import { ListsModule } from './lists/lists.module';
+import { CollabModule } from './collab/collab.module';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const PG_CLIENT = Symbol('PG_CLIENT');
@@ -69,9 +70,10 @@ export class AppModule {
       });
     }
 
-    // Collaboration Lists (§A4.7) — channel-attached task lists (Postgres only).
+    // Collaboration (§A4.7) — Lists (task lists) + Clips + Canvas, all channel-attached (Postgres).
     if (pg) {
       imports.push(ListsModule.forRoot({ pg }));
+      imports.push(CollabModule.forRoot({ pg }));
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);
