@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
-import { uuidv7, NotFoundError, ValidationError } from '@velchat/common';
+import { uuidv7, NotFoundError, ValidationError, ForbiddenError, GoneError } from '@velchat/common';
 import type { ObjectStorage } from '@velchat/storage';
 import { MediaRepository } from './media.repository';
 import { MediaEvents } from './media.events';
-import { storageKeyForHash, type MediaObject } from './media.types';
+import { storageKeyForHash, type MediaObject, type TranscodeResult } from './media.types';
 
 export interface InitUploadInput {
   ownerId: string;
@@ -106,5 +106,77 @@ export class MediaService {
     const media = await this.repo.findById(mediaId);
     if (!media) throw new NotFoundError('media not found');
     return media;
+  }
+
+  /** Per-conversation media gallery (§A16) — ready objects newest-first, cursor by created_at. */
+  async gallery(conversationId: string, limit = 50, before?: string): Promise<MediaObject[]> {
+    if (!conversationId) throw new ValidationError('conversationId is required');
+    return this.repo.listByConversation(conversationId, Math.min(Math.max(limit, 1), 100), before);
+  }
+
+  /**
+   * Delete a media object. Only the owner may delete. The blob is content-addressed, so it is
+   * removed from storage only when no OTHER metadata row still references it (refcount → 0).
+   */
+  async deleteMedia(
+    mediaId: string,
+    actorId: string,
+  ): Promise<{ deleted: true; blobRemoved: boolean }> {
+    const media = await this.repo.findById(mediaId);
+    if (!media) throw new NotFoundError('media not found');
+    if (media.owner_id !== actorId)
+      throw new ForbiddenError('only the owner can delete this media');
+    return this.purge(media);
+  }
+
+  /**
+   * View-once consume (§C22). Atomically claims the single view; a replay finds it already claimed
+   * and gets 410 Gone. On the winning call we return the signed URL and delete the blob so it can
+   * never be fetched again (replay-proof — the metadata gate closes even if a URL was cached).
+   */
+  async consumeViewOnce(
+    mediaId: string,
+    ttlSeconds = 60,
+  ): Promise<{ url: string; mime: string | null }> {
+    const media = await this.repo.findById(mediaId);
+    if (!media || media.status !== 'ready' || !media.storage_key) {
+      throw new NotFoundError('media not ready');
+    }
+    if (!media.view_once) throw new ValidationError('media is not view-once');
+    if (!(await this.repo.claimViewOnce(mediaId))) {
+      throw new GoneError('this view-once media has already been viewed');
+    }
+    const url = await this.storage.getSignedUrl(media.storage_key, ttlSeconds);
+    await this.purge(media); // one-view → remove immediately (refcount-aware)
+    return { url, mime: media.mime };
+  }
+
+  /**
+   * Write back transcode/thumbnail output (§B11 async pipeline, enterprise only). Personal media is
+   * encrypted ciphertext and is never transcoded — reject to keep the E2EE boundary explicit.
+   */
+  async applyRenditions(mediaId: string, result: TranscodeResult): Promise<MediaObject> {
+    const media = await this.repo.findById(mediaId);
+    if (!media) throw new NotFoundError('media not found');
+    if (media.encrypted) throw new ValidationError('encrypted media is never transcoded (E2EE)');
+    await this.repo.applyRenditions(mediaId, result);
+    const updated = (await this.repo.findById(mediaId)) as MediaObject;
+    await this.events.fileTranscoded(updated);
+    return updated;
+  }
+
+  /** Remove metadata + (if last reference) the blob, then emit file.deleted. */
+  private async purge(media: MediaObject): Promise<{ deleted: true; blobRemoved: boolean }> {
+    await this.repo.deleteById(media.media_id);
+    let blobRemoved = false;
+    if (media.storage_key) {
+      const others = await this.repo.countOthersByStorageKey(media.storage_key, media.media_id);
+      if (others === 0) {
+        await this.storage.deleteObject(media.storage_key);
+        blobRemoved = true;
+      }
+    }
+    await this.events.fileDeleted(media.media_id, media.conversation_id, media.tenant_id);
+    return { deleted: true, blobRemoved };
   }
 }
