@@ -15,6 +15,7 @@ import { ChatRepository } from './chat/chat.repository';
 import { ReceiptsRepository } from './chat/receipts.repository';
 import { ReceiptsConsumer } from './chat/receipts.consumer';
 import { PollsModule } from './polls/polls.module';
+import { ResendModule } from './resend/resend.module';
 
 export interface AppDeps {
   config: AppConfig;
@@ -38,6 +39,7 @@ export class AppModule {
       const eventBus = createEventBus(deps.config, deps.logger);
       const receipts = new ReceiptsRepository(mongo);
       const polls = PollsModule.forRoot({ logger: deps.logger, mongo, valkey, eventBus });
+      const resend = ResendModule.forRoot({ logger: deps.logger, mongo, eventBus });
       // Create the §A10.2 indexes once Mongo is connected (runs after mongo in array order).
       const indexInit: ManagedResource = {
         name: 'chat-indexes',
@@ -45,6 +47,7 @@ export class AppModule {
           await new ChatRepository(mongo).ensureIndexes();
           await receipts.ensureIndexes();
           await polls.repo.ensureIndexes();
+          await resend.repo.ensureIndexes();
         },
         ping: async () => true,
         close: async () => undefined,
@@ -62,6 +65,7 @@ export class AppModule {
       managed.push(mongo, valkey, eventBus, indexInit, consumerInit);
       imports.push(ChatModule.forRoot({ logger: deps.logger, mongo, valkey, eventBus }));
       imports.push(polls.module);
+      imports.push(resend.module);
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);

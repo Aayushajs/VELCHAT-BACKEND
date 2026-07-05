@@ -40,3 +40,5 @@ export type {
 } from './entities/automation.schema';
 export * as oprfSchema from './entities/oprf.schema';
 export type { OprfKeyRow, OprfDiscoverableRow } from './entities/oprf.schema';
+export * as collabSchema from './entities/collab.schema';
+export type { ListRow, ListItemRow } from './entities/collab.schema';
