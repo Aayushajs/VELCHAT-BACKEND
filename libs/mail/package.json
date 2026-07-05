@@ -1,6 +1,6 @@
 {
   "name": "@velchat/mail",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Transactional email (shared) — Mailer port + self-hosted Postfix SMTP / dev log.",
   "main": "dist/index.js",

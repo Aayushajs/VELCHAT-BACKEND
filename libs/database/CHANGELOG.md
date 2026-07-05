@@ -1,5 +1,13 @@
 # @velchat/database
 
+## 0.2.4
+
+### Patch Changes
+
+- Updated dependencies [d9578ad]
+- Updated dependencies [c3d39ff]
+  - @velchat/common@0.2.0
+
 ## 0.2.3
 
 ### Patch Changes

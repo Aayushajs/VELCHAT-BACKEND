@@ -1,5 +1,28 @@
 # @velchat/media-service
 
+## 0.2.0
+
+### Minor Changes
+
+- c3d39ff: media-service: conversation media gallery, owner delete with content-hash refcount GC, view-once
+  consume (§C22, replay-proof 410), and transcode/thumbnail write-back emitting file.transcoded.
+  @velchat/common gains GoneError (410).
+
+### Patch Changes
+
+- 2eb83c0: search-service: files, channels, people, and typeahead (suggest) search alongside messages, each
+  ACL-scoped. Indexes are built from the event stream. Additive event enrichment: conversation.created
+  carries name/visibility; new typed channel.updated + file.deleted payloads.
+- Updated dependencies [d9578ad]
+- Updated dependencies [c3d39ff]
+- Updated dependencies [2eb83c0]
+  - @velchat/common@0.2.0
+  - @velchat/config@0.1.2
+  - @velchat/shared-types@0.2.0
+  - @velchat/database@0.2.4
+  - @velchat/event-bus@0.1.2
+  - @velchat/storage@0.1.2
+
 ## 0.1.4
 
 ### Patch Changes
