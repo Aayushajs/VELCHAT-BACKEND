@@ -28,4 +28,14 @@ export class MongoClient implements ManagedResource {
   get connection(): Connection | undefined {
     return this.conn;
   }
+
+  /**
+   * The connected Mongo `Db`. Throws if the connection isn't ready. Repositories access their
+   * collections via `mongo.db.collection('…')` instead of repeating the connected-guard everywhere.
+   */
+  get db() {
+    const db = this.conn?.db;
+    if (!db) throw new Error('Mongo is not connected');
+    return db;
+  }
 }

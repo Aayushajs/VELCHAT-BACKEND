@@ -17,9 +17,7 @@ export class ReceiptsRepository {
   constructor(private readonly mongo: MongoClient) {}
 
   private collection() {
-    const db = this.mongo.connection?.db;
-    if (!db) throw new Error('Mongo is not connected');
-    return db.collection('receipts');
+    return this.mongo.db.collection('receipts');
   }
 
   async ensureIndexes(): Promise<void> {
