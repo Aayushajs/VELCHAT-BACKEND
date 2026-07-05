@@ -1,5 +1,12 @@
 # @velchat/presence-service
 
+## 0.1.4
+
+### Patch Changes
+
+- Updated dependencies [45ac2f4]
+  - @velchat/database@0.2.2
+
 ## 0.1.3
 
 ### Patch Changes
