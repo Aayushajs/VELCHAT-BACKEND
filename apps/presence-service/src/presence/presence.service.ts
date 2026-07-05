@@ -1,7 +1,21 @@
 import { ValidationError } from '@velchat/common';
 import { PresenceRepository } from './presence.repository';
 import { PresenceEvents } from './presence.events';
-import { computePresence, coarse, type ManualStatus, type Presence } from './presence-state';
+import {
+  computePresence,
+  coarse,
+  canSee,
+  type ManualStatus,
+  type Presence,
+  type PresencePrivacy,
+} from './presence-state';
+
+/** Optional viewer context so `get` can honour the owner's last-seen/online privacy (§B8). */
+export interface ViewerCtx {
+  viewerId: string;
+  /** Whether the viewer is one of the owner's contacts (resolved upstream in user-service). */
+  viewerIsContact?: boolean;
+}
 
 /**
  * Presence service (§A15 / §B8). Tracks per-device connections + last-seen, resolves rich presence
@@ -35,15 +49,60 @@ export class PresenceService {
     return this.fanout(userId);
   }
 
-  /** Resolve a user's current rich presence (call state wiring lands with §C20). */
-  async get(userId: string): Promise<Presence & { lastSeen: number | null }> {
+  /**
+   * Resolve a user's current rich presence + last-seen (call state wiring lands with §C20).
+   * When a `viewer` is supplied, the owner's last-seen/online privacy is enforced (§B8): a hidden
+   * `online` collapses the visible status to `offline`, and a hidden `last-seen` is stripped —
+   * with the WhatsApp reciprocity rule (a viewer who hides their own signal can't see others').
+   */
+  async get(userId: string, viewer?: ViewerCtx): Promise<Presence & { lastSeen: number | null }> {
     const [onlineDeviceCount, manual, lastSeen] = await Promise.all([
       this.repo.onlineCount(userId),
       this.repo.getManual(userId),
       this.repo.lastSeen(userId),
     ]);
     const presence = computePresence({ onlineDeviceCount, manual });
-    return { ...presence, lastSeen: presence.status === 'offline' ? lastSeen : null };
+    const base = { ...presence, lastSeen: presence.status === 'offline' ? lastSeen : null };
+    if (!viewer) return base;
+
+    const isSelf = viewer.viewerId === userId;
+    const [ownerP, viewerP] = await Promise.all([
+      this.repo.getPrivacy(userId),
+      isSelf ? Promise.resolve(null) : this.repo.getPrivacy(viewer.viewerId),
+    ]);
+    const viewerIsContact = viewer.viewerIsContact ?? false;
+
+    const onlineVisible = canSee({
+      isSelf,
+      owner: ownerP.online,
+      viewer: viewerP?.online ?? 'everyone',
+      viewerIsContact,
+    });
+    const lastSeenVisible = canSee({
+      isSelf,
+      owner: ownerP.lastSeen,
+      viewer: viewerP?.lastSeen ?? 'everyone',
+      viewerIsContact,
+    });
+
+    return {
+      // If the viewer may not see me online, I appear offline to them (no online/away/typing leak).
+      status: onlineVisible ? base.status : 'offline',
+      ...(onlineVisible ? { emoji: base.emoji, text: base.text } : {}),
+      lastSeen: lastSeenVisible ? base.lastSeen : null,
+    };
+  }
+
+  /** Update the owner's last-seen/online privacy (§B8). */
+  async setPrivacy(userId: string, privacy: PresencePrivacy): Promise<PresencePrivacy> {
+    if (!userId) throw new ValidationError('userId is required');
+    await this.repo.setPrivacy(userId, privacy);
+    return privacy;
+  }
+
+  /** Read the owner's current privacy settings. */
+  getPrivacy(userId: string): Promise<PresencePrivacy> {
+    return this.repo.getPrivacy(userId);
   }
 
   /** A client subscribes to the presence of the contacts currently on screen (§A15.2). */

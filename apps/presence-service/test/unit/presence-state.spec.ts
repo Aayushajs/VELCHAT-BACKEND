@@ -1,4 +1,4 @@
-import { computePresence, coarse } from '../../src/presence/presence-state';
+import { computePresence, coarse, canSee } from '../../src/presence/presence-state';
 
 const NOW = 1_800_000_000_000;
 
@@ -50,5 +50,27 @@ describe('coarse (fan-out bucket)', () => {
     expect(coarse('brb')).toBe('away');
     expect(coarse('away')).toBe('away');
     expect(coarse('offline')).toBe('offline');
+  });
+});
+
+describe('canSee (WhatsApp-style last-seen/online privacy §B8)', () => {
+  const base = { owner: 'everyone', viewer: 'everyone', viewerIsContact: false, isSelf: false };
+  it('everyone → visible to anyone', () => {
+    expect(canSee({ ...base } as never)).toBe(true);
+  });
+  it('nobody owner → hidden even from a contact', () => {
+    expect(canSee({ ...base, owner: 'nobody', viewerIsContact: true } as never)).toBe(false);
+  });
+  it('contacts owner → visible only to a contact', () => {
+    expect(canSee({ ...base, owner: 'contacts', viewerIsContact: true } as never)).toBe(true);
+    expect(canSee({ ...base, owner: 'contacts', viewerIsContact: false } as never)).toBe(false);
+  });
+  it('reciprocity: a viewer who hides their own signal cannot see others’', () => {
+    expect(canSee({ ...base, owner: 'everyone', viewer: 'nobody' } as never)).toBe(false);
+  });
+  it('always visible to self, regardless of settings', () => {
+    expect(
+      canSee({ owner: 'nobody', viewer: 'nobody', viewerIsContact: false, isSelf: true }),
+    ).toBe(true);
   });
 });

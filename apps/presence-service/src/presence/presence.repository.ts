@@ -1,5 +1,5 @@
 import type { Redis } from 'ioredis';
-import type { ManualStatus } from './presence-state';
+import { DEFAULT_PRIVACY, type ManualStatus, type PresencePrivacy } from './presence-state';
 
 const ONLINE_TTL_SEC = 30;
 
@@ -56,5 +56,15 @@ export class PresenceRepository {
 
   async subscribersOf(userId: string): Promise<string[]> {
     return this.redis.smembers(`subscribers:${userId}`);
+  }
+
+  /** Durable last-seen/online privacy (§B8). Absent → everyone (WhatsApp default). */
+  async setPrivacy(userId: string, privacy: PresencePrivacy): Promise<void> {
+    await this.redis.set(`privacy:${userId}`, JSON.stringify(privacy));
+  }
+
+  async getPrivacy(userId: string): Promise<PresencePrivacy> {
+    const v = await this.redis.get(`privacy:${userId}`);
+    return v ? (JSON.parse(v) as PresencePrivacy) : DEFAULT_PRIVACY;
   }
 }

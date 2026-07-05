@@ -1,7 +1,15 @@
-import { Controller, Post, Put, Get, Body, Param } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiOkResponse, ApiParam } from '@nestjs/swagger';
+import { Controller, Post, Put, Get, Body, Param, Query } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiOkResponse,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { PresenceService } from './presence.service';
-import { ConnDto, HeartbeatDto, SetStatusDto, SubscribeDto } from './presence.dto';
+import { ConnDto, HeartbeatDto, SetPrivacyDto, SetStatusDto, SubscribeDto } from './presence.dto';
+import { DEFAULT_PRIVACY, type Visibility } from './presence-state';
 
 /** Rich presence REST (§A15 / §B8). Routed via the gateway: /presence. */
 @ApiTags('presence')
@@ -56,11 +64,51 @@ export class PresenceController {
     return this.presence.subscribe(body.watcher, body.targets);
   }
 
-  @Get(':userId')
-  @ApiOperation({ summary: 'Resolve a user’s rich presence + last-seen' })
+  @Put('privacy')
+  @ApiOperation({
+    summary: 'Set last-seen / online privacy',
+    description:
+      'WhatsApp-style: everyone | contacts | nobody. Hiding your own signal also hides others’ ' +
+      'from you (reciprocity). Enforced by GET when a viewerId is supplied.',
+  })
+  @ApiOkResponse({ description: 'The stored privacy settings.' })
+  setPrivacy(@Body() body: SetPrivacyDto) {
+    return this.presence.setPrivacy(body.userId, {
+      lastSeen: (body.lastSeen as Visibility) ?? DEFAULT_PRIVACY.lastSeen,
+      online: (body.online as Visibility) ?? DEFAULT_PRIVACY.online,
+    });
+  }
+
+  @Get(':userId/privacy')
+  @ApiOperation({ summary: 'Get a user’s own last-seen / online privacy' })
   @ApiParam({ name: 'userId', description: 'Account_id.' })
+  getPrivacy(@Param('userId') userId: string) {
+    return this.presence.getPrivacy(userId);
+  }
+
+  @Get(':userId')
+  @ApiOperation({
+    summary: 'Resolve a user’s rich presence + last-seen',
+    description:
+      'Pass viewerId (+ viewerIsContact) to apply the owner’s last-seen/online privacy; omit ' +
+      'for the raw signal (e.g. internal callers).',
+  })
+  @ApiParam({ name: 'userId', description: 'Account_id being viewed.' })
+  @ApiQuery({ name: 'viewerId', required: false, description: 'The requesting account_id.' })
+  @ApiQuery({
+    name: 'viewerIsContact',
+    required: false,
+    description: 'true if the viewer is in the owner’s contacts (for the "contacts" mode).',
+  })
   @ApiOkResponse({ description: '{ status, emoji?, text?, lastSeen }.' })
-  get(@Param('userId') userId: string) {
-    return this.presence.get(userId);
+  get(
+    @Param('userId') userId: string,
+    @Query('viewerId') viewerId?: string,
+    @Query('viewerIsContact') viewerIsContact?: string,
+  ) {
+    return this.presence.get(
+      userId,
+      viewerId ? { viewerId, viewerIsContact: viewerIsContact === 'true' } : undefined,
+    );
   }
 }
