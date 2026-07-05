@@ -15,6 +15,7 @@ import { FanoutConsumer } from './fanout/fanout-consumer';
 import { ReceiptPublisher } from './fanout/receipt-publisher';
 import { SkdmStore } from './fanout/skdm-store';
 import { SkdmService } from './fanout/skdm.service';
+import { TypingRelay } from './fanout/typing-relay';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -35,6 +36,8 @@ async function main(): Promise<void> {
     const projection = new MembershipProjection(valkey.redis);
     // Sender-key distribution relay (§G1-2) — Valkey-backed, independent of the event bus.
     const skdm = new SkdmService(new SkdmStore(valkey.redis), router, projection, logger);
+    // Ephemeral typing fan-out (§C4) — fans to conversation members via the membership projection.
+    const typing = new TypingRelay(projection, router);
 
     const fabric = new WsFabric(app.getHttpServer(), valkey.redis, registry, logger, {
       podId: process.env.POD_ID ?? hostname(),
@@ -42,6 +45,7 @@ async function main(): Promise<void> {
       // Inbound delivered/read acks → durable receipt events (§B4.4).
       sink: bus ? new ReceiptPublisher(bus) : undefined,
       skdm,
+      typing,
     });
     await fabric.start();
 
