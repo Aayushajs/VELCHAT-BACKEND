@@ -86,4 +86,109 @@ export class ChannelsRepository {
     const row = res.rows[0] as { sender_key_epoch: string } | undefined;
     return row ? Number(row.sender_key_epoch) : null;
   }
+
+  // ── conversation details + channel discovery/update (§B7) ──
+  async getConversation(conversationId: string): Promise<Record<string, unknown> | null> {
+    const res = await this.pg.pool.query('SELECT * FROM conversations WHERE conversation_id = $1', [
+      conversationId,
+    ]);
+    return (res.rows[0] as Record<string, unknown> | undefined) ?? null;
+  }
+
+  /** Discover channels in a tenant. `onlyPublic` restricts to publicly-joinable ones. */
+  async listChannels(
+    tenantId: string,
+    onlyPublic: boolean,
+  ): Promise<Array<Record<string, unknown>>> {
+    const res = await this.pg.pool.query(
+      `SELECT * FROM conversations
+       WHERE type = 'channel' AND tenant_id = $1
+       ${onlyPublic ? "AND visibility = 'public'" : ''}
+       ORDER BY created_at DESC LIMIT 200`,
+      [tenantId],
+    );
+    return res.rows as Array<Record<string, unknown>>;
+  }
+
+  async updateConversation(
+    conversationId: string,
+    p: {
+      name?: string;
+      topic?: string;
+      avatarMediaId?: string;
+      visibility?: string;
+      isAnnouncement?: boolean;
+      settings?: unknown;
+    },
+  ): Promise<Record<string, unknown> | null> {
+    const res = await this.pg.pool.query(
+      `UPDATE conversations SET
+         name = COALESCE($2, name),
+         topic = COALESCE($3, topic),
+         avatar_media_id = COALESCE($4, avatar_media_id),
+         visibility = COALESCE($5, visibility),
+         is_announcement = COALESCE($6, is_announcement),
+         settings = COALESCE($7, settings)
+       WHERE conversation_id = $1 RETURNING *`,
+      [
+        conversationId,
+        p.name ?? null,
+        p.topic ?? null,
+        p.avatarMediaId ?? null,
+        p.visibility ?? null,
+        p.isAnnouncement ?? null,
+        p.settings !== undefined ? JSON.stringify(p.settings) : null,
+      ],
+    );
+    return (res.rows[0] as Record<string, unknown> | undefined) ?? null;
+  }
+
+  async setMemberRole(conversationId: string, userId: string, role: MemberRole): Promise<void> {
+    await this.pg.pool.query(
+      'UPDATE conversation_members SET role = $3 WHERE conversation_id = $1 AND user_id = $2',
+      [conversationId, userId, role],
+    );
+  }
+
+  async setNotifLevel(conversationId: string, userId: string, level: string): Promise<void> {
+    await this.pg.pool.query(
+      'UPDATE conversation_members SET notif_level = $3 WHERE conversation_id = $1 AND user_id = $2',
+      [conversationId, userId, level],
+    );
+  }
+
+  // ── communities (group-of-groups + announcement channel, §B7) ──
+  async createCommunity(
+    communityId: string,
+    name: string,
+    orgId: string | null,
+    announcementChannelId: string | null,
+  ): Promise<void> {
+    await this.pg.pool.query(
+      `INSERT INTO communities(community_id, name, org_id, announcement_channel_id) VALUES ($1,$2,$3,$4)`,
+      [communityId, name, orgId, announcementChannelId],
+    );
+  }
+
+  async getCommunity(communityId: string): Promise<Record<string, unknown> | null> {
+    const res = await this.pg.pool.query('SELECT * FROM communities WHERE community_id = $1', [
+      communityId,
+    ]);
+    return (res.rows[0] as Record<string, unknown> | undefined) ?? null;
+  }
+
+  async attachChannelToCommunity(conversationId: string, communityId: string): Promise<void> {
+    await this.pg.pool.query(
+      'UPDATE conversations SET parent_community_id = $2 WHERE conversation_id = $1',
+      [conversationId, communityId],
+    );
+  }
+
+  async listCommunityChannels(communityId: string): Promise<Array<Record<string, unknown>>> {
+    const res = await this.pg.pool.query(
+      'SELECT * FROM conversations WHERE parent_community_id = $1 ORDER BY created_at',
+      [communityId],
+    );
+    return res.rows as Array<Record<string, unknown>>;
+  }
 }

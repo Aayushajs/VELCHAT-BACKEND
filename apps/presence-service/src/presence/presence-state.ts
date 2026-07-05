@@ -48,3 +48,44 @@ export function coarse(status: Availability): 'online' | 'away' | 'offline' {
   if (status === 'away' || status === 'brb') return 'away';
   return 'online';
 }
+
+/**
+ * Who may see a presence signal (last-seen / online), mirroring WhatsApp's privacy model.
+ * `everyone` — anyone; `contacts` — only the owner's contacts; `nobody` — no one.
+ */
+export type Visibility = 'everyone' | 'contacts' | 'nobody';
+
+export interface PresencePrivacy {
+  /** Who can see the owner's last-seen timestamp. */
+  lastSeen: Visibility;
+  /** Who can see the owner as online / typing. */
+  online: Visibility;
+}
+
+export const DEFAULT_PRIVACY: PresencePrivacy = { lastSeen: 'everyone', online: 'everyone' };
+
+export interface VisibilityCtx {
+  /** The owner's own setting for this signal. */
+  owner: Visibility;
+  /** The viewer's own setting for the SAME signal (drives the reciprocity rule). */
+  viewer: Visibility;
+  /** Whether the viewer is in the owner's contacts (resolved upstream in user-service). */
+  viewerIsContact: boolean;
+  /** True when the owner is looking at their own presence — always visible. */
+  isSelf: boolean;
+}
+
+/**
+ * Resolve whether a viewer may see one presence signal (§B8 "respect privacy flags before
+ * exposure"). Pure + side-effect-free so it's exhaustively unit-testable. Fails closed.
+ *
+ * WhatsApp reciprocity: if you hide your own last-seen from everyone (`nobody`), you can't see
+ * anyone else's either — modelled here by denying when the viewer's own setting is `nobody`.
+ */
+export function canSee(ctx: VisibilityCtx): boolean {
+  if (ctx.isSelf) return true;
+  if (ctx.owner === 'nobody') return false;
+  if (ctx.viewer === 'nobody') return false; // reciprocity
+  if (ctx.owner === 'contacts') return ctx.viewerIsContact;
+  return true; // everyone
+}

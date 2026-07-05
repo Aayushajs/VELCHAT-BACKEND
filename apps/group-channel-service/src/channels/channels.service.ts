@@ -1,4 +1,4 @@
-import { uuidv7, ValidationError, ForbiddenError } from '@velchat/common';
+import { uuidv7, ValidationError, ForbiddenError, NotFoundError } from '@velchat/common';
 import { ChannelsRepository } from './channels.repository';
 import { ChannelsEvents } from './channels.events';
 import { dmConversationId } from './dm-id';
@@ -42,7 +42,9 @@ export class ChannelsService {
     await this.repo.addMember(conversationId, creator, 'owner');
     for (const u of memberIds)
       if (u !== creator) await this.repo.addMember(conversationId, u, 'member');
-    await this.events.conversationCreated(conversationId, 'group', null, creator, members);
+    await this.events.conversationCreated(conversationId, 'group', null, creator, members, {
+      name,
+    });
     return { conversationId };
   }
 
@@ -64,7 +66,10 @@ export class ChannelsService {
       createdBy: creator,
     });
     await this.repo.addMember(conversationId, creator, 'owner');
-    await this.events.conversationCreated(conversationId, 'channel', tenantId, creator, [creator]);
+    await this.events.conversationCreated(conversationId, 'channel', tenantId, creator, [creator], {
+      name,
+      visibility,
+    });
     return { conversationId };
   }
 
@@ -112,5 +117,126 @@ export class ChannelsService {
     if (role !== 'owner' && role !== 'admin') {
       throw new ForbiddenError('only an owner or admin can manage members');
     }
+  }
+
+  // ── details + channel discovery/update (§B7) ──
+  async getConversation(conversationId: string): Promise<Record<string, unknown>> {
+    const c = await this.repo.getConversation(conversationId);
+    if (!c) throw new NotFoundError('conversation not found');
+    return c;
+  }
+
+  listChannels(tenantId: string, onlyPublic = true): Promise<Array<Record<string, unknown>>> {
+    if (!tenantId) throw new ValidationError('tenantId is required');
+    return this.repo.listChannels(tenantId, onlyPublic);
+  }
+
+  async updateChannel(
+    conversationId: string,
+    actorId: string,
+    patch: {
+      name?: string;
+      topic?: string;
+      avatarMediaId?: string;
+      visibility?: string;
+      isAnnouncement?: boolean;
+      settings?: unknown;
+    },
+  ): Promise<Record<string, unknown>> {
+    await this.assertAdmin(conversationId, actorId);
+    const updated = await this.repo.updateConversation(conversationId, patch);
+    if (!updated) throw new NotFoundError('conversation not found');
+    await this.events.channelUpdated(conversationId, {
+      tenantId: (updated.tenant_id as string) ?? null,
+      name: (updated.name as string) ?? null,
+      topic: (updated.topic as string) ?? null,
+      visibility: (updated.visibility as string) ?? null,
+      isAnnouncement: (updated.is_announcement as boolean) ?? null,
+    });
+    return updated;
+  }
+
+  /** Self-service join of a PUBLIC channel. Private channels require an admin invite (addMember). */
+  async joinChannel(conversationId: string, userId: string): Promise<{ message: string }> {
+    const c = await this.repo.getConversation(conversationId);
+    if (!c) throw new NotFoundError('channel not found');
+    if (c.type !== 'channel') throw new ValidationError('can only self-join channels');
+    if (c.visibility !== 'public') throw new ForbiddenError('this channel is invite-only');
+    await this.repo.addMember(conversationId, userId, 'member');
+    await this.events.memberAdded(
+      conversationId,
+      userId,
+      'member',
+      (c.tenant_id as string) ?? null,
+    );
+    return { message: 'Joined channel.' };
+  }
+
+  async leaveChannel(conversationId: string, userId: string): Promise<{ message: string }> {
+    await this.repo.removeMember(conversationId, userId);
+    await this.events.memberRemoved(conversationId, userId, null);
+    return { message: 'Left channel.' };
+  }
+
+  async setMemberRole(
+    conversationId: string,
+    actorId: string,
+    userId: string,
+    role: MemberRole,
+  ): Promise<{ message: string }> {
+    await this.assertAdmin(conversationId, actorId);
+    await this.repo.setMemberRole(conversationId, userId, role);
+    return { message: `Role updated to ${role}.` };
+  }
+
+  /** A member sets their OWN per-conversation notification level (all|mentions|none). */
+  async setNotifLevel(
+    conversationId: string,
+    userId: string,
+    level: string,
+  ): Promise<{ message: string }> {
+    await this.repo.setNotifLevel(conversationId, userId, level);
+    return { message: `Notifications set to ${level}.` };
+  }
+
+  // ── communities (group-of-groups + announcement channel, §B7) ──
+  async createCommunity(
+    name: string,
+    creator: string,
+    orgId?: string,
+  ): Promise<{ communityId: string; announcementChannelId: string }> {
+    if (!name) throw new ValidationError('name is required');
+    const communityId = uuidv7();
+    // Every community gets a read-only announcement channel.
+    const announcementChannelId = uuidv7();
+    await this.repo.createConversation({
+      conversationId: announcementChannelId,
+      type: 'channel',
+      tenantId: orgId ?? null,
+      name: `${name} — Announcements`,
+      visibility: 'public',
+      isAnnouncement: true,
+      createdBy: creator,
+    });
+    await this.repo.addMember(announcementChannelId, creator, 'owner');
+    await this.repo.attachChannelToCommunity(announcementChannelId, communityId);
+    await this.repo.createCommunity(communityId, name, orgId ?? null, announcementChannelId);
+    return { communityId, announcementChannelId };
+  }
+
+  async addChannelToCommunity(
+    communityId: string,
+    conversationId: string,
+    actorId: string,
+  ): Promise<{ message: string }> {
+    if (!(await this.repo.getCommunity(communityId)))
+      throw new NotFoundError('community not found');
+    await this.assertAdmin(conversationId, actorId);
+    await this.repo.attachChannelToCommunity(conversationId, communityId);
+    return { message: 'Channel added to community.' };
+  }
+
+  listCommunityChannels(communityId: string): Promise<Array<Record<string, unknown>>> {
+    return this.repo.listCommunityChannels(communityId);
   }
 }

@@ -50,3 +50,28 @@ export class SubscribeDto {
   @IsString({ each: true })
   targets!: string[];
 }
+
+const VISIBILITY = ['everyone', 'contacts', 'nobody'] as const;
+
+export class SetPrivacyDto {
+  @ApiProperty({ description: 'Account_id whose privacy is being set.' })
+  @IsString()
+  @IsNotEmpty()
+  userId!: string;
+
+  @ApiPropertyOptional({
+    enum: VISIBILITY,
+    description: 'Who can see the last-seen timestamp (default everyone).',
+  })
+  @IsOptional()
+  @IsIn(VISIBILITY)
+  lastSeen?: string;
+
+  @ApiPropertyOptional({
+    enum: VISIBILITY,
+    description: 'Who can see you as online/typing (default everyone).',
+  })
+  @IsOptional()
+  @IsIn(VISIBILITY)
+  online?: string;
+}

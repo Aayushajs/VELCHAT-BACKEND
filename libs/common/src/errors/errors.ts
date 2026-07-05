@@ -56,6 +56,13 @@ export class RateLimitError extends AppError {
   }
 }
 
+/** §C22: a view-once resource that has already been consumed → replay-proof 410 Gone. */
+export class GoneError extends AppError {
+  constructor(message = 'Resource is no longer available') {
+    super('GONE', message, 410);
+  }
+}
+
 /** §G6: tenant context required but not established → fail closed, never default to "all". */
 export class TenantContextMissingError extends AppError {
   constructor(message = 'Tenant context is required but was not established (fail-closed)') {

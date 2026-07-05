@@ -2,6 +2,7 @@ import { buildEnvelope } from '@velchat/common';
 import type { EventBus } from '@velchat/event-bus';
 import type {
   ChannelMemberPayload,
+  ChannelUpdatedPayload,
   ConversationCreatedPayload,
   GroupEpochChangedPayload,
 } from '@velchat/shared-types';
@@ -17,6 +18,7 @@ export class ChannelsEvents {
     tenantId: string | null,
     createdBy: string,
     memberIds: string[],
+    meta?: { name?: string | null; visibility?: string | null },
   ): Promise<void> {
     await this.bus.publish<ConversationCreatedPayload>(
       'conversation.created',
@@ -31,6 +33,8 @@ export class ChannelsEvents {
           tenant_id: tenantId,
           created_by: createdBy,
           member_ids: memberIds,
+          name: meta?.name ?? null,
+          visibility: meta?.visibility ?? null,
         },
       }),
     );
@@ -71,6 +75,36 @@ export class ChannelsEvents {
           user_id: userId,
           role: 'member',
           tenant_id: tenantId,
+        },
+      }),
+    );
+  }
+
+  /** Channel metadata changed (name/topic/visibility/settings) → search + cache invalidation. */
+  async channelUpdated(
+    conversationId: string,
+    meta?: {
+      tenantId?: string | null;
+      name?: string | null;
+      topic?: string | null;
+      visibility?: string | null;
+      isAnnouncement?: boolean | null;
+    },
+  ): Promise<void> {
+    await this.bus.publish<ChannelUpdatedPayload>(
+      'channel.updated',
+      buildEnvelope({
+        eventType: 'channel.updated',
+        key: conversationId,
+        producer: 'group-channel-service',
+        tenantId: meta?.tenantId ?? null,
+        payload: {
+          conversation_id: conversationId,
+          tenant_id: meta?.tenantId ?? null,
+          name: meta?.name ?? null,
+          topic: meta?.topic ?? null,
+          visibility: meta?.visibility ?? null,
+          is_announcement: meta?.isAnnouncement ?? null,
         },
       }),
     );
