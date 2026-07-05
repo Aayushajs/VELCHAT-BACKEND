@@ -1,5 +1,18 @@
 # @velchat/automation-service
 
+## 0.3.0
+
+### Minor Changes
+
+- a45d90d: Collaboration Lists (§A4.7): lightweight structured task/tracking lists attached to a channel/DM —
+  create lists, add/update/complete/reorder items with optional assignee + due date. Postgres-backed
+  in automation-service.
+
+### Patch Changes
+
+- Updated dependencies [a45d90d]
+  - @velchat/database@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes
