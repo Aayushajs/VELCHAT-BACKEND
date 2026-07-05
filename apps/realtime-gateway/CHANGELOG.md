@@ -1,5 +1,12 @@
 # @velchat/realtime-gateway
 
+## 0.2.0
+
+### Minor Changes
+
+- ae68190: Ephemeral typing fan-out (§C4): inbound `typing` ws signal fans typing.started/stopped to the
+  other conversation members; ephemeral (dropped under backpressure, never stored).
+
 ## 0.1.3
 
 ### Patch Changes

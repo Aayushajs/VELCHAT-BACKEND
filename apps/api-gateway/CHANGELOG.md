@@ -1,5 +1,12 @@
 # @velchat/api-gateway
 
+## 0.2.1
+
+### Patch Changes
+
+- aa79115: Route the new group-channel conversation-detail + notif + role endpoints to group-channel (they
+  previously fell through to chat). messages + pins stay with chat.
+
 ## 0.2.0
 
 ### Minor Changes
