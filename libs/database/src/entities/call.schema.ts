@@ -62,8 +62,29 @@ export const meetings = pgTable('meetings', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Screen-share remote control (§A4.4, Teams-style). During a screen share a viewer requests control
+ * of the sharer's screen; the sharer grants/denies; either can release/revoke. One active grant per
+ * call at a time. Signaling only — the actual input relay rides the WebRTC data channel client-side.
+ */
+export const callScreenControl = pgTable(
+  'call_screen_control',
+  {
+    id: uuid('id').primaryKey(),
+    callId: uuid('call_id').notNull(),
+    controllerId: uuid('controller_id').notNull(), // the viewer requesting/holding control
+    sharerId: uuid('sharer_id').notNull(), // the screen owner
+    status: text('status').notNull().default('requested'), // requested|active|denied|released|revoked
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ byCall: index('call_screen_control_call_idx').on(t.callId, t.status) }),
+);
+
 export type CallRow = typeof calls.$inferSelect;
 export type CallParticipantRow = typeof callParticipants.$inferSelect;
 export type MeetingRow = typeof meetings.$inferSelect;
+export type CallScreenControlRow = typeof callScreenControl.$inferSelect;
 export type CallType = 'dm' | 'group' | 'meeting' | 'huddle';
 export type ParticipantRole = 'host' | 'cohost' | 'attendee';
+export type ScreenControlStatus = 'requested' | 'active' | 'denied' | 'released' | 'revoked';

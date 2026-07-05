@@ -10,6 +10,7 @@ import {
 import { createEventBus, type EventBus } from '@velchat/event-bus';
 import { PostgresClient } from '@velchat/database';
 import { CallsModule } from './calls/calls.module';
+import { ScreenControlModule } from './screen-control/screen-control.module';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const PG_CLIENT = Symbol('PG_CLIENT');
@@ -65,6 +66,8 @@ export class AppModule {
           },
         }),
       );
+      // Screen-share remote control (§A4.4) — Teams-style request/grant signaling.
+      imports.push(ScreenControlModule.forRoot({ pg, eventBus }));
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);

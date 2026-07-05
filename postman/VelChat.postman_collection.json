@@ -5,15 +5,66 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "authUrl", "value": "http://localhost:8080" },
-    { "key": "userUrl", "value": "http://localhost:8080" },
-    { "key": "chatUrl", "value": "http://localhost:8080" },
-    { "key": "groupChannelUrl", "value": "http://localhost:8080" },
-    { "key": "presenceUrl", "value": "http://localhost:8080" },
-    { "key": "realtimeUrl", "value": "http://localhost:8080" },
-    { "key": "apiGatewayUrl", "value": "http://localhost:8080" },
-    { "key": "accessToken", "value": "" },
-    { "key": "tenant", "value": "org-demo" }
+    {
+      "key": "authUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "userUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "chatUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "groupChannelUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "presenceUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "realtimeUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "apiGatewayUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "tenant",
+      "value": "org-demo"
+    },
+    {
+      "key": "notificationUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "mediaUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "searchUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "callUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "automationUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "aiUrl",
+      "value": "http://localhost:8080"
+    }
   ],
   "item": [
     {
@@ -21,25 +72,67 @@
       "item": [
         {
           "name": "api-gateway /health",
-          "request": { "method": "GET", "url": "{{apiGatewayUrl}}/health" }
+          "request": {
+            "method": "GET",
+            "url": "{{apiGatewayUrl}}/health"
+          }
         },
-        { "name": "auth /health", "request": { "method": "GET", "url": "{{authUrl}}/health" } },
-        { "name": "user /health", "request": { "method": "GET", "url": "{{userUrl}}/health" } },
-        { "name": "chat /health", "request": { "method": "GET", "url": "{{chatUrl}}/health" } },
+        {
+          "name": "auth /health",
+          "request": {
+            "method": "GET",
+            "url": "{{authUrl}}/health"
+          }
+        },
+        {
+          "name": "user /health",
+          "request": {
+            "method": "GET",
+            "url": "{{userUrl}}/health"
+          }
+        },
+        {
+          "name": "chat /health",
+          "request": {
+            "method": "GET",
+            "url": "{{chatUrl}}/health"
+          }
+        },
         {
           "name": "group-channel /health",
-          "request": { "method": "GET", "url": "{{groupChannelUrl}}/health" }
+          "request": {
+            "method": "GET",
+            "url": "{{groupChannelUrl}}/health"
+          }
         },
         {
           "name": "presence /health",
-          "request": { "method": "GET", "url": "{{presenceUrl}}/health" }
+          "request": {
+            "method": "GET",
+            "url": "{{presenceUrl}}/health"
+          }
         },
         {
           "name": "realtime /health",
-          "request": { "method": "GET", "url": "{{realtimeUrl}}/health" }
+          "request": {
+            "method": "GET",
+            "url": "{{realtimeUrl}}/health"
+          }
         },
-        { "name": "auth /ready", "request": { "method": "GET", "url": "{{authUrl}}/ready" } },
-        { "name": "auth /metrics", "request": { "method": "GET", "url": "{{authUrl}}/metrics" } }
+        {
+          "name": "auth /ready",
+          "request": {
+            "method": "GET",
+            "url": "{{authUrl}}/ready"
+          }
+        },
+        {
+          "name": "auth /metrics",
+          "request": {
+            "method": "GET",
+            "url": "{{authUrl}}/metrics"
+          }
+        }
       ]
     },
     {
@@ -61,7 +154,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/register",
             "body": {
               "mode": "raw",
@@ -84,16 +182,29 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/session",
-            "body": { "mode": "raw", "raw": "{\n  \"sessionId\": \"{{sessionId}}\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"{{sessionId}}\"\n}"
+            }
           }
         },
         {
           "name": "Reverse-OTP webhook (SIP gateway → server)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/revotp/webhook",
             "body": {
               "mode": "raw",
@@ -105,16 +216,29 @@
           "name": "Challenge (device-key login step 1)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/challenge",
-            "body": { "mode": "raw", "raw": "{\n  \"deviceId\": \"<device uuid>\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deviceId\": \"<device uuid>\"\n}"
+            }
           }
         },
         {
           "name": "Login with device-key (step 2)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/login/device-key",
             "body": {
               "mode": "raw",
@@ -126,7 +250,12 @@
           "name": "Refresh token (rotating + DPoP)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/token/refresh",
             "body": {
               "mode": "raw",
@@ -136,13 +265,21 @@
         },
         {
           "name": "List devices",
-          "request": { "method": "GET", "url": "{{authUrl}}/auth/devices?accountId=<account uuid>" }
+          "request": {
+            "method": "GET",
+            "url": "{{authUrl}}/auth/devices?accountId=<account uuid>"
+          }
         },
         {
           "name": "Magic-link begin (email)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/magic/begin",
             "body": {
               "mode": "raw",
@@ -154,16 +291,29 @@
           "name": "Magic-link verify",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/magic/verify",
-            "body": { "mode": "raw", "raw": "{\n  \"token\": \"<magic token>\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"<magic token>\"\n}"
+            }
           }
         },
         {
           "name": "Link new device — request (QR)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/link/request",
             "body": {
               "mode": "raw",
@@ -175,7 +325,12 @@
           "name": "Link new device — approve (trusted device)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/link/approve",
             "body": {
               "mode": "raw",
@@ -187,16 +342,29 @@
           "name": "Link new device — poll",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/link/poll",
-            "body": { "mode": "raw", "raw": "{\n  \"linkId\": \"<from request>\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"linkId\": \"<from request>\"\n}"
+            }
           }
         },
         {
           "name": "Passkey register — options",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/passkey/register/options",
             "body": {
               "mode": "raw",
@@ -208,7 +376,12 @@
           "name": "Passkey register — verify",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/passkey/register/verify",
             "body": {
               "mode": "raw",
@@ -220,16 +393,29 @@
           "name": "Passkey login — options",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/passkey/login/options",
-            "body": { "mode": "raw", "raw": "{\n  \"accountId\": \"<account uuid>\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountId\": \"<account uuid>\"\n}"
+            }
           }
         },
         {
           "name": "Passkey login — verify",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/passkey/login/verify",
             "body": {
               "mode": "raw",
@@ -241,7 +427,12 @@
           "name": "Number change — begin",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/number-change/begin",
             "body": {
               "mode": "raw",
@@ -253,16 +444,29 @@
           "name": "Recovery — begin",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/recovery/begin",
-            "body": { "mode": "raw", "raw": "{\n  \"accountId\": \"<account uuid>\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountId\": \"<account uuid>\"\n}"
+            }
           }
         },
         {
           "name": "Recovery — add factor",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/recovery/factor",
             "body": {
               "mode": "raw",
@@ -274,7 +478,12 @@
           "name": "Recovery — backup code",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/recovery/backup-code",
             "body": {
               "mode": "raw",
@@ -286,23 +495,42 @@
           "name": "Recovery — complete",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/recovery/complete",
-            "body": { "mode": "raw", "raw": "{\n  \"recoveryId\": \"<from begin>\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recoveryId\": \"<from begin>\"\n}"
+            }
           }
         },
         {
           "name": "Backup codes — issue",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{authUrl}}/auth/backup-codes/issue",
-            "body": { "mode": "raw", "raw": "{\n  \"accountId\": \"<account uuid>\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountId\": \"<account uuid>\"\n}"
+            }
           }
         },
         {
           "name": "JWKS (public verify keys)",
-          "request": { "method": "GET", "url": "{{authUrl}}/.well-known/jwks.json" }
+          "request": {
+            "method": "GET",
+            "url": "{{authUrl}}/.well-known/jwks.json"
+          }
         }
       ]
     },
@@ -324,16 +552,29 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{groupChannelUrl}}/conversations/dm",
-            "body": { "mode": "raw", "raw": "{\n  \"a\": \"alice\",\n  \"b\": \"bob\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"a\": \"alice\",\n  \"b\": \"bob\"\n}"
+            }
           }
         },
         {
           "name": "Create group",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{groupChannelUrl}}/groups",
             "body": {
               "mode": "raw",
@@ -346,8 +587,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-tenant-id", "value": "{{tenant}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
             ],
             "url": "{{groupChannelUrl}}/channels",
             "body": {
@@ -360,7 +607,12 @@
           "name": "Add member (owner/admin only)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{groupChannelUrl}}/conversations/{{conversationId}}/members",
             "body": {
               "mode": "raw",
@@ -392,9 +644,18 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "x-tenant-id", "value": "{{tenant}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
             ],
             "url": "{{chatUrl}}/chat/messages",
             "body": {
@@ -407,7 +668,12 @@
           "name": "Message history (cursor by seq)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{chatUrl}}/chat/conversations/{{conversationId}}/messages?afterSeq=0&limit=50"
           }
         }
@@ -419,18 +685,1118 @@
       "item": [
         {
           "name": "realtime /health",
-          "request": { "method": "GET", "url": "{{realtimeUrl}}/health" }
+          "request": {
+            "method": "GET",
+            "url": "{{realtimeUrl}}/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Directory & Discovery (§B3/§G2)",
+      "item": [
+        {
+          "name": "Update profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{userUrl}}/users/{{accountId}}/profile",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Alice\",\n  \"about\": \"hi\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{userUrl}}/users/{{accountId}}/profile"
+          }
+        },
+        {
+          "name": "Add contact",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{userUrl}}/users/{{accountId}}/contacts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contactUserId\": \"bob\",\n  \"displayName\": \"Bob\"\n}"
+            }
+          }
+        },
+        {
+          "name": "OPRF: public key",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{userUrl}}/discovery/oprf/key"
+          }
+        },
+        {
+          "name": "OPRF: evaluate (blinded)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{userUrl}}/discovery/oprf/evaluate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountId\": \"{{accountId}}\",\n  \"blinded\": [\n    \"<base64url-blinded-value>\"\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "OPRF: register (opt in)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{userUrl}}/discovery/oprf/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountId\": \"{{accountId}}\",\n  \"token\": \"<sha256-hex-token>\",\n  \"keyVersion\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "OPRF: match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{userUrl}}/discovery/oprf/match",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountId\": \"{{accountId}}\",\n  \"tokens\": [\n    \"<sha256-hex-token>\"\n  ]\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Polls (§B16)",
+      "item": [
+        {
+          "name": "Create poll",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{chatUrl}}/polls",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"conversationId\": \"{{conversationId}}\",\n  \"options\": [\n    \"Yes\",\n    \"No\"\n  ],\n  \"multi\": false,\n  \"anonymous\": false,\n  \"createdBy\": \"{{accountId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Vote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{chatUrl}}/polls/{{messageId}}/vote",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{accountId}}\",\n  \"optionIds\": [\n    \"<option-id>\"\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Results",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{chatUrl}}/polls/{{messageId}}"
+          }
+        },
+        {
+          "name": "Close",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{chatUrl}}/polls/{{messageId}}/close"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chat extras — pin/star/archive/mute (§A4.1)",
+      "item": [
+        {
+          "name": "Pin message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{chatUrl}}/conversations/{{conversationId}}/pins/{{messageId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"by\": \"{{accountId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List pins",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{chatUrl}}/conversations/{{conversationId}}/pins"
+          }
+        },
+        {
+          "name": "Star message",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{chatUrl}}/users/{{accountId}}/stars/{{messageId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"conversationId\": \"{{conversationId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List saved",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{chatUrl}}/users/{{accountId}}/stars"
+          }
+        },
+        {
+          "name": "Archive chat",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{chatUrl}}/users/{{accountId}}/conversations/{{conversationId}}/archive",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"archived\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Mute chat",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{chatUrl}}/users/{{accountId}}/conversations/{{conversationId}}/mute",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"duration\": \"8h\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Archived list",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{chatUrl}}/users/{{accountId}}/conversations/archived"
+          }
+        }
+      ]
+    },
+    {
+      "name": "E2EE resend (§G1-1)",
+      "item": [
+        {
+          "name": "Request resend",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{chatUrl}}/messages/{{messageId}}/resend-request",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requesterId\": \"{{accountId}}\",\n  \"requesterDeviceId\": \"{{deviceId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Fulfil resend",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{chatUrl}}/messages/{{messageId}}/resend-fulfill",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requesterDeviceId\": \"{{deviceId}}\",\n  \"senderId\": \"bob\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Pending (sender)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{chatUrl}}/messages/resend/pending?senderId={{accountId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications (§B10)",
+      "item": [
+        {
+          "name": "Set prefs",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{notificationUrl}}/notifications/prefs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{accountId}}\",\n  \"scopeType\": \"conversation\",\n  \"scopeId\": \"{{conversationId}}\",\n  \"level\": \"all\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get prefs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{notificationUrl}}/notifications/prefs?userId={{accountId}}&scopeType=conversation&scopeId={{conversationId}}"
+          }
+        },
+        {
+          "name": "Register endpoint",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{notificationUrl}}/notifications/endpoints",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deviceId\": \"{{deviceId}}\",\n  \"userId\": \"{{accountId}}\",\n  \"platform\": \"web\",\n  \"subscription\": {\n    \"endpoint\": \"https://push...\",\n    \"keys\": {\n      \"p256dh\": \"...\",\n      \"auth\": \"...\"\n    }\n  }\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Mail campaigns (§A19)",
+      "item": [
+        {
+          "name": "Bulk send now",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{notificationUrl}}/mail/campaigns/bulk",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipients\": [\n    \"a@x.com\",\n    \"b@x.com\"\n  ],\n  \"subject\": \"Hello\",\n  \"template\": \"notification\",\n  \"text\": \"Body text\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Create campaign (recurring)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{notificationUrl}}/mail/campaigns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Weekly digest\",\n  \"subject\": \"Digest\",\n  \"template\": \"notification\",\n  \"text\": \"Your weekly digest\",\n  \"recipients\": [\n    \"a@x.com\"\n  ],\n  \"mode\": \"recurring\",\n  \"recurrence\": {\n    \"daysOfWeek\": [\n      1,\n      4\n    ]\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "List campaigns",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{notificationUrl}}/mail/campaigns"
+          }
+        }
+      ]
+    },
+    {
+      "name": "AI / Translation (§A26)",
+      "item": [
+        {
+          "name": "Translate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{aiUrl}}/ai/translate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"hello\",\n  \"target\": \"hi\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Detect language",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{aiUrl}}/ai/detect",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"bonjour\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Set user language",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{aiUrl}}/ai/language",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountId\": \"{{accountId}}\",\n  \"uiLang\": \"hi\",\n  \"autoTranslate\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Set chat translate pref",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{aiUrl}}/ai/translate/pref",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountId\": \"{{accountId}}\",\n  \"conversationId\": \"{{conversationId}}\",\n  \"mode\": \"auto\",\n  \"targetLang\": \"hi\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Automation — bots/slash/workflows (§B17)",
+      "item": [
+        {
+          "name": "Create bot",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{automationUrl}}/automation/bots",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workspaceId\": \"{{tenant}}\",\n  \"name\": \"reminder-bot\",\n  \"webhookUrl\": \"https://bot.example.com/hook\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Register slash command",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{automationUrl}}/automation/commands",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workspaceId\": \"{{tenant}}\",\n  \"command\": \"remind\",\n  \"botId\": \"<bot-id>\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Dispatch slash command",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{automationUrl}}/automation/slash",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workspaceId\": \"{{tenant}}\",\n  \"command\": \"remind\",\n  \"args\": \"tea in 5m\",\n  \"userId\": \"{{accountId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Schedule reminder",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{automationUrl}}/automation/reminders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"standup\",\n  \"remindAt\": \"2026-07-06T09:00:00Z\",\n  \"userId\": \"{{accountId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Create workflow",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{automationUrl}}/automation/workflows",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workspaceId\": \"{{tenant}}\",\n  \"name\": \"notify-on-keyword\",\n  \"trigger\": {\n    \"type\": \"manual\"\n  },\n  \"steps\": [\n    {\n      \"type\": \"webhook\",\n      \"url\": \"https://bot.example.com/step\"\n    }\n  ]\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Lists (§A4.7)",
+      "item": [
+        {
+          "name": "Create list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{automationUrl}}/lists",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"conversationId\": \"{{conversationId}}\",\n  \"title\": \"Sprint tasks\",\n  \"createdBy\": \"{{accountId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Lists in conversation",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{automationUrl}}/lists?conversationId={{conversationId}}"
+          }
+        },
+        {
+          "name": "Add item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{automationUrl}}/lists/{{listId}}/items",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"ship the thing\",\n  \"assignee\": \"{{accountId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update item (done)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{automationUrl}}/lists/items/{{itemId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"done\": true\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Calls + screen control (§B12/§A4.4)",
+      "item": [
+        {
+          "name": "Create call",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{callUrl}}/calls",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"group\",\n  \"hostId\": \"{{accountId}}\",\n  \"conversationId\": \"{{conversationId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Join (LiveKit token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{callUrl}}/calls/{{callId}}/join",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{accountId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Screen control: request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{callUrl}}/calls/{{callId}}/screen-control/request",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"controllerId\": \"{{accountId}}\",\n  \"sharerId\": \"bob\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Screen control: current",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{callUrl}}/calls/{{callId}}/screen-control"
+          }
+        },
+        {
+          "name": "Screen control: grant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{callUrl}}/calls/{{callId}}/screen-control/{{controlId}}/grant",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"actorId\": \"bob\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Screen control: release",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant}}"
+              }
+            ],
+            "url": "{{callUrl}}/calls/{{callId}}/screen-control/{{controlId}}/release",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"actorId\": \"{{accountId}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Search (§B13)",
+      "item": [
+        {
+          "name": "Search messages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{searchUrl}}/search?q=in:{{conversationId}}%20hello&limit=20"
+          }
         }
       ]
     },
     {
       "name": "Docs (Swagger per service)",
       "item": [
-        { "name": "auth /docs", "request": { "method": "GET", "url": "{{authUrl}}/docs" } },
-        { "name": "chat /docs", "request": { "method": "GET", "url": "{{chatUrl}}/docs" } },
+        {
+          "name": "auth /docs",
+          "request": {
+            "method": "GET",
+            "url": "{{authUrl}}/docs"
+          }
+        },
+        {
+          "name": "chat /docs",
+          "request": {
+            "method": "GET",
+            "url": "{{chatUrl}}/docs"
+          }
+        },
         {
           "name": "group-channel /docs",
-          "request": { "method": "GET", "url": "{{groupChannelUrl}}/docs" }
+          "request": {
+            "method": "GET",
+            "url": "{{groupChannelUrl}}/docs"
+          }
         }
       ]
     }

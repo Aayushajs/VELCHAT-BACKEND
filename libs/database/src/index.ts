@@ -8,8 +8,10 @@ export type {
   CallRow,
   CallParticipantRow,
   MeetingRow,
+  CallScreenControlRow,
   CallType,
   ParticipantRole,
+  ScreenControlStatus,
 } from './entities/call.schema';
 export * as notificationSchema from './entities/notification.schema';
 export type {
