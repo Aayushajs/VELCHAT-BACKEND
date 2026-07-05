@@ -84,3 +84,80 @@ export class AddMemberDto {
   @IsIn(['owner', 'admin', 'member'])
   role?: MemberRole;
 }
+
+export class UpdateChannelDto {
+  @ApiProperty({ description: 'Acting user — owner/admin only.' })
+  @IsString()
+  @IsNotEmpty()
+  actorId!: string;
+
+  @ApiPropertyOptional() @IsOptional() @IsString() name?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() topic?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() avatarMediaId?: string;
+  @ApiPropertyOptional({ enum: ['public', 'private'] })
+  @IsOptional()
+  @IsIn(['public', 'private'])
+  visibility?: string;
+  @ApiPropertyOptional({ description: 'Announcement (admins-only posting).' })
+  @IsOptional()
+  @IsBoolean()
+  isAnnouncement?: boolean;
+}
+
+export class JoinLeaveDto {
+  @ApiProperty({ description: 'Account_id joining/leaving.' })
+  @IsString()
+  @IsNotEmpty()
+  userId!: string;
+}
+
+export class SetRoleDto {
+  @ApiProperty({ description: 'Acting user — owner/admin only.' })
+  @IsString()
+  @IsNotEmpty()
+  actorId!: string;
+
+  @ApiProperty({ enum: ['owner', 'admin', 'member'] })
+  @IsIn(['owner', 'admin', 'member'])
+  role!: MemberRole;
+}
+
+export class SetNotifDto {
+  @ApiProperty({ description: 'The member setting their own level.' })
+  @IsString()
+  @IsNotEmpty()
+  userId!: string;
+
+  @ApiProperty({ enum: ['all', 'mentions', 'none'] })
+  @IsIn(['all', 'mentions', 'none'])
+  level!: string;
+}
+
+export class CreateCommunityDto {
+  @ApiProperty({ description: 'Community name (an announcement channel is auto-created).' })
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @ApiProperty({ description: 'Creator account_id.' })
+  @IsString()
+  @IsNotEmpty()
+  creator!: string;
+
+  @ApiPropertyOptional({ description: 'Owning org id (optional).' })
+  @IsOptional()
+  @IsString()
+  orgId?: string;
+}
+
+export class AttachChannelDto {
+  @ApiProperty({ description: 'Channel (conversation) id to add to the community.' })
+  @IsString()
+  @IsNotEmpty()
+  conversationId!: string;
+
+  @ApiProperty({ description: 'Acting user — owner/admin of the channel.' })
+  @IsString()
+  @IsNotEmpty()
+  actorId!: string;
+}

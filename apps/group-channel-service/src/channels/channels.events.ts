@@ -76,6 +76,19 @@ export class ChannelsEvents {
     );
   }
 
+  /** Channel metadata changed (name/topic/visibility/settings) → search + cache invalidation. */
+  async channelUpdated(conversationId: string): Promise<void> {
+    await this.bus.publish(
+      'channel.updated',
+      buildEnvelope({
+        eventType: 'channel.updated',
+        key: conversationId,
+        producer: 'group-channel-service',
+        payload: { conversation_id: conversationId },
+      }),
+    );
+  }
+
   /** Sender-Key epoch rotated (§G1-2) — members redistribute keys, ciphertext binds to the epoch. */
   async groupEpochChanged(
     conversationId: string,
