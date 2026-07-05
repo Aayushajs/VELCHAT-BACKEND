@@ -1,5 +1,12 @@
 # @velchat/chat-service
 
+## 0.4.2
+
+### Patch Changes
+
+- Updated dependencies [eb9f1d0]
+  - @velchat/database@0.2.3
+
 ## 0.4.1
 
 ### Patch Changes
