@@ -1,5 +1,12 @@
 # @velchat/automation-service
 
+## 0.3.1
+
+### Patch Changes
+
+- Updated dependencies [45ac2f4]
+  - @velchat/database@0.2.2
+
 ## 0.3.0
 
 ### Minor Changes
