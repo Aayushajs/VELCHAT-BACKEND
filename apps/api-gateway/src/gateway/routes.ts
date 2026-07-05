@@ -21,9 +21,12 @@ export const ROUTES: Route[] = [
   // chat-service extras reuse the /users prefix — match these BEFORE the user-service catch-all.
   R(/^\/users\/[^/]+\/(stars|conversations)(\/|$)/, 'CHAT', 3004),
   R(/^\/(users|orgs|workspaces|teams|memberships|authorize|admin|discovery)(\/|$)/, 'USER', 3003),
-  // /conversations is split: dm + members → group-channel, everything else → chat.
+  // /conversations is split: dm + members + role + notif + bare details → group-channel;
+  // everything else under /conversations/:id (messages, pins, state) → chat.
   R(/^\/conversations\/dm(\/|$)/, 'GROUP_CHANNEL', 3005),
   R(/^\/conversations\/[^/]+\/members(\/|$)/, 'GROUP_CHANNEL', 3005),
+  R(/^\/conversations\/[^/]+\/notif(\/|$)/, 'GROUP_CHANNEL', 3005),
+  R(/^\/conversations\/[^/]+\/?$/, 'GROUP_CHANNEL', 3005), // GET details (single segment only)
   R(/^\/conversations(\/|$)/, 'CHAT', 3004),
   R(/^\/(chat|polls|messages)(\/|$)/, 'CHAT', 3004),
   R(/^\/(groups|channels|communities|broadcasts)(\/|$)/, 'GROUP_CHANNEL', 3005),

@@ -34,6 +34,12 @@ jobs:
   proto-compat:
     name: proto FULL_TRANSITIVE compat (§G7)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # buf-action posts the breaking-change result as a PR comment; without this the comment
+      # step 403s on pull_request runs ("Resource not accessible by integration"). Push-to-main
+      # runs have no PR so they never hit it — which is why only dev PRs were failing.
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:

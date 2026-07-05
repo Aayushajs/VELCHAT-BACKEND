@@ -56,6 +56,7 @@ describe('ChannelsService (§B7)', () => {
       null,
       'owner',
       ['owner', 'u2', 'u3'],
+      { name: 'Team' }, // discovery metadata for search (§A18.1)
     );
   });
 

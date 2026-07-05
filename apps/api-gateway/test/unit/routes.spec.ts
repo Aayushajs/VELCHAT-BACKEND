@@ -38,16 +38,40 @@ describe('gateway routing (§A12.1)', () => {
     expect(upstreamPort('/users/u1/conversations/archived')).toBe(portFor('CHAT'));
   });
 
-  it('splits the shared /conversations prefix: dm+members→group-channel, rest→chat', () => {
+  it('splits the shared /conversations prefix: dm+members+role+notif+details→group-channel, rest→chat', () => {
     expect(upstreamPort('/conversations/dm')).toBe(portFor('GROUP_CHANNEL'));
     expect(upstreamPort('/conversations/c1/members')).toBe(portFor('GROUP_CHANNEL'));
+    expect(upstreamPort('/conversations/c1/members/u1/role')).toBe(portFor('GROUP_CHANNEL'));
+    expect(upstreamPort('/conversations/c1/notif')).toBe(portFor('GROUP_CHANNEL'));
+    expect(upstreamPort('/conversations/c1')).toBe(portFor('GROUP_CHANNEL')); // bare details
     expect(upstreamPort('/conversations/c1/messages')).toBe(portFor('CHAT'));
     expect(upstreamPort('/conversations/c1/pins/m1')).toBe(portFor('CHAT'));
   });
 
-  it('groups/channels → group-channel', () => {
+  it('groups/channels/communities → group-channel', () => {
     expect(upstreamPort('/groups')).toBe(portFor('GROUP_CHANNEL'));
     expect(upstreamPort('/channels')).toBe(portFor('GROUP_CHANNEL'));
+    expect(upstreamPort('/channels/c1/join')).toBe(portFor('GROUP_CHANNEL'));
+    expect(upstreamPort('/communities')).toBe(portFor('GROUP_CHANNEL'));
+    expect(upstreamPort('/communities/c1/channels')).toBe(portFor('GROUP_CHANNEL'));
+  });
+
+  it('search sub-paths (files/people/channels/suggest) → search', () => {
+    expect(upstreamPort('/search/files?q=x')).toBe(portFor('SEARCH'));
+    expect(upstreamPort('/search/people?q=x')).toBe(portFor('SEARCH'));
+    expect(upstreamPort('/search/channels?q=x')).toBe(portFor('SEARCH'));
+    expect(upstreamPort('/search/suggest?q=x')).toBe(portFor('SEARCH'));
+  });
+
+  it('media sub-paths (gallery/view/renditions) → media', () => {
+    expect(upstreamPort('/media?conversationId=c1')).toBe(portFor('MEDIA'));
+    expect(upstreamPort('/media/m1/view')).toBe(portFor('MEDIA'));
+    expect(upstreamPort('/media/m1/renditions')).toBe(portFor('MEDIA'));
+  });
+
+  it('presence privacy → presence', () => {
+    expect(upstreamPort('/presence/privacy')).toBe(portFor('PRESENCE'));
+    expect(upstreamPort('/presence/u1/privacy')).toBe(portFor('PRESENCE'));
   });
 
   it('unknown paths (gateway-owned) resolve to null', () => {

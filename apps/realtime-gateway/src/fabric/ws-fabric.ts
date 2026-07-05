@@ -8,6 +8,7 @@ import { ConnectionRegistry } from './connection-registry';
 import { SendQueue, type Frame } from './send-queue';
 import type { InboundSink } from '../fanout/receipt-publisher';
 import type { SkdmService, SkdmTarget } from '../fanout/skdm.service';
+import type { TypingRelay } from '../fanout/typing-relay';
 
 interface SocketCtx {
   connId: string;
@@ -33,6 +34,8 @@ export interface WsFabricOptions {
   sink?: InboundSink;
   /** Sender-key distribution relay (§G1-2); omitted in dev when there is no bus. */
   skdm?: SkdmService;
+  /** Ephemeral typing fan-out (§C4); omitted in dev when there is no Valkey. */
+  typing?: TypingRelay;
 }
 
 /**
@@ -149,7 +152,14 @@ export class WsFabric {
         await this.opts.skdm.request(conv, epoch, ctx.userId, ctx.deviceId);
         break;
       }
-      // 'typing' fan-out wired in P7 (presence).
+      case 'typing': {
+        // §C4 ephemeral typing → fan out to the other members; never stored, dropped under pressure.
+        const conv = typeof msg.conversationId === 'string' ? msg.conversationId : null;
+        const state = msg.state === 'stop' ? 'stop' : 'start';
+        if (!conv || !this.opts.typing) break;
+        await this.opts.typing.relay(ctx.userId, conv, state);
+        break;
+      }
       default:
         break;
     }
