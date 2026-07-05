@@ -114,6 +114,10 @@ export const envSchema = z.object({
   GRPC_PORT: z.coerce.number().int().positive().default(50051),
   METRICS_PORT: z.coerce.number().int().positive().default(9464),
 
+  // CORS — which web origins may call the API (web/desktop clients; native apps aren't CORS-bound).
+  // '*' reflects any origin (dev default). In prod set a comma-separated allowlist of your app URLs.
+  CORS_ORIGINS: z.string().default('*'),
+
   // PostgreSQL (relational; RLS-enforced multi-tenant)
   POSTGRES_URL: z.string().url().optional(),
   POSTGRES_MAX_POOL: z.coerce.number().int().positive().default(10),

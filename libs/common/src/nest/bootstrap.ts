@@ -12,6 +12,11 @@ import { shutdownTelemetry } from '../observability/tracer';
 export interface BootstrapOptions {
   config: AppConfig;
   logger: Logger;
+  /**
+   * Optional pre-listen hook (e.g. the api-gateway mounts its reverse-proxy middleware here). Runs
+   * after interceptors/pipes/CORS are configured but before `app.listen`.
+   */
+  configure?: (app: INestApplication) => void | Promise<void>;
 }
 
 /**
@@ -27,6 +32,20 @@ export async function bootstrapService(
 
   app.useGlobalInterceptors(new TenantInterceptor(), new ResponseInterceptor());
   app.useGlobalFilters(new AllExceptionsFilter(opts.logger));
+
+  // CORS for browser clients (web/desktop). Native iOS/Android aren't bound by CORS, so this doesn't
+  // affect them. '*' reflects any origin (dev); prod sets a comma-separated allowlist (CORS_ORIGINS).
+  // Skipped on the api-gateway: it only PROXIES, so it pipes each upstream's own CORS headers back —
+  // adding CORS here too would emit a duplicate Access-Control-Allow-Origin (which browsers reject).
+  if (opts.config.SERVICE_NAME !== 'api-gateway') {
+    const origins = opts.config.CORS_ORIGINS.trim();
+    app.enableCors({
+      origin: origins === '*' ? true : origins.split(',').map((o) => o.trim()),
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Authorization', 'Content-Type', 'x-tenant-id', 'x-velchat-signature'],
+    });
+  }
   // Global input validation for every service (§A14.5). `whitelist` strips unknown props
   // (anti mass-assignment); `transform` coerces payloads to the DTO types. Endpoints with a
   // DTO class + class-validator decorators are validated; inline/native body types pass through.
@@ -91,6 +110,9 @@ export async function bootstrapService(
   };
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
   process.on('SIGINT', () => void shutdown('SIGINT'));
+
+  // Pre-listen extension point (api-gateway mounts its reverse proxy here).
+  if (opts.configure) await opts.configure(app);
 
   await app.listen(opts.config.HTTP_PORT, '0.0.0.0');
   opts.logger.info(
