@@ -1,6 +1,11 @@
 import { buildEnvelope } from '@velchat/common';
 import type { EventBus } from '@velchat/event-bus';
-import type { MessageSentPayload } from '@velchat/shared-types';
+import type {
+  MessageSentPayload,
+  MessageReactionPayload,
+  MessageEditedPayload,
+  MessageDeletedPayload,
+} from '@velchat/shared-types';
 import type { MessageDoc } from './message.types';
 
 /** message.* events (§A11). Keyed by conversation_id so per-conversation order is preserved. */
@@ -28,6 +33,73 @@ export class ChatEvents {
           sent_at: m.server_ts,
           ...(text !== undefined ? { text } : {}),
         },
+      }),
+    );
+  }
+
+  /** Emit message.reaction.added / message.reaction.removed (§A11/§B15) for live fan-out. */
+  async reaction(
+    added: boolean,
+    conversationId: string,
+    messageId: string,
+    userId: string,
+    emoji: string,
+  ): Promise<void> {
+    const eventType = added ? 'message.reaction.added' : 'message.reaction.removed';
+    await this.bus.publish<MessageReactionPayload>(
+      eventType,
+      buildEnvelope({
+        eventType,
+        key: conversationId,
+        producer: 'chat-service',
+        payload: {
+          conversation_id: conversationId,
+          message_id: messageId,
+          user_id: userId,
+          emoji,
+        },
+      }),
+    );
+  }
+
+  /**
+   * Emit message.edited (§B15). `text` (the new plaintext body) is carried ONLY when server-readable
+   * (enterprise/channel) so search can re-index; personal E2EE edits stay opaque (§A18.2).
+   */
+  async edited(m: MessageDoc, tenantId: string | null = null, text?: string): Promise<void> {
+    await this.bus.publish<MessageEditedPayload>(
+      'message.edited',
+      buildEnvelope({
+        eventType: 'message.edited',
+        key: m.conversation_id,
+        producer: 'chat-service',
+        tenantId,
+        payload: {
+          conversation_id: m.conversation_id,
+          message_id: m._id,
+          seq: m.seq,
+          edited_at: m.edited_at ?? m.server_ts,
+          ...(text !== undefined ? { text } : {}),
+        },
+      }),
+    );
+  }
+
+  /** Emit message.deleted (§B15) — the tombstone fan-out; realtime clears it and search purges it. */
+  async deleted(
+    conversationId: string,
+    messageId: string,
+    seq: number,
+    tenantId: string | null = null,
+  ): Promise<void> {
+    await this.bus.publish<MessageDeletedPayload>(
+      'message.deleted',
+      buildEnvelope({
+        eventType: 'message.deleted',
+        key: conversationId,
+        producer: 'chat-service',
+        tenantId,
+        payload: { conversation_id: conversationId, message_id: messageId, seq },
       }),
     );
   }

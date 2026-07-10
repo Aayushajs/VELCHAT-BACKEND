@@ -86,3 +86,79 @@ export class SendMessageDto {
   @IsBoolean()
   encrypted?: boolean;
 }
+
+/** Add/remove a reaction on a message (§B15). Idempotent per (user, emoji). */
+export class ReactionDto {
+  @ApiProperty({ description: 'Conversation the message belongs to.' })
+  @IsString()
+  @IsNotEmpty()
+  conversationId!: string;
+
+  @ApiProperty({ description: 'Reacting user (account_id).' })
+  @IsString()
+  @IsNotEmpty()
+  userId!: string;
+
+  @ApiProperty({ description: 'Emoji reaction (e.g. 👍).' })
+  @IsString()
+  @IsNotEmpty()
+  emoji!: string;
+}
+
+/** Edit a message (§B15) — sender-only. `content` is opaque (ciphertext for personal E2EE). */
+export class EditMessageDto {
+  @ApiProperty({ description: 'Conversation the message belongs to.' })
+  @IsString()
+  @IsNotEmpty()
+  conversationId!: string;
+
+  @ApiProperty({ description: 'Editor account_id — must be the original sender.' })
+  @IsString()
+  @IsNotEmpty()
+  editorId!: string;
+
+  @ApiProperty({
+    description: 'New content — plaintext (enterprise) or ciphertext (personal E2EE).',
+    oneOf: [{ type: 'string' }, { type: 'object' }],
+  })
+  @IsDefined()
+  content!: string | Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    description:
+      'Owning tenant (enterprise/channel). Present ⇒ server-readable; the edit is re-indexed for ' +
+      'search. Omit for personal chats (E2EE, never indexed).',
+  })
+  @IsOptional()
+  @IsString()
+  tenantId?: string;
+
+  @ApiPropertyOptional({
+    default: false,
+    description:
+      'True for personal E2EE — content is opaque ciphertext; never indexed server-side.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  encrypted?: boolean;
+}
+
+/** Delete a message (§B15). 'me' hides per-device; 'everyone' tombstones for all (sender-only). */
+export class DeleteMessageDto {
+  @ApiProperty({ description: 'Conversation the message belongs to.' })
+  @IsString()
+  @IsNotEmpty()
+  conversationId!: string;
+
+  @ApiProperty({ description: 'Actor account_id. For scope=everyone must be the original sender.' })
+  @IsString()
+  @IsNotEmpty()
+  actorId!: string;
+
+  @ApiProperty({
+    enum: ['me', 'everyone'],
+    description: "'me' hides locally (per-device); 'everyone' tombstones for all.",
+  })
+  @IsIn(['me', 'everyone'])
+  scope!: 'me' | 'everyone';
+}
