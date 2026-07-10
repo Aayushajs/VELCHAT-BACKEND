@@ -62,8 +62,11 @@ export class ChatService {
       throw err;
     }
 
-    // 5. emit (fan-out, notify, index happen off this event).
-    await this.events.messageSent(doc);
+    // 5. emit (fan-out, notify, index happen off this event). Carry plaintext for full-text search
+    //    ONLY when server-readable (enterprise/channel + not encrypted); personal E2EE stays opaque.
+    const serverReadable = !!input.tenantId && !input.encrypted;
+    const searchText = serverReadable && typeof doc.content === 'string' ? doc.content : undefined;
+    await this.events.messageSent(doc, input.tenantId ?? null, searchText);
 
     // 6. fast ACK.
     return ack(doc);

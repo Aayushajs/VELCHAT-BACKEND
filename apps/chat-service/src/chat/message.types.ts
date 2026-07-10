@@ -48,6 +48,13 @@ export interface SendMessageInput {
   replyTo?: string;
   threadRoot?: string;
   mentions?: Mention[];
+  /**
+   * Owning tenant for enterprise/workspace channel messages. Present ⇒ server-readable; the message
+   * is eligible for full-text indexing + mention routing. Absent ⇒ personal (E2EE), never indexed.
+   */
+  tenantId?: string | null;
+  /** True for personal E2EE — `content` is opaque ciphertext; never indexed/translated server-side. */
+  encrypted?: boolean;
 }
 
 export interface SendAck {

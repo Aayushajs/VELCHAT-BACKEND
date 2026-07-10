@@ -59,4 +59,40 @@ describe('ChatService.send (§B4.2 hot path)', () => {
     const doc = repo.insert.mock.calls[0]?.[0] as unknown as MessageDoc;
     expect(doc.content).toBe('OPAQUE_CIPHERTEXT');
   });
+
+  it('enterprise message carries tenant + plaintext for search indexing', async () => {
+    const { svc, events } = makeChat();
+    await svc.send({ ...input, content: 'quarterly budget', tenantId: 'org-1', encrypted: false });
+    const [, tenantId, text] = events.messageSent.mock.calls[0] as unknown as [
+      MessageDoc,
+      string | null,
+      string | undefined,
+    ];
+    expect(tenantId).toBe('org-1');
+    expect(text).toBe('quarterly budget'); // server-readable → indexed
+  });
+
+  it('E2EE personal message NEVER leaks plaintext to the search index (§A18.2)', async () => {
+    const { svc, events } = makeChat();
+    // encrypted + no tenant → the ciphertext must not be carried as searchable text.
+    await svc.send({ ...input, content: 'CIPHERTEXT', encrypted: true });
+    const [, tenantId, text] = events.messageSent.mock.calls[0] as unknown as [
+      MessageDoc,
+      string | null,
+      string | undefined,
+    ];
+    expect(tenantId).toBeNull();
+    expect(text).toBeUndefined();
+  });
+
+  it('does not index plaintext even for a tenant conversation if it is marked encrypted', async () => {
+    const { svc, events } = makeChat();
+    await svc.send({ ...input, content: 'secret', tenantId: 'org-1', encrypted: true });
+    const [, , text] = events.messageSent.mock.calls[0] as unknown as [
+      MessageDoc,
+      string | null,
+      string | undefined,
+    ];
+    expect(text).toBeUndefined();
+  });
 });

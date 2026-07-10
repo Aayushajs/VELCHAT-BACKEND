@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsDefined, IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsDefined,
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import type { MessageType, Mention } from './message.types';
 
 const MESSAGE_TYPES = [
@@ -59,4 +67,22 @@ export class SendMessageDto {
   @IsOptional()
   @IsArray()
   mentions?: Mention[];
+
+  @ApiPropertyOptional({
+    description:
+      'Owning tenant for enterprise/workspace channel messages. Present ⇒ server-readable (indexed ' +
+      'for search + mention routing). Omit for personal chats (E2EE, never indexed).',
+  })
+  @IsOptional()
+  @IsString()
+  tenantId?: string;
+
+  @ApiPropertyOptional({
+    default: false,
+    description:
+      'True for personal E2EE — content is opaque ciphertext; never indexed server-side.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  encrypted?: boolean;
 }

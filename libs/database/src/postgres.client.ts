@@ -11,7 +11,18 @@ export class PostgresClient implements ManagedResource {
     max: number,
     private readonly logger: Logger,
   ) {
-    this.pool = new Pool({ connectionString, max });
+    this.pool = new Pool({
+      connectionString,
+      max,
+      // Fail fast instead of hanging on an unreachable host (default is no timeout → OS TCP timeout).
+      connectionTimeoutMillis: 10_000,
+      idleTimeoutMillis: 30_000,
+    });
+    // Managed Postgres (Neon/Supabase) closes idle connections; without this listener that surfaces
+    // as an unhandled 'error' on the pool and crashes the process. Log it and let the pool recover.
+    this.pool.on('error', (err) => {
+      this.logger.warn({ err: err.message }, 'postgres idle client error (pool will recover)');
+    });
   }
 
   async connect(): Promise<void> {

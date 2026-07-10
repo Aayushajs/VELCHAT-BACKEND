@@ -12,7 +12,18 @@ export class MongoClient implements ManagedResource {
   ) {}
 
   async connect(): Promise<void> {
-    this.conn = await mongoose.createConnection(this.url).asPromise();
+    // Bounded selection/connect timeouts so an unreachable cluster fails in ~10s instead of the
+    // 30s mongoose default (which reads as a silent "long connection" hang during boot).
+    this.conn = await mongoose
+      .createConnection(this.url, {
+        serverSelectionTimeoutMS: 10_000,
+        connectTimeoutMS: 10_000,
+      })
+      .asPromise();
+    // Log post-boot connection drops instead of letting them surface as unhandled errors.
+    this.conn.on('error', (err: Error) => {
+      this.logger.warn({ err: err.message }, 'mongo connection error');
+    });
   }
 
   async ping(): Promise<boolean> {
