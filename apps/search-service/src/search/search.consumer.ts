@@ -34,8 +34,9 @@ export class SearchConsumer {
         senderId: e.payload.sender_account_id,
         seq: e.payload.seq,
         sentAt: e.payload.sent_at,
-        // Body text is added once chat-service carries plaintext for server-readable convs; metadata
-        // (sender/channel/date) is searchable now via filters.
+        // Plaintext body for server-readable (enterprise/channel) messages → full-text searchable.
+        // Personal E2EE messages never carry `text`, so only their metadata is ever indexed.
+        text: e.payload.text,
       });
     });
 

@@ -117,6 +117,11 @@ export interface MessageSentPayload {
   seq: number;
   /** Ciphertext for personal (E2EE) conversations; the server never reads it. */
   ciphertext_ref?: string;
+  /**
+   * Plaintext body for SERVER-READABLE (enterprise/channel) messages only — powers full-text
+   * search indexing (§A18). NEVER set for personal E2EE messages (the server has only ciphertext).
+   */
+  text?: string;
   sender_account_id: AccountId;
   sent_at: Iso8601;
 }

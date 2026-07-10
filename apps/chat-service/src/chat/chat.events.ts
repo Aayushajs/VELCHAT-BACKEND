@@ -7,7 +7,12 @@ import type { MessageDoc } from './message.types';
 export class ChatEvents {
   constructor(private readonly bus: EventBus) {}
 
-  async messageSent(m: MessageDoc, tenantId: string | null = null): Promise<void> {
+  /**
+   * Emit message.sent. `tenantId` set ⇒ server-readable (enterprise/channel); `text` is the plaintext
+   * body carried ONLY in that case so search can index it. For personal E2EE both are omitted — the
+   * server holds only ciphertext and must never index/route on plaintext (§A14.3 / §A18.2).
+   */
+  async messageSent(m: MessageDoc, tenantId: string | null = null, text?: string): Promise<void> {
     await this.bus.publish<MessageSentPayload>(
       'message.sent',
       buildEnvelope({
@@ -21,6 +26,7 @@ export class ChatEvents {
           seq: m.seq,
           sender_account_id: m.sender_id,
           sent_at: m.server_ts,
+          ...(text !== undefined ? { text } : {}),
         },
       }),
     );
