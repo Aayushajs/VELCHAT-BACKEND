@@ -1,5 +1,23 @@
 # @velchat/chat-service
 
+## 0.5.0
+
+### Minor Changes
+
+- 7615923: Full-text search now matches message body for server-readable (enterprise/channel) messages.
+  chat carries plaintext on message.sent only when a tenant is set and the message is not encrypted;
+  personal E2EE messages never carry text (§A18.2). Send DTO gains tenantId + encrypted.
+
+### Patch Changes
+
+- Updated dependencies [676071e]
+- Updated dependencies [7615923]
+  - @velchat/common@0.2.1
+  - @velchat/cache@0.2.2
+  - @velchat/database@0.2.5
+  - @velchat/shared-types@0.3.0
+  - @velchat/event-bus@0.1.3
+
 ## 0.4.3
 
 ### Patch Changes

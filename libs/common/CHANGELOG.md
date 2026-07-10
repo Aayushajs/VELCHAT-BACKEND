@@ -1,5 +1,12 @@
 # @velchat/common
 
+## 0.2.1
+
+### Patch Changes
+
+- 676071e: Boot no longer hangs on an unreachable datastore: bounded connect timeouts + error listeners on
+  Postgres/Mongo/Valkey clients, and parallel boot connect with a hard per-dependency cap.
+
 ## 0.2.0
 
 ### Minor Changes
