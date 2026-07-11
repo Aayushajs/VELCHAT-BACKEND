@@ -1,5 +1,13 @@
 # @velchat/call-service
 
+## 0.2.4
+
+### Patch Changes
+
+- Updated dependencies [aa2e770]
+- Updated dependencies [68dd778]
+  - @velchat/shared-types@0.4.0
+
 ## 0.2.3
 
 ### Patch Changes

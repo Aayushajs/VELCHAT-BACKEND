@@ -1,5 +1,18 @@
 # @velchat/api-gateway
 
+## 0.2.3
+
+### Patch Changes
+
+- aa2e770: Feature Flag & Remote-Config platform (docs/FEATURE-FLAGS.md), MongoDB-only, hosted in
+  automation-service: flags/remote-config/experiments, %/country/platform/version/role rollout, user
+  overrides, segments, dependencies, kill switch, scheduled enable/disable, emergency rollback,
+  versioning + audit, global maintenance mode + announcement, Valkey-cached pure evaluation engine, and
+  the featureflag.changed event. Gateway routes /feature-flags to automation-service.
+- Updated dependencies [aa2e770]
+- Updated dependencies [68dd778]
+  - @velchat/shared-types@0.4.0
+
 ## 0.2.2
 
 ### Patch Changes

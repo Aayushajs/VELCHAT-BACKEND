@@ -1,5 +1,19 @@
 # @velchat/search-service
 
+## 0.4.0
+
+### Minor Changes
+
+- 68dd778: Message reactions, edit, and delete (§B15): reaction add/remove, sender-only edit with history,
+  delete-for-everyone tombstone + delete-for-me hide. Emits message.reaction.\*/edited/deleted; search
+  re-indexes edits and purges deletes. Personal E2EE never leaks plaintext to the index.
+
+### Patch Changes
+
+- Updated dependencies [aa2e770]
+- Updated dependencies [68dd778]
+  - @velchat/shared-types@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

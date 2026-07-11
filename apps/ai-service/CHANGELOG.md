@@ -1,5 +1,13 @@
 # @velchat/ai-service
 
+## 0.2.7
+
+### Patch Changes
+
+- Updated dependencies [aa2e770]
+- Updated dependencies [68dd778]
+  - @velchat/shared-types@0.4.0
+
 ## 0.2.6
 
 ### Patch Changes

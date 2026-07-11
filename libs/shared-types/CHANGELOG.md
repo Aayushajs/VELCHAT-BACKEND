@@ -1,5 +1,18 @@
 # @velchat/shared-types
 
+## 0.4.0
+
+### Minor Changes
+
+- aa2e770: Feature Flag & Remote-Config platform (docs/FEATURE-FLAGS.md), MongoDB-only, hosted in
+  automation-service: flags/remote-config/experiments, %/country/platform/version/role rollout, user
+  overrides, segments, dependencies, kill switch, scheduled enable/disable, emergency rollback,
+  versioning + audit, global maintenance mode + announcement, Valkey-cached pure evaluation engine, and
+  the featureflag.changed event. Gateway routes /feature-flags to automation-service.
+- 68dd778: Message reactions, edit, and delete (§B15): reaction add/remove, sender-only edit with history,
+  delete-for-everyone tombstone + delete-for-me hide. Emits message.reaction.\*/edited/deleted; search
+  re-indexes edits and purges deletes. Personal E2EE never leaks plaintext to the index.
+
 ## 0.3.0
 
 ### Minor Changes
