@@ -123,4 +123,78 @@ export class MediaRepository {
       ],
     );
   }
+
+  // ── storage usage (§A4.10 "Manage Storage") — bytes come back as bigint strings; map to Number. ──
+
+  /** Bytes + count of a user's READY media, grouped by top-level mime type (image/video/audio/…). */
+  async ownerUsageByType(ownerId: string): Promise<UsageByKey[]> {
+    const res = await this.pg.pool.query(
+      `SELECT COALESCE(split_part(mime,'/',1),'other') AS key,
+              count(*)::int AS count, COALESCE(SUM(size),0)::text AS bytes
+       FROM media_objects WHERE owner_id = $1 AND status = 'ready'
+       GROUP BY 1 ORDER BY SUM(size) DESC NULLS LAST`,
+      [ownerId],
+    );
+    return mapUsage(res.rows);
+  }
+
+  /** Bytes + count of a user's READY media, grouped by conversation (for the per-chat list). */
+  async ownerUsageByConversation(ownerId: string, limit = 500): Promise<UsageByKey[]> {
+    const res = await this.pg.pool.query(
+      `SELECT conversation_id AS key, count(*)::int AS count, COALESCE(SUM(size),0)::text AS bytes
+       FROM media_objects
+       WHERE owner_id = $1 AND status = 'ready' AND conversation_id IS NOT NULL
+       GROUP BY conversation_id ORDER BY SUM(size) DESC NULLS LAST LIMIT $2`,
+      [ownerId, limit],
+    );
+    return mapUsage(res.rows);
+  }
+
+  /** Bytes + count for ONE conversation's READY media, grouped by top-level mime type. */
+  async conversationUsageByType(conversationId: string): Promise<UsageByKey[]> {
+    const res = await this.pg.pool.query(
+      `SELECT COALESCE(split_part(mime,'/',1),'other') AS key,
+              count(*)::int AS count, COALESCE(SUM(size),0)::text AS bytes
+       FROM media_objects WHERE conversation_id = $1 AND status = 'ready'
+       GROUP BY 1 ORDER BY SUM(size) DESC NULLS LAST`,
+      [conversationId],
+    );
+    return mapUsage(res.rows);
+  }
+
+  /**
+   * Which media are still fetchable server-side (re-download strategy §C — a client that evicted a
+   * blob from its cache can re-download only if the server still has it; view-once/deleted → gone).
+   */
+  async availability(mediaIds: string[]): Promise<Array<{ mediaId: string; available: boolean }>> {
+    if (mediaIds.length === 0) return [];
+    const res = await this.pg.pool.query(
+      `SELECT media_id, (status = 'ready' AND storage_key IS NOT NULL) AS available
+       FROM media_objects WHERE media_id = ANY($1)`,
+      [mediaIds],
+    );
+    const found = new Map(
+      (res.rows as Array<{ media_id: string; available: boolean }>).map((r) => [
+        r.media_id,
+        r.available,
+      ]),
+    );
+    // Unknown ids → not available (deleted / never existed).
+    return mediaIds.map((id) => ({ mediaId: id, available: found.get(id) ?? false }));
+  }
+}
+
+/** A usage bucket keyed by type or conversation, with byte totals coerced from bigint strings. */
+export interface UsageByKey {
+  key: string;
+  count: number;
+  bytes: number;
+}
+
+function mapUsage(rows: unknown[]): UsageByKey[] {
+  return (rows as Array<{ key: string; count: number; bytes: string }>).map((r) => ({
+    key: r.key,
+    count: r.count,
+    bytes: Number(r.bytes),
+  }));
 }

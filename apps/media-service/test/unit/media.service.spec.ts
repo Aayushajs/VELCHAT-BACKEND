@@ -45,6 +45,15 @@ function setup(opts: { existsByHash?: boolean; existsInStore?: boolean; others?:
     countOthersByStorageKey: jest.fn(async () => opts.others ?? 0),
     claimViewOnce: jest.fn(async () => true),
     applyRenditions: jest.fn(async () => undefined),
+    ownerUsageByType: jest.fn(async () => [
+      { key: 'video', count: 2, bytes: 3000 },
+      { key: 'image', count: 5, bytes: 1000 },
+    ]),
+    ownerUsageByConversation: jest.fn(async () => [{ key: 'c1', count: 7, bytes: 4000 }]),
+    conversationUsageByType: jest.fn(async () => [{ key: 'image', count: 3, bytes: 1500 }]),
+    availability: jest.fn(async (ids: string[]) =>
+      ids.map((id) => ({ mediaId: id, available: id !== 'gone' })),
+    ),
   } as unknown as MediaRepository;
   const storage = {
     putObject: jest.fn(async (i: { key: string }) => {
@@ -133,6 +142,30 @@ describe('MediaService (§B11)', () => {
     await expect(
       svc.streamUpload('s2', Readable.from([Buffer.from('x')]), 'video/mp4', 999 * 1024 * 1024),
     ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('ownerUsage totals bytes/count and returns breakdowns (Manage Storage)', async () => {
+    const { svc } = setup();
+    const u = await svc.ownerUsage('alice');
+    expect(u.totalBytes).toBe(4000); // 3000 + 1000
+    expect(u.totalCount).toBe(7);
+    expect(u.byConversation[0]).toMatchObject({ key: 'c1', bytes: 4000 });
+    await expect(svc.ownerUsage('')).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('conversationUsage totals per-chat bytes/count', async () => {
+    const { svc } = setup();
+    const u = await svc.conversationUsage('c1');
+    expect(u).toMatchObject({ conversationId: 'c1', totalBytes: 1500, totalCount: 3 });
+  });
+
+  it('availability reports which media are still fetchable (re-download check)', async () => {
+    const { svc } = setup();
+    const res = await svc.availability(['m1', 'gone']);
+    expect(res).toEqual([
+      { mediaId: 'm1', available: true },
+      { mediaId: 'gone', available: false },
+    ]);
   });
 
   it('gallery lists a conversation’s media and requires conversationId', async () => {

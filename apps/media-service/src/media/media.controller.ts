@@ -27,7 +27,7 @@ import {
 } from '@nestjs/swagger';
 import { ValidationError } from '@velchat/common';
 import { MediaService } from './media.service';
-import { InitUploadDto, RenditionsDto } from './media.dto';
+import { AvailabilityDto, InitUploadDto, RenditionsDto } from './media.dto';
 
 /** Minimal shape of a multer file (avoids pulling the Express namespace into types). */
 interface UploadedMedia {
@@ -91,6 +91,41 @@ export class MediaController {
       typeof contentType === 'string' ? contentType : undefined,
       len ? Number(len) : undefined,
     );
+  }
+
+  @Get('usage')
+  @ApiOperation({
+    summary: 'A user’s storage usage (Manage Storage)',
+    description:
+      'Total bytes/count + breakdown by media type and by conversation. The client renders this on ' +
+      'its storage screen and applies its own cache limit + LRU eviction (docs/CLIENT-MEDIA-CACHE.md).',
+  })
+  @ApiQuery({ name: 'ownerId', description: 'Account_id to compute usage for.' })
+  @ApiOkResponse({
+    description: '{ ownerId, totalBytes, totalCount, byType[], byConversation[] }.',
+  })
+  usage(@Query('ownerId') ownerId: string) {
+    return this.media.ownerUsage(ownerId);
+  }
+
+  @Get('usage/conversation/:conversationId')
+  @ApiOperation({ summary: 'Per-chat storage usage (total + by media type)' })
+  @ApiParam({ name: 'conversationId' })
+  @ApiOkResponse({ description: '{ conversationId, totalBytes, totalCount, byType[] }.' })
+  conversationUsage(@Param('conversationId') conversationId: string) {
+    return this.media.conversationUsage(conversationId);
+  }
+
+  @Post('availability')
+  @ApiOperation({
+    summary: 'Which media are still fetchable server-side (re-download check)',
+    description:
+      'A client whose local cache evicted a blob calls this before re-download — view-once/deleted ' +
+      'media report available:false so the UI shows "no longer available" instead of a failed fetch.',
+  })
+  @ApiOkResponse({ description: '[{ mediaId, available }].' })
+  availability(@Body() body: AvailabilityDto) {
+    return this.media.availability(body.mediaIds);
   }
 
   @Get()
