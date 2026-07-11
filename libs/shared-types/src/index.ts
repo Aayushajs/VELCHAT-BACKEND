@@ -224,6 +224,29 @@ export interface PresenceChangedPayload {
   changed_at: Iso8601;
 }
 
+/**
+ * A feature flag / remote-config entry changed (automation-service feature-flags module).
+ * Carries no flag values — realtime-gateway broadcasts a compact "refetch" signal so clients
+ * re-call `/feature-flags/evaluate` (§6 of docs/FEATURE-FLAGS.md). `tenant_id === null` = global
+ * (platform-wide) change affecting every tenant.
+ */
+export interface FeatureFlagChangedPayload {
+  tenant_id: TenantId | null;
+  flag_key: string;
+  action:
+    | 'update'
+    | 'enable'
+    | 'disable'
+    | 'rollout'
+    | 'rollback'
+    | 'schedule'
+    | 'kill'
+    | 'archive'
+    | 'maintenance'
+    | 'announcement';
+  version: number;
+}
+
 /** Map of topic → payload type, for end-to-end type-safe producers/consumers. */
 export interface EventPayloads {
   'user.created': UserCreatedPayload;
@@ -254,6 +277,7 @@ export interface EventPayloads {
   'call.participant.left': CallParticipantPayload;
   'meeting.scheduled': MeetingScheduledPayload;
   'presence.changed': PresenceChangedPayload;
+  'featureflag.changed': FeatureFlagChangedPayload;
 }
 
 export type EventTopic = keyof EventPayloads;

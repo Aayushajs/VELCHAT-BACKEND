@@ -8,10 +8,12 @@ import {
   type ManagedResource,
 } from '@velchat/common';
 import { createEventBus, type EventBus } from '@velchat/event-bus';
-import { PostgresClient } from '@velchat/database';
+import { PostgresClient, MongoClient } from '@velchat/database';
+import { ValkeyClient } from '@velchat/cache';
 import { AutomationModule } from './automation/automation.module';
 import { ListsModule } from './lists/lists.module';
 import { CollabModule } from './collab/collab.module';
+import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const PG_CLIENT = Symbol('PG_CLIENT');
@@ -74,6 +76,37 @@ export class AppModule {
     if (pg) {
       imports.push(ListsModule.forRoot({ pg }));
       imports.push(CollabModule.forRoot({ pg }));
+    }
+
+    // Feature Flags & Remote Config (docs/FEATURE-FLAGS.md) — MongoDB-only, Valkey-cached. Wired
+    // only when Mongo + Valkey + a bus are configured; otherwise the service boots without it. The
+    // managed entry owns its clients' lifecycle (connect → ensureIndexes → worker) so there's no
+    // parallel-connect race, and its ping feeds readiness.
+    if (deps.config.MONGO_URL && deps.config.VALKEY_URL && eventBus) {
+      const mongo = new MongoClient(deps.config.MONGO_URL, deps.logger);
+      const redis = new ValkeyClient(deps.config.VALKEY_URL, deps.logger);
+      const { module, wiring } = FeatureFlagsModule.forRoot({
+        logger: deps.logger,
+        mongo,
+        redis: redis.redis,
+        eventBus,
+      });
+      imports.push(module);
+      managed.push({
+        name: 'feature-flags',
+        connect: async () => {
+          await mongo.connect();
+          await redis.connect();
+          await wiring.repo.ensureIndexes();
+          wiring.worker.start();
+        },
+        ping: async () => (await mongo.ping()) && (await redis.ping()),
+        close: async () => {
+          wiring.worker.stop();
+          await mongo.close();
+          await redis.close();
+        },
+      });
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);
