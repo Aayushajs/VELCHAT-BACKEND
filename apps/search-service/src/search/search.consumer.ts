@@ -1,6 +1,8 @@
 import type { EventBus } from '@velchat/event-bus';
 import type {
   MessageSentPayload,
+  MessageEditedPayload,
+  MessageDeletedPayload,
   FileUploadedPayload,
   FileDeletedPayload,
   ConversationCreatedPayload,
@@ -38,6 +40,25 @@ export class SearchConsumer {
         // Personal E2EE messages never carry `text`, so only their metadata is ever indexed.
         text: e.payload.text,
       });
+    });
+
+    // A server-readable message was edited (§B15) → re-index the new text. Personal E2EE edits carry
+    // no `text` (the server holds only ciphertext) → skip, keeping the index blind (§A18.2).
+    this.bus.subscribe<MessageEditedPayload>('message.edited', GROUP, async (e) => {
+      if (!e.tenant_id || e.payload.text === undefined) return;
+      await this.service.indexMessage({
+        messageId: e.payload.message_id,
+        tenantId: e.tenant_id,
+        conversationId: e.payload.conversation_id,
+        seq: e.payload.seq,
+        text: e.payload.text,
+      });
+    });
+
+    // A message was deleted for everyone (tombstone, §B15) → purge it from the index.
+    this.bus.subscribe<MessageDeletedPayload>('message.deleted', GROUP, async (e) => {
+      if (!e.tenant_id) return;
+      await this.service.removeMessage(e.payload.message_id, e.tenant_id);
     });
 
     // ── files ──

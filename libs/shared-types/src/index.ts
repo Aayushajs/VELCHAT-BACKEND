@@ -126,6 +126,33 @@ export interface MessageSentPayload {
   sent_at: Iso8601;
 }
 
+/** A reaction was added/removed on a message (§B15) → realtime fan-out to conversation members. */
+export interface MessageReactionPayload {
+  conversation_id: ConversationId;
+  message_id: string;
+  user_id: AccountId;
+  emoji: string;
+}
+
+/**
+ * A message was edited (§B15). `text` is carried ONLY for SERVER-READABLE (enterprise/channel) edits
+ * so search can re-index; personal E2EE edits omit it (the server holds only ciphertext, §A18.2).
+ */
+export interface MessageEditedPayload {
+  conversation_id: ConversationId;
+  message_id: string;
+  seq: number;
+  text?: string;
+  edited_at: Iso8601;
+}
+
+/** A message was deleted for everyone (tombstone, §B15) → realtime clear + search purge. */
+export interface MessageDeletedPayload {
+  conversation_id: ConversationId;
+  message_id: string;
+  seq: number;
+}
+
 /** Compact receipt covering every message up to `up_to_seq` (§B4.4). */
 export interface MessageReceiptPayload {
   conversation_id: ConversationId;
@@ -197,6 +224,29 @@ export interface PresenceChangedPayload {
   changed_at: Iso8601;
 }
 
+/**
+ * A feature flag / remote-config entry changed (automation-service feature-flags module).
+ * Carries no flag values — realtime-gateway broadcasts a compact "refetch" signal so clients
+ * re-call `/feature-flags/evaluate` (§6 of docs/FEATURE-FLAGS.md). `tenant_id === null` = global
+ * (platform-wide) change affecting every tenant.
+ */
+export interface FeatureFlagChangedPayload {
+  tenant_id: TenantId | null;
+  flag_key: string;
+  action:
+    | 'update'
+    | 'enable'
+    | 'disable'
+    | 'rollout'
+    | 'rollback'
+    | 'schedule'
+    | 'kill'
+    | 'archive'
+    | 'maintenance'
+    | 'announcement';
+  version: number;
+}
+
 /** Map of topic → payload type, for end-to-end type-safe producers/consumers. */
 export interface EventPayloads {
   'user.created': UserCreatedPayload;
@@ -209,6 +259,10 @@ export interface EventPayloads {
   'channel.member.removed': ChannelMemberPayload;
   'group.epoch.changed': GroupEpochChangedPayload;
   'message.sent': MessageSentPayload;
+  'message.reaction.added': MessageReactionPayload;
+  'message.reaction.removed': MessageReactionPayload;
+  'message.edited': MessageEditedPayload;
+  'message.deleted': MessageDeletedPayload;
   'message.delivered': MessageReceiptPayload;
   'message.read': MessageReceiptPayload;
   'file.uploaded': FileUploadedPayload;
@@ -223,6 +277,7 @@ export interface EventPayloads {
   'call.participant.left': CallParticipantPayload;
   'meeting.scheduled': MeetingScheduledPayload;
   'presence.changed': PresenceChangedPayload;
+  'featureflag.changed': FeatureFlagChangedPayload;
 }
 
 export type EventTopic = keyof EventPayloads;

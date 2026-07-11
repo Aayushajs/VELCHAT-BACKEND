@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, Query } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Delete, Body, Param, Query } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -9,7 +9,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { ChatService } from './chat.service';
-import { SendMessageDto } from './chat.dto';
+import { SendMessageDto, ReactionDto, EditMessageDto, DeleteMessageDto } from './chat.dto';
 
 /** Chat REST surface (§B4 / flow C2). Content is opaque ciphertext for personal conversations. */
 @ApiTags('chat')
@@ -44,5 +44,73 @@ export class ChatController {
     @Query('limit') limit?: string,
   ) {
     return this.chat.history(id, afterSeq ? Number(afterSeq) : 0, limit ? Number(limit) : 50);
+  }
+
+  @Post('messages/:id/reactions')
+  @ApiOperation({
+    summary: 'Add a reaction to a message',
+    description: 'Idempotent per (user, emoji) (§B15). Emits message.reaction.added.',
+  })
+  @ApiParam({ name: 'id', description: 'Message id.' })
+  react(@Param('id') id: string, @Body() body: ReactionDto) {
+    return this.chat.react({
+      messageId: id,
+      conversationId: body.conversationId,
+      userId: body.userId,
+      emoji: body.emoji,
+    });
+  }
+
+  @Delete('messages/:id/reactions')
+  @ApiOperation({
+    summary: 'Remove a reaction from a message',
+    description: 'Emits message.reaction.removed (§B15).',
+  })
+  @ApiParam({ name: 'id', description: 'Message id.' })
+  unreact(@Param('id') id: string, @Body() body: ReactionDto) {
+    return this.chat.unreact({
+      messageId: id,
+      conversationId: body.conversationId,
+      userId: body.userId,
+      emoji: body.emoji,
+    });
+  }
+
+  @Patch('messages/:id')
+  @ApiOperation({
+    summary: 'Edit a message',
+    description:
+      'Sender-only (§B15): appends the previous content to edit_history and emits message.edited. ' +
+      'Plaintext is carried for search re-index only when server-readable (enterprise/channel).',
+  })
+  @ApiParam({ name: 'id', description: 'Message id.' })
+  @ApiOkResponse({ description: 'Edit ack: { messageId, editedAt }.' })
+  edit(@Param('id') id: string, @Body() body: EditMessageDto) {
+    return this.chat.edit({
+      messageId: id,
+      conversationId: body.conversationId,
+      editorId: body.editorId,
+      content: body.content,
+      tenantId: body.tenantId,
+      encrypted: body.encrypted,
+    });
+  }
+
+  @Delete('messages/:id')
+  @ApiOperation({
+    summary: 'Delete a message',
+    description:
+      "scope 'everyone' tombstones (sender-only) and emits message.deleted; scope 'me' hides the " +
+      'message per-device with no event (§B15).',
+  })
+  @ApiParam({ name: 'id', description: 'Message id.' })
+  @ApiOkResponse({ description: 'Delete ack.' })
+  del(@Param('id') id: string, @Body() body: DeleteMessageDto) {
+    return this.chat.delete({
+      messageId: id,
+      conversationId: body.conversationId,
+      actorId: body.actorId,
+      scope: body.scope,
+    });
   }
 }

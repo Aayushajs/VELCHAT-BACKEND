@@ -35,7 +35,7 @@ export const ROUTES: Route[] = [
   R(/^\/(media|backups)(\/|$)/, 'MEDIA', 3008),
   R(/^\/search(\/|$)/, 'SEARCH', 3009),
   R(/^\/(calls|meetings)(\/|$)/, 'CALL', 3010),
-  R(/^\/(automation|lists|clips|canvas)(\/|$)/, 'AUTOMATION', 3011),
+  R(/^\/(automation|lists|clips|canvas|feature-flags)(\/|$)/, 'AUTOMATION', 3011),
   R(/^\/ai(\/|$)/, 'AI', 3012),
 ];
 

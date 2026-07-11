@@ -21,24 +21,28 @@ const CHANNELS = 'channels';
 export class SearchService {
   constructor(private readonly index: SearchIndex) {}
 
-  /** Index a server-readable message (enterprise/channel only — caller passes tenantId). */
+  /**
+   * Index a server-readable message (enterprise/channel only — caller passes tenantId). `senderId`
+   * and `sentAt` are optional so an edit re-index (message.edited carries only the new text +
+   * conversation/seq metadata) can update the body without them; on the send path both are supplied.
+   */
   async indexMessage(doc: {
     messageId: string;
     tenantId: string;
     conversationId: string;
-    senderId: string;
+    senderId?: string;
     seq: number;
-    sentAt: string;
+    sentAt?: string;
     text?: string;
   }): Promise<void> {
     await this.index.index(MESSAGES, {
       id: doc.messageId,
       tenantId: doc.tenantId,
       conversationId: doc.conversationId,
-      senderId: doc.senderId,
       seq: doc.seq,
-      sentAt: doc.sentAt,
       text: doc.text ?? '',
+      ...(doc.senderId !== undefined ? { senderId: doc.senderId } : {}),
+      ...(doc.sentAt !== undefined ? { sentAt: doc.sentAt } : {}),
     });
   }
 

@@ -27,6 +27,8 @@ describe('gateway routing (§A12.1)', () => {
     expect(upstreamPort('/calls/c1/join')).toBe(portFor('CALL'));
     expect(upstreamPort('/lists')).toBe(portFor('AUTOMATION'));
     expect(upstreamPort('/canvas/x')).toBe(portFor('AUTOMATION'));
+    expect(upstreamPort('/feature-flags')).toBe(portFor('AUTOMATION'));
+    expect(upstreamPort('/feature-flags/evaluate')).toBe(portFor('AUTOMATION'));
     expect(upstreamPort('/ai/translate')).toBe(portFor('AI'));
   });
 
