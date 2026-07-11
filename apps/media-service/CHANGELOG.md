@@ -1,5 +1,17 @@
 # @velchat/media-service
 
+## 0.3.1
+
+### Patch Changes
+
+- Updated dependencies [e1a4b61]
+  - @velchat/shared-types@0.5.0
+  - @velchat/config@0.3.0
+  - @velchat/common@0.3.1
+  - @velchat/event-bus@0.1.5
+  - @velchat/storage@0.2.1
+  - @velchat/database@0.2.7
+
 ## 0.3.0
 
 ### Minor Changes

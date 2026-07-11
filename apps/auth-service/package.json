@@ -1,6 +1,6 @@
 {
   "name": "@velchat/auth-service",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": true,
   "main": "dist/main.js",
   "scripts": {

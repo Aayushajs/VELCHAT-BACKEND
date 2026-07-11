@@ -1,5 +1,18 @@
 # @velchat/auth-service
 
+## 0.1.10
+
+### Patch Changes
+
+- Updated dependencies [e1a4b61]
+  - @velchat/shared-types@0.5.0
+  - @velchat/config@0.3.0
+  - @velchat/common@0.3.1
+  - @velchat/event-bus@0.1.5
+  - @velchat/mail@0.2.4
+  - @velchat/cache@0.2.4
+  - @velchat/database@0.2.7
+
 ## 0.1.9
 
 ### Patch Changes

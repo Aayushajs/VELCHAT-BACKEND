@@ -1,5 +1,13 @@
 # @velchat/search
 
+## 0.1.5
+
+### Patch Changes
+
+- Updated dependencies [e1a4b61]
+  - @velchat/config@0.3.0
+  - @velchat/common@0.3.1
+
 ## 0.1.4
 
 ### Patch Changes

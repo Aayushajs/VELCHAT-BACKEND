@@ -1,5 +1,13 @@
 # @velchat/push
 
+## 0.2.4
+
+### Patch Changes
+
+- Updated dependencies [e1a4b61]
+  - @velchat/config@0.3.0
+  - @velchat/common@0.3.1
+
 ## 0.2.3
 
 ### Patch Changes

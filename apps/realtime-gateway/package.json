@@ -1,6 +1,6 @@
 {
   "name": "@velchat/realtime-gateway",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "private": true,
   "main": "dist/main.js",
   "scripts": {
