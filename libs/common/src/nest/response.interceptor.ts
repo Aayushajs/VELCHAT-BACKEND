@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import type { Observable } from 'rxjs';
 import { map } from 'rxjs';
+import { requestIdOf } from './request-id.middleware';
 
 interface MinimalHttpResponse {
   statusCode: number;
@@ -50,7 +51,8 @@ export class ResponseInterceptor implements NestInterceptor {
             data = rest;
           }
         }
-        return { success: true, statusCode, message, data };
+        const requestId = requestIdOf(req);
+        return { success: true, statusCode, message, data, requestId };
       }),
     );
   }

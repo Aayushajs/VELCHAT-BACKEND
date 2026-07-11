@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Query } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -6,6 +6,7 @@ import {
   ApiCreatedResponse,
   ApiOkResponse,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { CallsService } from './calls.service';
 import { AdmitDto, CreateCallDto, EndCallDto, JoinCallDto, ScheduleMeetingDto } from './calls.dto';
@@ -16,6 +17,20 @@ import { AdmitDto, CreateCallDto, EndCallDto, JoinCallDto, ScheduleMeetingDto } 
 @Controller()
 export class CallsController {
   constructor(private readonly calls: CallsService) {}
+
+  // Declared before `calls/:id` so the static path wins over the :id param route.
+  @Get('calls/ice-servers')
+  @ApiOperation({
+    summary: 'WebRTC ICE servers (STUN/TURN) for a raw/P2P call',
+    description:
+      'Self-hosted coturn STUN + short-lived TURN credentials. Feed straight into ' +
+      'new RTCPeerConnection({ iceServers }). Group calls use the LiveKit token from join instead.',
+  })
+  @ApiQuery({ name: 'userId', description: 'Account_id the TURN credential is bound to.' })
+  @ApiOkResponse({ description: '{ iceServers: [{ urls, username?, credential? }] }.' })
+  ice(@Query('userId') userId: string) {
+    return this.calls.iceServers(userId);
+  }
 
   @Post('calls')
   @ApiOperation({

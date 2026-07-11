@@ -7,6 +7,7 @@ import type { AppConfig } from '@velchat/config';
 import { TenantInterceptor } from './tenant.interceptor';
 import { ResponseInterceptor } from './response.interceptor';
 import { AllExceptionsFilter } from './all-exceptions.filter';
+import { requestIdMiddleware } from './request-id.middleware';
 import { shutdownTelemetry } from '../observability/tracer';
 
 export interface BootstrapOptions {
@@ -30,6 +31,9 @@ export async function bootstrapService(
 ): Promise<INestApplication> {
   const app = await NestFactory.create(appModule, { bufferLogs: false });
 
+  // Correlation id first: stamps req.requestId + the x-request-id response header so every success
+  // and error envelope (and every log line) carries the same id end-to-end (§A20).
+  app.use(requestIdMiddleware);
   app.useGlobalInterceptors(new TenantInterceptor(), new ResponseInterceptor());
   app.useGlobalFilters(new AllExceptionsFilter(opts.logger));
 

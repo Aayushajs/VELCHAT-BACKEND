@@ -3,6 +3,7 @@ import type { CallType } from '@velchat/database';
 import { CallsRepository } from './calls.repository';
 import { CallsEvents } from './calls.events';
 import { mintLivekitToken } from './livekit-token';
+import { buildIceServers, type IceServer, type TurnConfig } from './ice';
 
 export interface LivekitConfig {
   url?: string;
@@ -46,7 +47,17 @@ export class CallsService {
     private readonly repo: CallsRepository,
     private readonly events: CallsEvents,
     private readonly livekit: LivekitConfig,
+    private readonly turn: TurnConfig,
   ) {}
+
+  /**
+   * ICE servers for a raw/P2P WebRTC call (§A17.1) — self-hosted coturn STUN/TURN with short-lived
+   * TURN credentials. Group calls use the LiveKit SFU instead (createCall/join return its token).
+   */
+  iceServers(userId: string): { iceServers: IceServer[] } {
+    if (!userId) throw new ValidationError('userId is required');
+    return { iceServers: buildIceServers(this.turn, userId, Date.now()) };
+  }
 
   private token(room: string, identity: string, canPublish = true): string {
     if (!this.livekit.apiKey || !this.livekit.apiSecret) {

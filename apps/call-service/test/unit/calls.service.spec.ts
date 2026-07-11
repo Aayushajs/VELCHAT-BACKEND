@@ -44,7 +44,13 @@ function setup(
     meetingScheduled: jest.fn(async () => undefined),
   } as unknown as CallsEvents;
   const livekit = { url: 'wss://lk', apiKey: 'k', apiSecret: 's', ttlSec: 3600 };
-  return { svc: new CallsService(repo, events, livekit), repo, events };
+  const turn = {
+    stunUrls: 'stun:turn.local:3478',
+    turnUrls: 'turn:turn.local:3478',
+    turnSecret: 'sekret',
+    ttlSec: 86400,
+  };
+  return { svc: new CallsService(repo, events, livekit, turn), repo, events };
 }
 
 describe('CallsService (§B12/§A17)', () => {

@@ -1,5 +1,10 @@
 import { v2 as cloudinary } from 'cloudinary';
-import type { ObjectStorage, PutObjectInput, PutObjectResult } from '../storage.port';
+import type {
+  ObjectStorage,
+  PutObjectInput,
+  PutObjectResult,
+  PutObjectStreamInput,
+} from '../storage.port';
 
 /** Cloudinary object storage (free tier). Configured from a `cloudinary://key:secret@cloud` URL. */
 export class CloudinaryStorage implements ObjectStorage {
@@ -19,6 +24,20 @@ export class CloudinaryStorage implements ObjectStorage {
       overwrite: true,
     });
     return { key: res.public_id, url: res.secure_url };
+  }
+
+  async putObjectStream(input: PutObjectStreamInput): Promise<PutObjectResult> {
+    // Pipe the source into Cloudinary's upload_stream — never buffers the whole file in the service.
+    return new Promise<PutObjectResult>((resolve, reject) => {
+      const upload = cloudinary.uploader.upload_stream(
+        { public_id: input.key, resource_type: 'auto', overwrite: true },
+        (err, res) => {
+          if (err || !res) reject(err ?? new Error('cloudinary upload failed'));
+          else resolve({ key: res.public_id, url: res.secure_url });
+        },
+      );
+      input.body.on('error', reject).pipe(upload);
+    });
   }
 
   async getSignedUrl(key: string, _ttlSeconds = 3600): Promise<string> {
