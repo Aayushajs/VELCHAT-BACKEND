@@ -32,5 +32,6 @@ export {
 export { TenantInterceptor } from './nest/tenant.interceptor';
 export { ResponseInterceptor } from './nest/response.interceptor';
 export { AllExceptionsFilter } from './nest/all-exceptions.filter';
+export { requestIdMiddleware, requestIdOf, type RequestWithId } from './nest/request-id.middleware';
 export { bootstrapService, type BootstrapOptions } from './nest/bootstrap';
 export { InfraLifecycle, type ManagedResource } from './nest/infra-lifecycle';

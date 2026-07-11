@@ -1,6 +1,7 @@
 import { Catch, HttpException, type ArgumentsHost, type ExceptionFilter } from '@nestjs/common';
 import type { Logger } from 'pino';
 import { isAppError } from '../errors/errors';
+import { requestIdOf } from './request-id.middleware';
 
 interface MinimalResponse {
   status(code: number): { json(body: unknown): unknown };
@@ -62,10 +63,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }
     }
 
+    const requestId = requestIdOf(req);
     this.logger.error(
       {
         code,
         status,
+        requestId,
         method: req?.method,
         path: req?.url,
         err: exception instanceof Error ? exception.message : String(exception),
@@ -78,6 +81,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode: status,
       message,
       error: details === undefined ? { code } : { code, details },
+      requestId,
       path: req?.url ?? null,
       timestamp: new Date().toISOString(),
     });
