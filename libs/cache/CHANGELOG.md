@@ -1,5 +1,11 @@
 # @velchat/cache
 
+## 0.2.4
+
+### Patch Changes
+
+- @velchat/common@0.3.1
+
 ## 0.2.3
 
 ### Patch Changes

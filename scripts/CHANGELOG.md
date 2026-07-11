@@ -1,5 +1,16 @@
 # @velchat/scripts
 
+## 0.1.5
+
+### Patch Changes
+
+- Updated dependencies [e1a4b61]
+  - @velchat/config@0.3.0
+  - @velchat/common@0.3.1
+  - @velchat/mail@0.2.4
+  - @velchat/push@0.2.4
+  - @velchat/storage@0.2.1
+
 ## 0.1.4
 
 ### Patch Changes
