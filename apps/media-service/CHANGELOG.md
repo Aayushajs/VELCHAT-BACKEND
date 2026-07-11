@@ -1,5 +1,24 @@
 # @velchat/media-service
 
+## 0.3.0
+
+### Minor Changes
+
+- 2b1d811: Memory-safe streaming media upload: putObjectStream on the storage port + S3/Cloudinary adapters,
+  and PUT /media/uploads/:id/stream that streams source → storage without buffering the whole file
+  (size-capped + hashed on the fly). No new dependency.
+
+### Patch Changes
+
+- Updated dependencies [2b1d811]
+- Updated dependencies [0ec403d]
+- Updated dependencies [bb29628]
+  - @velchat/storage@0.2.0
+  - @velchat/common@0.3.0
+  - @velchat/config@0.2.0
+  - @velchat/database@0.2.6
+  - @velchat/event-bus@0.1.4
+
 ## 0.2.2
 
 ### Patch Changes

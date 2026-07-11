@@ -1,5 +1,18 @@
 # @velchat/common
 
+## 0.3.0
+
+### Minor Changes
+
+- 0ec403d: Central request-id correlation: every success + error envelope and error log now carries a
+  `requestId` (from inbound x-request-id / OTel traceparent, else generated) plus an x-request-id
+  response header. No per-handler wiring; no new dependency.
+
+### Patch Changes
+
+- Updated dependencies [bb29628]
+  - @velchat/config@0.2.0
+
 ## 0.2.1
 
 ### Patch Changes
