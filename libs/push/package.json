@@ -1,6 +1,6 @@
 {
   "name": "@velchat/push",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "description": "Push notifications (shared) — Web Push (VAPID) + FCM port/adapters. §B10: E2EE payloads carry no content.",
   "main": "dist/index.js",

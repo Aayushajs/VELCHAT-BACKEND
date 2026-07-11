@@ -1,5 +1,16 @@
 # @velchat/search-service
 
+## 0.4.1
+
+### Patch Changes
+
+- Updated dependencies [0ec403d]
+- Updated dependencies [bb29628]
+  - @velchat/common@0.3.0
+  - @velchat/config@0.2.0
+  - @velchat/event-bus@0.1.4
+  - @velchat/search@0.1.4
+
 ## 0.4.0
 
 ### Minor Changes

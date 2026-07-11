@@ -1,5 +1,16 @@
 # @velchat/group-channel-service
 
+## 0.2.3
+
+### Patch Changes
+
+- Updated dependencies [0ec403d]
+- Updated dependencies [bb29628]
+  - @velchat/common@0.3.0
+  - @velchat/config@0.2.0
+  - @velchat/database@0.2.6
+  - @velchat/event-bus@0.1.4
+
 ## 0.2.2
 
 ### Patch Changes

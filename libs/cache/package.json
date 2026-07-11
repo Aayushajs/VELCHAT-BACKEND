@@ -1,6 +1,6 @@
 {
   "name": "@velchat/cache",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "description": "Valkey/Redis cache client (shared) — connection + health as a ManagedResource.",
   "main": "dist/index.js",
