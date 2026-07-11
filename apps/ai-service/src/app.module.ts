@@ -7,10 +7,12 @@ import {
   type ServiceMetrics,
   type ManagedResource,
 } from '@velchat/common';
-import { createEventBus } from '@velchat/event-bus';
+import { createEventBus, type EventBus } from '@velchat/event-bus';
 import { ValkeyClient } from '@velchat/cache';
 import { PostgresClient } from '@velchat/database';
 import { TranslateModule } from './translate/translate.module';
+import { createAiGateway } from './ai-gateway/create-ai-gateway';
+import { CaptionModule } from './realtime-translate/caption.module';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const VALKEY_CLIENT = Symbol('VALKEY_CLIENT');
@@ -54,8 +56,9 @@ export class AppModule {
       providers.push({ provide: VALKEY_CLIENT, useValue: valkey });
     }
 
+    let eventBus: EventBus | undefined;
     if (deps.config.EVENT_BUS === 'kafka' ? deps.config.KAFKA_BROKERS : deps.config.VALKEY_URL) {
-      const eventBus = createEventBus(deps.config, deps.logger);
+      eventBus = createEventBus(deps.config, deps.logger);
       managed.push(eventBus);
       providers.push({ provide: EVENT_BUS, useValue: eventBus });
     }
@@ -69,6 +72,13 @@ export class AppModule {
         redis: valkey.redis,
       });
       imports.push(module);
+    }
+
+    // Real-time call translation (§A26.3 / C20) — STT → per-listener translate → call.caption.
+    // Uses the unified AI gateway (the self-hosted HF model server, docs/AI-SERVER.md) + the bus.
+    if (eventBus) {
+      const ai = createAiGateway(deps.config, deps.logger);
+      imports.push(CaptionModule.forRoot({ ai, eventBus }));
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);

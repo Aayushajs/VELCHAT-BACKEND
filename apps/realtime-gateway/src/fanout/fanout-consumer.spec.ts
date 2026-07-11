@@ -31,9 +31,10 @@ describe('FanoutConsumer (§B9.2)', () => {
     return { handlers, bus, projection, router };
   }
 
-  it('subscribes to membership + message + receipt topics', () => {
+  it('subscribes to membership + message + receipt + caption topics', () => {
     const { handlers } = setup([]);
     expect([...handlers.keys()].sort()).toEqual([
+      'call.caption',
       'channel.member.added',
       'channel.member.removed',
       'conversation.created',
@@ -41,6 +42,25 @@ describe('FanoutConsumer (§B9.2)', () => {
       'message.read',
       'message.sent',
     ]);
+  });
+
+  it('routes a live call caption to the single listener it is for (§A26.3)', async () => {
+    const { handlers, router } = setup([]);
+    await handlers.get('call.caption')!(
+      envelope({
+        call_id: 'call-1',
+        to_user_id: 'listener',
+        from_user_id: 'speaker',
+        text: 'namaste',
+        lang: 'hi',
+        is_final: true,
+        ts: 'now',
+      }),
+    );
+    expect(router.route).toHaveBeenCalledWith(
+      ['listener'],
+      expect.objectContaining({ kind: 'ephemeral', type: 'caption' }),
+    );
   });
 
   it('fans a read receipt to members as an ephemeral cue', async () => {

@@ -162,6 +162,15 @@ export const envSchema = z.object({
   AI_TRANSLATE_API_KEY: z.string().optional(),
   AI_DEFAULT_LANG: z.string().default('en'),
 
+  // Unified AI model server (deploy the Python server on Hugging Face Spaces — see docs/AI-SERVER.md).
+  // One base URL exposes /translate /detect /stt /tts /summarize /moderate /embed. HMAC-signed so the
+  // server trusts only us. Unset → a no-op dev gateway (never leaks plaintext, features degrade
+  // gracefully). Free/self-hosted only — never a paid API. Timeout is the realtime budget (<1.5s).
+  AI_BASE_URL: z.string().url().optional(),
+  AI_API_KEY: z.string().optional(),
+  AI_HMAC_SECRET: z.string().optional(),
+  AI_TIMEOUT_MS: z.coerce.number().int().positive().default(1500),
+
   // OpenTelemetry → Grafana Cloud (free). Headers carry the basic-auth token.
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
   OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),
