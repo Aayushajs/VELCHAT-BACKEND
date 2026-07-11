@@ -1,6 +1,7 @@
 import type { Logger } from '@velchat/common';
 import type { EventBus } from '@velchat/event-bus';
 import type {
+  CallCaptionPayload,
   ChannelMemberPayload,
   ConversationCreatedPayload,
   MessageReceiptPayload,
@@ -47,6 +48,15 @@ export class FanoutConsumer {
     });
     this.bus.subscribe<MessageReceiptPayload>('message.read', GROUP, async (e) => {
       await this.onReceipt('receipt', e.payload);
+    });
+    // Live translated call captions (§A26.3): route each to the single listener it's for. Ephemeral
+    // (a UI/audio cue) — never durable; a missed partial is superseded by the next segment.
+    this.bus.subscribe<CallCaptionPayload>('call.caption', GROUP, async (e) => {
+      await this.router.route([e.payload.to_user_id], {
+        kind: 'ephemeral',
+        type: 'caption',
+        data: e.payload,
+      });
     });
   }
 

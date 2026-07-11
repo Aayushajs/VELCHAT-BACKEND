@@ -225,6 +225,28 @@ export interface PresenceChangedPayload {
 }
 
 /**
+ * A live translated call caption for ONE listener (§A26.3 / C20). ai-service produces it per listener
+ * in their language; realtime-gateway routes it to that user's sockets so a call is subtitled (and
+ * optionally spoken) in each participant's own language in near-real-time. Enterprise/server-readable
+ * calls only — personal E2EE call translation runs on-device (§A26.1).
+ */
+export interface CallCaptionPayload {
+  call_id: string;
+  /** The listener this caption is for. */
+  to_user_id: AccountId;
+  /** The speaker. */
+  from_user_id: AccountId;
+  /** Caption text already translated into the listener's language. */
+  text: string;
+  lang: string;
+  /** Partial (fast interim) vs final segment — drives sub-second incremental captions. */
+  is_final: boolean;
+  /** Optional TTS audio the client can play in the listener's language. */
+  audio_url?: string;
+  ts: Iso8601;
+}
+
+/**
  * A feature flag / remote-config entry changed (automation-service feature-flags module).
  * Carries no flag values — realtime-gateway broadcasts a compact "refetch" signal so clients
  * re-call `/feature-flags/evaluate` (§6 of docs/FEATURE-FLAGS.md). `tenant_id === null` = global
@@ -278,6 +300,7 @@ export interface EventPayloads {
   'meeting.scheduled': MeetingScheduledPayload;
   'presence.changed': PresenceChangedPayload;
   'featureflag.changed': FeatureFlagChangedPayload;
+  'call.caption': CallCaptionPayload;
 }
 
 export type EventTopic = keyof EventPayloads;
