@@ -275,10 +275,9 @@ Details: [Architecture §A21–A22](docs/VelChat-Architecture.md#a21-kubernetes-
 ## Contributing
 
 1. Branch off `dev` (short-lived feature branches).
-2. Match the task to a subagent role in `.claude/agents/`; stay within the architecture doc.
-3. Ask before adding a dependency or breaking a contract.
-4. `pnpm lint && pnpm typecheck && pnpm test` green + `pnpm changeset` before you push.
-5. Conventional Commit messages; open a PR into `main` with a green CI.
+2. Ask before adding a dependency or breaking a contract.
+3. `pnpm lint && pnpm typecheck && pnpm test` green + `pnpm changeset` before you push.
+4. Conventional Commit messages; open a PR into `main` with a green CI.
 
 ---
 
