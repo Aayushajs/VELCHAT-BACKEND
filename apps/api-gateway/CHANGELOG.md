@@ -1,5 +1,15 @@
 # @velchat/api-gateway
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [676071e]
+- Updated dependencies [7615923]
+  - @velchat/common@0.2.1
+  - @velchat/shared-types@0.3.0
+  - @velchat/event-bus@0.1.3
+
 ## 0.2.1
 
 ### Patch Changes
