@@ -64,6 +64,12 @@ export class AppModule {
             apiSecret: deps.config.LIVEKIT_API_SECRET,
             ttlSec: deps.config.LIVEKIT_TOKEN_TTL_SECONDS,
           },
+          turn: {
+            stunUrls: deps.config.STUN_URLS,
+            turnUrls: deps.config.TURN_URLS,
+            turnSecret: deps.config.TURN_SECRET,
+            ttlSec: deps.config.TURN_TTL_SECONDS,
+          },
         }),
       );
       // Screen-share remote control (§A4.4) — Teams-style request/grant signaling.

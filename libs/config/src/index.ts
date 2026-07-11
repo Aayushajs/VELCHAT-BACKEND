@@ -196,6 +196,14 @@ export const envSchema = z.object({
   LIVEKIT_API_SECRET: z.string().optional(),
   LIVEKIT_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
 
+  // WebRTC ICE for raw/P2P calls (§A17.1) — self-hosted coturn (free). STUN/TURN URLs are CSV.
+  // TURN uses coturn's REST-API time-limited creds (HMAC of `<expiry>:<user>` with the shared
+  // secret) — nothing paid, nothing external baked in. All unset → the ICE endpoint returns [].
+  STUN_URLS: z.string().default(''), // e.g. "stun:turn.example.com:3478"
+  TURN_URLS: z.string().default(''), // e.g. "turn:turn.example.com:3478,turns:turn.example.com:5349"
+  TURN_SECRET: z.string().optional(), // coturn static-auth-secret (use-auth-secret)
+  TURN_TTL_SECONDS: z.coerce.number().int().positive().default(86400),
+
   // Reverse-OTP gateway (§B2.2) — Asterisk/FreeSWITCH webhook shared secret + owned DID.
   REVOTP_WEBHOOK_SECRET: z.string().optional(),
   REVOTP_DID: z.string().optional(), // the inbound number users missed-call / SMS
