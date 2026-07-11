@@ -1,5 +1,21 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsNotEmpty, IsObject, IsOptional, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
+} from 'class-validator';
+
+/** Body to check which media are still fetchable server-side (re-download strategy). */
+export class AvailabilityDto {
+  @ApiProperty({ type: [String], description: 'Media ids to check (max 500).' })
+  @IsArray()
+  @IsString({ each: true })
+  mediaIds!: string[];
+}
 
 /** Body to reserve a media object before uploading its bytes (§B11). */
 export class InitUploadDto {

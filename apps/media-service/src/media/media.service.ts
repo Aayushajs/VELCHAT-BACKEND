@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { Transform, type Readable } from 'node:stream';
 import { uuidv7, NotFoundError, ValidationError, ForbiddenError, GoneError } from '@velchat/common';
 import type { ObjectStorage } from '@velchat/storage';
-import { MediaRepository } from './media.repository';
+import { MediaRepository, type UsageByKey } from './media.repository';
 import { MediaEvents } from './media.events';
 import { storageKeyForHash, type MediaObject, type TranscodeResult } from './media.types';
 
@@ -229,6 +229,54 @@ export class MediaService {
     const updated = (await this.repo.findById(mediaId)) as MediaObject;
     await this.events.fileTranscoded(updated);
     return updated;
+  }
+
+  /**
+   * A user's storage usage (§A4.10 "Manage Storage") — total bytes/count + breakdown by media type
+   * and by conversation. Drives the client's storage screen (which then applies its own cache limit +
+   * LRU eviction — see docs/CLIENT-MEDIA-CACHE.md).
+   */
+  async ownerUsage(ownerId: string): Promise<{
+    ownerId: string;
+    totalBytes: number;
+    totalCount: number;
+    byType: UsageByKey[];
+    byConversation: UsageByKey[];
+  }> {
+    if (!ownerId) throw new ValidationError('ownerId is required');
+    const [byType, byConversation] = await Promise.all([
+      this.repo.ownerUsageByType(ownerId),
+      this.repo.ownerUsageByConversation(ownerId),
+    ]);
+    return {
+      ownerId,
+      totalBytes: byType.reduce((s, r) => s + r.bytes, 0),
+      totalCount: byType.reduce((s, r) => s + r.count, 0),
+      byType,
+      byConversation,
+    };
+  }
+
+  /** Per-chat storage usage — total + by media type for one conversation. */
+  async conversationUsage(conversationId: string): Promise<{
+    conversationId: string;
+    totalBytes: number;
+    totalCount: number;
+    byType: UsageByKey[];
+  }> {
+    if (!conversationId) throw new ValidationError('conversationId is required');
+    const byType = await this.repo.conversationUsageByType(conversationId);
+    return {
+      conversationId,
+      totalBytes: byType.reduce((s, r) => s + r.bytes, 0),
+      totalCount: byType.reduce((s, r) => s + r.count, 0),
+      byType,
+    };
+  }
+
+  /** Re-download availability: which media are still fetchable server-side (§C — cache-evicted refetch). */
+  async availability(mediaIds: string[]): Promise<Array<{ mediaId: string; available: boolean }>> {
+    return this.repo.availability((mediaIds ?? []).filter(Boolean).slice(0, 500));
   }
 
   /** Remove metadata + (if last reference) the blob, then emit file.deleted. */
