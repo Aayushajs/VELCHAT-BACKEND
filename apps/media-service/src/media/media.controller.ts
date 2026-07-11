@@ -1,3 +1,4 @@
+import type { IncomingMessage } from 'node:http';
 import {
   Controller,
   Post,
@@ -8,6 +9,7 @@ import {
   Body,
   Param,
   Query,
+  Req,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -68,6 +70,27 @@ export class MediaController {
   complete(@Param('id') id: string, @UploadedFile() file?: UploadedMedia) {
     if (!file?.buffer) throw new ValidationError('multipart field "file" is required');
     return this.media.completeUpload(id, file.buffer, file.mimetype);
+  }
+
+  @Put('uploads/:id/stream')
+  @ApiOperation({
+    summary: 'Streaming upload (memory-safe for large media)',
+    description:
+      'Send the raw bytes as the request body with Content-Type + Content-Length headers. Streamed ' +
+      'straight to storage without buffering the whole file — use this for video/large media. For ' +
+      'personal chats the body is opaque ciphertext.',
+  })
+  @ApiParam({ name: 'id', description: 'Media id from init.' })
+  @ApiOkResponse({ description: '{ mediaId, status, storageKey, size }.' })
+  stream(@Param('id') id: string, @Req() req: IncomingMessage) {
+    const contentType = req.headers['content-type'];
+    const len = req.headers['content-length'];
+    return this.media.streamUpload(
+      id,
+      req,
+      typeof contentType === 'string' ? contentType : undefined,
+      len ? Number(len) : undefined,
+    );
   }
 
   @Get()

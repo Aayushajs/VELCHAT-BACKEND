@@ -6,7 +6,12 @@ import {
   HeadObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import type { ObjectStorage, PutObjectInput, PutObjectResult } from '../storage.port';
+import type {
+  ObjectStorage,
+  PutObjectInput,
+  PutObjectResult,
+  PutObjectStreamInput,
+} from '../storage.port';
 
 export interface S3StorageOptions {
   endpoint: string;
@@ -40,6 +45,21 @@ export class S3Storage implements ObjectStorage {
         Key: input.key,
         Body: body,
         ContentType: input.contentType,
+      }),
+    );
+    return { key: input.key };
+  }
+
+  async putObjectStream(input: PutObjectStreamInput): Promise<PutObjectResult> {
+    // Stream the body straight to S3/MinIO. Passing ContentLength lets the SDK send a single PUT
+    // without buffering the whole object to compute the length (memory-safe for large media).
+    await this.s3.send(
+      new PutObjectCommand({
+        Bucket: this.opts.bucket,
+        Key: input.key,
+        Body: input.body,
+        ContentType: input.contentType,
+        ContentLength: input.contentLength,
       }),
     );
     return { key: input.key };

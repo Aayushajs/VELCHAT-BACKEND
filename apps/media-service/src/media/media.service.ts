@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { Transform, type Readable } from 'node:stream';
 import { uuidv7, NotFoundError, ValidationError, ForbiddenError, GoneError } from '@velchat/common';
 import type { ObjectStorage } from '@velchat/storage';
 import { MediaRepository } from './media.repository';
@@ -85,6 +86,71 @@ export class MediaService {
     };
     await this.events.fileUploaded(ready);
     return { mediaId, status: 'ready', deduped, storageKey };
+  }
+
+  /**
+   * Streaming upload (§A16/§B11) — industry-level memory management for large media. The bytes flow
+   * source → hash/size meter → storage and are NEVER fully buffered in the service (unlike the
+   * multipart path which holds the whole file in RAM). Enforces the size cap mid-stream and hashes
+   * on the fly for integrity. The streamed object uses a per-media key (this path trades content-hash
+   * dedup for memory-safety on large files; the buffered path keeps dedup for small media).
+   */
+  async streamUpload(
+    mediaId: string,
+    source: Readable,
+    contentType?: string,
+    contentLength?: number,
+  ): Promise<{ mediaId: string; status: string; storageKey: string; size: number }> {
+    const media = await this.repo.findById(mediaId);
+    if (!media) throw new NotFoundError('media not found — call init first');
+    if (contentLength !== undefined && contentLength > MAX_BYTES) {
+      throw new ValidationError('upload exceeds size limit');
+    }
+
+    const storageKey = `media/${mediaId}`;
+    const hash = createHash('sha256');
+    let size = 0;
+    const meter = new Transform({
+      transform(chunk: Buffer, _enc, cb) {
+        size += chunk.length;
+        if (size > MAX_BYTES) {
+          cb(new ValidationError('upload exceeds size limit'));
+          return;
+        }
+        hash.update(chunk);
+        cb(null, chunk);
+      },
+    });
+
+    try {
+      await this.storage.putObjectStream({
+        key: storageKey,
+        body: source.pipe(meter),
+        contentType,
+        contentLength,
+      });
+    } catch (err) {
+      await this.storage.deleteObject(storageKey).catch(() => undefined); // best-effort cleanup
+      throw err;
+    }
+    if (size === 0) {
+      await this.storage.deleteObject(storageKey).catch(() => undefined);
+      throw new ValidationError('empty upload');
+    }
+
+    const contentHash = hash.digest('hex');
+    const mime = contentType ?? media.mime;
+    await this.repo.markReady(mediaId, { contentHash, size, mime, storageKey });
+    const ready: MediaObject = {
+      ...media,
+      content_hash: contentHash,
+      size,
+      mime,
+      storage_key: storageKey,
+      status: 'ready',
+    };
+    await this.events.fileUploaded(ready);
+    return { mediaId, status: 'ready', storageKey, size };
   }
 
   /** Short-lived signed download URL (§B11). View-once enforcement lands with §C22. */

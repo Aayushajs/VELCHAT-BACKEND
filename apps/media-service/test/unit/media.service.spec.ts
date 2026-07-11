@@ -51,6 +51,12 @@ function setup(opts: { existsByHash?: boolean; existsInStore?: boolean; others?:
       puts.push(i.key);
       return { key: i.key };
     }),
+    // Drain the stream so the service's hash/size meter runs to completion (real adapters consume it).
+    putObjectStream: jest.fn(async (i: { key: string; body: import('node:stream').Readable }) => {
+      puts.push(i.key);
+      for await (const _ of i.body) void _;
+      return { key: i.key };
+    }),
     exists: jest.fn(async () => opts.existsInStore ?? false),
     getSignedUrl: jest.fn(async (k: string) => `https://signed/${k}`),
     deleteObject: jest.fn(async () => undefined),
@@ -106,6 +112,27 @@ describe('MediaService (§B11)', () => {
     (repo.findById as jest.Mock).mockResolvedValueOnce(ready('m4'));
     const res = await svc.downloadUrl('m4');
     expect(res.url).toBe('https://signed/media/abc');
+  });
+
+  it('streamUpload pipes to storage, hashes on the fly, marks ready + emits (no buffering)', async () => {
+    const { svc, storage, events, repo } = setup();
+    (repo.findById as jest.Mock).mockResolvedValueOnce(pending('s1'));
+    const { Readable } = await import('node:stream');
+    const src = Readable.from([Buffer.from('hello '), Buffer.from('world')]);
+    const res = await svc.streamUpload('s1', src, 'image/jpeg', 11);
+    expect(res).toMatchObject({ mediaId: 's1', status: 'ready', size: 11, storageKey: 'media/s1' });
+    expect(storage.putObjectStream).toHaveBeenCalledTimes(1);
+    expect(storage.putObject).not.toHaveBeenCalled(); // streamed, never buffered
+    expect(repo.markReady).toHaveBeenCalled();
+    expect(events.fileUploaded).toHaveBeenCalled();
+  });
+
+  it('streamUpload rejects when Content-Length exceeds the cap (before streaming)', async () => {
+    const { svc } = setup();
+    const { Readable } = await import('node:stream');
+    await expect(
+      svc.streamUpload('s2', Readable.from([Buffer.from('x')]), 'video/mp4', 999 * 1024 * 1024),
+    ).rejects.toBeInstanceOf(ValidationError);
   });
 
   it('gallery lists a conversation’s media and requires conversationId', async () => {
