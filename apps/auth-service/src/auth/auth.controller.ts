@@ -39,10 +39,12 @@ export class AuthController {
     return this.auth.sendOtp(body.phone);
   }
 
-  /** Verify an SMS OTP the user typed (2Factor VERIFY3). */
+  /** Verify an SMS OTP the user typed (2Factor VERIFY3) → provision a session + return tokens. */
   @Post('otp/verify')
-  otpVerify(@Body() body: { phone: string; otp: string }): Promise<{ verified: true }> {
-    return this.auth.verifyOtp(body.phone, body.otp);
+  otpVerify(
+    @Body() body: { phone: string; otp: string; platform: string; devicePubkeyBase64: string },
+  ) {
+    return this.auth.verifyOtp(body.phone, body.otp, body.platform, body.devicePubkeyBase64);
   }
 
   /** §B2.5 same-device login (step 1): get a nonce to sign with the device key. */

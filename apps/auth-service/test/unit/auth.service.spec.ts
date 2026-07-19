@@ -1,5 +1,5 @@
 import { AuthService } from '../../src/auth/auth.service';
-import { ConflictError, RateLimitError } from '@velchat/common';
+import { ConflictError, RateLimitError, UnauthorizedError } from '@velchat/common';
 
 /**
  * Orchestration unit tests for AuthService — every dependency is a light fake (jest.fn), so we
@@ -220,5 +220,59 @@ describe('AuthService orchestration', () => {
     const res = await svc.recoveryUseBackupCode('R1', 'acc-1', 'code');
     expect(res.factors).toBe(2);
     expect(deps.recovery.addFactor).toHaveBeenCalledWith('R1', 'backup-code');
+  });
+
+  // ── 2Factor SMS OTP → session provisioning (OTP→token bridge) ──
+  it('otp verify → new account provisions account + trusted device + tokens', async () => {
+    const { svc, deps } = makeAuth();
+    const res = await svc.verifyOtp('+919990000000', '123456', 'android', 'AAAA');
+    expect(deps.otp.verify).toHaveBeenCalledWith('+919990000000', '123456');
+    expect(deps.repo.findVerifiedPhoneAccount).toHaveBeenCalledWith('+919990000000');
+    expect(deps.repo.createAccount).toHaveBeenCalledWith('full');
+    expect(deps.repo.upsertVerifiedIdentifier).toHaveBeenCalledWith(
+      'acc-new',
+      'phone',
+      '+919990000000',
+    );
+    expect(deps.repo.addDevice).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: 'acc-new', platform: 'android', trusted: true }),
+    );
+    expect(deps.repo.audit).toHaveBeenCalledWith('user.registered', 'acc-new', 'dev-new');
+    expect(deps.events.userCreated).toHaveBeenCalledWith('acc-new');
+    expect(deps.events.deviceAdded).toHaveBeenCalledWith('acc-new', 'dev-new', true);
+    expect(res).toEqual({
+      accountId: 'acc-new',
+      deviceId: 'dev-new',
+      access: 'access-jwt',
+      refresh: 'refresh-1',
+      expiresIn: 900,
+    });
+  });
+
+  it('otp verify → existing account reuses it, adds an untrusted device, no user.created', async () => {
+    const { svc, deps } = makeAuth();
+    deps.repo.findVerifiedPhoneAccount.mockResolvedValueOnce('acc-existing');
+    const res = await svc.verifyOtp('+919990000000', '123456', 'ios', 'AAAA');
+    expect(deps.repo.createAccount).not.toHaveBeenCalled();
+    expect(deps.repo.upsertVerifiedIdentifier).not.toHaveBeenCalled();
+    expect(deps.repo.addDevice).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: 'acc-existing', platform: 'ios', trusted: false }),
+    );
+    expect(deps.repo.audit).toHaveBeenCalledWith('login.otp', 'acc-existing', 'dev-new');
+    expect(deps.events.userCreated).not.toHaveBeenCalled();
+    expect(deps.events.deviceAdded).toHaveBeenCalledWith('acc-existing', 'dev-new', false);
+    expect(res.accountId).toBe('acc-existing');
+    expect(res.access).toBe('access-jwt');
+  });
+
+  it('otp verify → a wrong OTP throws before any provisioning', async () => {
+    const { svc, deps } = makeAuth();
+    deps.otp.verify.mockRejectedValueOnce(new UnauthorizedError('Invalid OTP'));
+    await expect(
+      svc.verifyOtp('+919990000000', '000000', 'android', 'AAAA'),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(deps.repo.findVerifiedPhoneAccount).not.toHaveBeenCalled();
+    expect(deps.repo.createAccount).not.toHaveBeenCalled();
+    expect(deps.repo.addDevice).not.toHaveBeenCalled();
   });
 });
