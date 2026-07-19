@@ -63,6 +63,19 @@ services:
     envVars:
       - { fromGroup: velchat-shared }
       - { key: SERVICE_NAME, value: api-gateway }
+      # Route each path prefix to its DEPLOYED service. Without these the gateway
+      # proxies to localhost and returns 502 "Upstream service unavailable".
+      - { key: UPSTREAM_AUTH, value: https://velchat-auth-service.onrender.com }
+      - { key: UPSTREAM_USER, value: https://velchat-user-service.onrender.com }
+      - { key: UPSTREAM_CHAT, value: https://velchat-chat-service.onrender.com }
+      - { key: UPSTREAM_GROUP_CHANNEL, value: https://velchat-group-channel-service.onrender.com }
+      - { key: UPSTREAM_PRESENCE, value: https://velchat-presence-service.onrender.com }
+      - { key: UPSTREAM_MEDIA, value: https://velchat-media-service.onrender.com }
+      - { key: UPSTREAM_NOTIFICATION, value: https://velchat-notification-service.onrender.com }
+      - { key: UPSTREAM_SEARCH, value: https://velchat-search-service.onrender.com }
+      - { key: UPSTREAM_CALL, value: https://velchat-call-service.onrender.com }
+      - { key: UPSTREAM_AUTOMATION, value: https://velchat-automation-service.onrender.com }
+      - { key: UPSTREAM_AI, value: https://velchat-ai-service.onrender.com }
 
   - type: web
     name: velchat-auth-service

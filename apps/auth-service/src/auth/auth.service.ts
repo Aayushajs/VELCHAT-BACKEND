@@ -10,6 +10,7 @@ import {
 import { AuthRepository, type DeviceRow } from './auth.repository';
 import { TokenService } from './tokens/token.service';
 import { ReverseOtpService, type InboundProof } from './reverse-otp/reverse-otp.service';
+import { OtpService } from './otp/otp.service';
 import { DeviceKeyService } from './dapt/device-key.service';
 import { MagicLinkService } from './dapt/magic-link.service';
 import { ApproveDeviceService } from './dapt/approve-device.service';
@@ -43,6 +44,7 @@ export class AuthService {
     private readonly repo: AuthRepository,
     private readonly tokens: TokenService,
     private readonly revotp: ReverseOtpService,
+    private readonly otp: OtpService,
     private readonly deviceKey: DeviceKeyService,
     private readonly magicLink: MagicLinkService,
     private readonly approve: ApproveDeviceService,
@@ -212,6 +214,19 @@ export class AuthService {
       300,
     );
     return { sessionId, expiresIn: Math.max(0, Math.floor((expiresAt - Date.now()) / 1000)) };
+  }
+
+  // ── 2Factor.in SMS OTP (additive auth method) ───────────────────────────
+  /** Send an SMS OTP via 2Factor (AUTOGEN). 2Factor owns the code; we only track send/lock metadata. */
+  async sendOtp(
+    phone: string,
+  ): Promise<{ message: string; resendAfter: number; expiresIn: number }> {
+    return this.otp.send(phone);
+  }
+
+  /** Verify an SMS OTP via 2Factor (VERIFY3). */
+  async verifyOtp(phone: string, otp: string): Promise<{ verified: true }> {
+    return this.otp.verify(phone, otp);
   }
 
   /**
