@@ -224,9 +224,48 @@ export class AuthService {
     return this.otp.send(phone);
   }
 
-  /** Verify an SMS OTP via 2Factor (VERIFY3). */
-  async verifyOtp(phone: string, otp: string): Promise<{ verified: true }> {
-    return this.otp.verify(phone, otp);
+  /**
+   * Verify an SMS OTP via 2Factor (VERIFY3), then PROVISION a session (the "OTP→token bridge").
+   * Mirrors the Reverse-OTP webhook provisioning path (§B2.4): dedup by phone, create/reuse the
+   * account + verified identifier, add the device (first device on a new account is trusted), audit
+   * + emit events, and mint tokens — so an SMS-OTP login stays logged in like every other flow.
+   */
+  async verifyOtp(
+    phone: string,
+    otp: string,
+    platform: string,
+    devicePubkeyBase64: string,
+  ): Promise<Tokens> {
+    // Pure 2Factor verify — throws on a wrong/expired/locked code (keeps OtpService untouched).
+    await this.otp.verify(phone, otp);
+
+    if (!platform || !devicePubkeyBase64) {
+      throw new ValidationError('platform and devicePubkeyBase64 are required');
+    }
+    try {
+      // Fail-fast if the provided key is not valid base64 (mirrors register()).
+      Buffer.from(devicePubkeyBase64, 'base64');
+    } catch {
+      throw new ValidationError('devicePubkeyBase64 must be a valid base64 string');
+    }
+
+    // Dedup by phone: reuse the account already verified for this number, else provision one.
+    const existing = await this.repo.findVerifiedPhoneAccount(phone);
+    const accountId = existing ?? (await this.repo.createAccount('full'));
+    if (!existing) await this.repo.upsertVerifiedIdentifier(accountId, 'phone', phone);
+
+    const deviceId = await this.repo.addDevice({
+      accountId,
+      platform,
+      devicePubkey: Buffer.from(devicePubkeyBase64, 'base64'),
+      trusted: !existing, // first device on a fresh account is trusted (can approve future devices)
+    });
+
+    await this.repo.audit(existing ? 'login.otp' : 'user.registered', accountId, deviceId);
+    if (!existing) await this.events.userCreated(accountId);
+    await this.events.deviceAdded(accountId, deviceId, !existing);
+
+    return this.mintTokens(accountId, deviceId);
   }
 
   /**
