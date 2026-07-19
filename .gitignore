@@ -49,3 +49,5 @@ libs/shared-types/src/gen/
 tmp/
 CLAUDE.md
 .claude/
+
+.early.coverage

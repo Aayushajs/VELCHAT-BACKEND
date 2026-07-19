@@ -9,6 +9,8 @@ import { AuthRepository } from './auth.repository';
 import { TokenService } from './tokens/token.service';
 import { ReverseOtpService } from './reverse-otp/reverse-otp.service';
 import { RedisReverseOtpStore } from './reverse-otp/reverse-otp.store';
+import { OtpService } from './otp/otp.service';
+import { RedisOtpStore } from './otp/otp.store';
 import { DeviceKeyService } from './dapt/device-key.service';
 import { MagicLinkService } from './dapt/magic-link.service';
 import { ApproveDeviceService } from './dapt/approve-device.service';
@@ -42,6 +44,15 @@ export class AuthModule {
       accessTtlSec: deps.config.JWT_ACCESS_TTL_SECONDS,
     });
     const revotp = new ReverseOtpService(new RedisReverseOtpStore(deps.redis));
+    const rateLimiter = new RateLimiter(deps.redis);
+    // 2Factor.in SMS OTP (additive) — AUTOGEN send + VERIFY3 verify; 2Factor owns the code, we only
+    // keep rate-limit/lock metadata. Reuses the shared RateLimiter for the send cap.
+    const otp = new OtpService(new RedisOtpStore(deps.redis), rateLimiter, deps.logger, {
+      apiKey: deps.config.OTP_API_KEY,
+      template: deps.config.OTP_TEMPLATE,
+      devMode: deps.config.OTP_DEV_MODE,
+      devPhone: deps.config.OTP_DEV_PHONE,
+    });
     const deviceKey = new DeviceKeyService(deps.redis);
     const baseUrl = process.env.PUBLIC_BASE_URL ?? 'http://localhost:8080';
     const magicLink = new MagicLinkService(
@@ -59,12 +70,12 @@ export class AuthModule {
       deps.redis,
     );
     const recovery = new RecoveryService(deps.redis);
-    const rateLimiter = new RateLimiter(deps.redis);
     const events = new AuthEvents(deps.eventBus);
     const service = new AuthService(
       repo,
       tokens,
       revotp,
+      otp,
       deviceKey,
       magicLink,
       approve,

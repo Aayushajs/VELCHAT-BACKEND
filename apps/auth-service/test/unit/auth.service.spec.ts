@@ -40,6 +40,10 @@ function makeAuth() {
     start: jest.fn(async () => ({ token: '123456', expiresAt: Date.now() + 300000 })),
     verify: jest.fn(async () => ({ verified: true, phone: '+919990000000' })),
   };
+  const otp = {
+    send: jest.fn(async () => ({ message: 'OTP sent', resendAfter: 120, expiresIn: 900 })),
+    verify: jest.fn(async () => ({ verified: true })),
+  };
   const deviceKey = {
     challenge: jest.fn(async () => ({ nonce: 'n', expiresIn: 120 })),
     verify: jest.fn(async () => undefined),
@@ -86,6 +90,7 @@ function makeAuth() {
     repo,
     tokens,
     revotp,
+    otp,
     deviceKey,
     magicLink,
     approve,
@@ -100,6 +105,7 @@ function makeAuth() {
     repo as never,
     tokens as never,
     revotp as never,
+    otp as never,
     deviceKey as never,
     magicLink as never,
     approve as never,

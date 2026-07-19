@@ -30,6 +30,21 @@ export class AuthController {
     return this.auth.getSession(body.sessionId);
   }
 
+  // ── 2Factor.in SMS OTP (additive auth method) ──
+  /** Send an SMS OTP (2Factor AUTOGEN). Dev-mode restricts sends to the configured dev phone. */
+  @Post('otp/send')
+  otpSend(
+    @Body() body: { phone: string },
+  ): Promise<{ message: string; resendAfter: number; expiresIn: number }> {
+    return this.auth.sendOtp(body.phone);
+  }
+
+  /** Verify an SMS OTP the user typed (2Factor VERIFY3). */
+  @Post('otp/verify')
+  otpVerify(@Body() body: { phone: string; otp: string }): Promise<{ verified: true }> {
+    return this.auth.verifyOtp(body.phone, body.otp);
+  }
+
   /** §B2.5 same-device login (step 1): get a nonce to sign with the device key. */
   @Post('challenge')
   challenge(@Body() body: { deviceId: string }) {

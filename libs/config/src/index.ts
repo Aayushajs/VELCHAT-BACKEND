@@ -216,6 +216,19 @@ export const envSchema = z.object({
   // Reverse-OTP gateway (§B2.2) — Asterisk/FreeSWITCH webhook shared secret + owned DID.
   REVOTP_WEBHOOK_SECRET: z.string().optional(),
   REVOTP_DID: z.string().optional(), // the inbound number users missed-call / SMS
+
+  // 2Factor.in SMS OTP (additive auth method). AUTOGEN: 2Factor generates/sends/stores the code
+  // itself, so we NEVER see, store, or log the OTP — only rate-limit/lock metadata lives in Redis.
+  // Integration key is optional in the base schema (like SMTP_URL / REVOTP_*); the OTP endpoints
+  // return a clean error when OTP_API_KEY is unset. Never commit the real key — .env only.
+  OTP_API_KEY: z.string().optional(),
+  OTP_TEMPLATE: z.string().default('Temp1'), // 2Factor SMS template name
+  // Dev-mode fuse: while true, only OTP_DEV_PHONE may receive an OTP (no SMS spent on other numbers).
+  OTP_DEV_MODE: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  OTP_DEV_PHONE: z.string().optional(), // the single phone allowed to receive OTP in dev-mode
 });
 
 export type AppConfig = Readonly<z.infer<typeof envSchema>>;
