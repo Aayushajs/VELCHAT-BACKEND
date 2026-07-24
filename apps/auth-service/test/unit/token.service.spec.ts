@@ -87,4 +87,17 @@ describe('TokenService (§B2.3)', () => {
     const { svc } = makeService();
     await expect(svc.rotateRefresh('not-a-real-token')).rejects.toThrow(/Unknown/i);
   });
+
+  it('revokeRefresh kills the presented token family (logout)', async () => {
+    const { svc } = makeService();
+    const issued = await svc.issueRefresh('dev-1');
+    await svc.revokeRefresh(issued.token);
+    // family revoked → presenting the token again is treated as reuse and rejected
+    await expect(svc.rotateRefresh(issued.token)).rejects.toThrow(/reuse detected/i);
+  });
+
+  it('revokeRefresh is a no-op for an unknown token (idempotent logout)', async () => {
+    const { svc } = makeService();
+    await expect(svc.revokeRefresh('not-a-real-token')).resolves.toBeUndefined();
+  });
 });

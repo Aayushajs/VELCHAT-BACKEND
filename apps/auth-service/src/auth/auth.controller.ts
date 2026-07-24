@@ -70,6 +70,19 @@ export class AuthController {
     return this.auth.listDevices(accountId);
   }
 
+  /** Explicit sign-out — revoke the presented refresh token family server-side (§B2.3). */
+  @Post('logout')
+  @HttpCode(200)
+  logout(@Body() body: { refreshToken: string }): Promise<{ loggedOut: true }> {
+    return this.auth.logout(body.refreshToken);
+  }
+
+  /** Remotely revoke a device (lost/stolen / sign-out that device) — kills its key + sessions. */
+  @Post('device/revoke')
+  revokeDevice(@Body() body: { accountId: string; deviceId: string }): Promise<{ revoked: true }> {
+    return this.auth.revokeDevice(body.accountId, body.deviceId);
+  }
+
   // ── DAPT fallback: email magic-link (§B2.5) ──
   @Post('magic/begin')
   magicBegin(@Body() body: { email: string; platform: string; devicePubkeyBase64: string }) {

@@ -116,6 +116,15 @@ export class TokenService {
     });
     return { ...next, deviceId: rec.deviceId };
   }
+
+  /**
+   * Revoke the ENTIRE family of a presented refresh token — used on explicit logout so the token
+   * (and any rotated sibling) can't be replayed. Idempotent: an unknown token is a no-op.
+   */
+  async revokeRefresh(presented: string): Promise<void> {
+    const rec = await this.store.findByHash(sha256(presented));
+    if (rec) await this.store.revokeFamily(rec.familyId);
+  }
 }
 
 function sha256(value: string): string {

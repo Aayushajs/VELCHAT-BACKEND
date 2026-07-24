@@ -425,6 +425,35 @@ export class AuthService {
     return this.repo.listDevices(accountId);
   }
 
+  // ── Sign-out / device revocation (§B2.3) ─────────────────────────────────
+  /**
+   * Explicit sign-out: revoke the presented refresh token's whole family server-side, so a stolen or
+   * lingering refresh token can't be replayed after logout. Idempotent (unknown token → still ok).
+   */
+  async logout(refreshToken: string): Promise<{ loggedOut: true }> {
+    if (!refreshToken) throw new ValidationError('refreshToken is required');
+    await this.tokens.revokeRefresh(refreshToken);
+    return { loggedOut: true };
+  }
+
+  /**
+   * Remotely revoke a device of the account (lost/stolen, or "sign out that device" from the device
+   * list): mark it revoked (device-key login then fails) AND kill its live refresh tokens.
+   */
+  async revokeDevice(accountId: string, deviceId: string): Promise<{ revoked: true }> {
+    if (!accountId || !deviceId) {
+      throw new ValidationError('accountId and deviceId are required');
+    }
+    const device = await this.repo.getDevice(deviceId);
+    if (!device || device.accountId !== accountId) {
+      throw new UnauthorizedError('Device does not belong to this account');
+    }
+    await this.repo.revokeDevice(deviceId);
+    await this.repo.revokeDeviceTokens(deviceId);
+    await this.repo.audit('device.revoked', accountId, deviceId);
+    return { revoked: true };
+  }
+
   jwks(): { keys: Array<Record<string, unknown>> } {
     return this.tokens.jwks();
   }

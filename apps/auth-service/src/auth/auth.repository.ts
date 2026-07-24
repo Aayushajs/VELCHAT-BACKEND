@@ -188,6 +188,18 @@ export class AuthRepository implements RefreshStore {
     ]);
   }
 
+  /**
+   * Mark a device revoked (remote sign-out / lost-stolen). Sets `revoked_at`, so getDevice /
+   * getDevicePubkey / listDevices (all filter `revoked_at IS NULL`) stop returning it and
+   * device-key login for it fails. Pair with revokeDeviceTokens() to also kill live sessions.
+   */
+  async revokeDevice(deviceId: string): Promise<void> {
+    await this.pg.pool.query(
+      'UPDATE devices SET revoked_at = now() WHERE device_id = $1 AND revoked_at IS NULL',
+      [deviceId],
+    );
+  }
+
   // ── Recovery backup codes (§B2.7) ────────────────────────────────────────
   async storeBackupCodes(accountId: string, codeHashes: string[]): Promise<void> {
     await this.pg.pool.query('DELETE FROM recovery_backup_codes WHERE account_id = $1', [
