@@ -22,6 +22,7 @@ function makeAuth() {
     accountForDevice: jest.fn(async () => 'acc-1'),
     listDevices: jest.fn(async () => [{ device_id: 'dev-1' }, { device_id: 'dev-2' }]),
     revokeDeviceTokens: jest.fn(async () => undefined),
+    revokeDevice: jest.fn(async () => undefined),
     findVerifiedPhoneAccount: jest.fn(async () => null),
     repointPhone: jest.fn(async () => undefined),
     consumeBackupCode: jest.fn(async () => true),
@@ -35,6 +36,7 @@ function makeAuth() {
       familyId: 'fam-1',
       deviceId: 'dev-1',
     })),
+    revokeRefresh: jest.fn(async () => undefined),
   };
   const revotp = {
     start: jest.fn(async () => ({ token: '123456', expiresAt: Date.now() + 300000 })),
@@ -274,5 +276,29 @@ describe('AuthService orchestration', () => {
     expect(deps.repo.findVerifiedPhoneAccount).not.toHaveBeenCalled();
     expect(deps.repo.createAccount).not.toHaveBeenCalled();
     expect(deps.repo.addDevice).not.toHaveBeenCalled();
+  });
+
+  // ── Sign-out / device revocation ──
+  it('logout revokes the presented refresh token family', async () => {
+    const { svc, deps } = makeAuth();
+    const res = await svc.logout('refresh-1');
+    expect(res.loggedOut).toBe(true);
+    expect(deps.tokens.revokeRefresh).toHaveBeenCalledWith('refresh-1');
+  });
+
+  it('revokeDevice marks the device revoked and kills its sessions (own account)', async () => {
+    const { svc, deps } = makeAuth();
+    const res = await svc.revokeDevice('acc-1', 'dev-1');
+    expect(res.revoked).toBe(true);
+    expect(deps.repo.revokeDevice).toHaveBeenCalledWith('dev-1');
+    expect(deps.repo.revokeDeviceTokens).toHaveBeenCalledWith('dev-1');
+    expect(deps.repo.audit).toHaveBeenCalledWith('device.revoked', 'acc-1', 'dev-1');
+  });
+
+  it('revokeDevice rejects a device that belongs to another account', async () => {
+    const { svc, deps } = makeAuth();
+    // getDevice returns accountId 'acc-1'; caller claims 'acc-OTHER' → unauthorized
+    await expect(svc.revokeDevice('acc-OTHER', 'dev-1')).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(deps.repo.revokeDevice).not.toHaveBeenCalled();
   });
 });
