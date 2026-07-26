@@ -60,6 +60,14 @@ services:
     dockerfilePath: ./docker/api-gateway.Dockerfile
     dockerContext: .
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - apps/api-gateway/**
+        - libs/**
+        - docker/api-gateway.Dockerfile
+        - package.json
+        - pnpm-lock.yaml
+        - render.yaml
     envVars:
       - { fromGroup: velchat-shared }
       - { key: SERVICE_NAME, value: api-gateway }
@@ -84,6 +92,13 @@ services:
     dockerfilePath: ./docker/auth-service.Dockerfile
     dockerContext: .
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - apps/auth-service/**
+        - libs/**
+        - docker/auth-service.Dockerfile
+        - package.json
+        - pnpm-lock.yaml
     envVars:
       - { fromGroup: velchat-shared }
       - { key: SERVICE_NAME, value: auth-service }
@@ -95,6 +110,13 @@ services:
     dockerfilePath: ./docker/user-service.Dockerfile
     dockerContext: .
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - apps/user-service/**
+        - libs/**
+        - docker/user-service.Dockerfile
+        - package.json
+        - pnpm-lock.yaml
     envVars:
       - { fromGroup: velchat-shared }
       - { key: SERVICE_NAME, value: user-service }
@@ -106,6 +128,13 @@ services:
     dockerfilePath: ./docker/chat-service.Dockerfile
     dockerContext: .
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - apps/chat-service/**
+        - libs/**
+        - docker/chat-service.Dockerfile
+        - package.json
+        - pnpm-lock.yaml
     envVars:
       - { fromGroup: velchat-shared }
       - { key: SERVICE_NAME, value: chat-service }
@@ -117,6 +146,13 @@ services:
     dockerfilePath: ./docker/realtime-gateway.Dockerfile
     dockerContext: .
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - apps/realtime-gateway/**
+        - libs/**
+        - docker/realtime-gateway.Dockerfile
+        - package.json
+        - pnpm-lock.yaml
     envVars:
       - { fromGroup: velchat-shared }
       - { key: SERVICE_NAME, value: realtime-gateway }
@@ -128,6 +164,13 @@ services:
     dockerfilePath: ./docker/group-channel-service.Dockerfile
     dockerContext: .
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - apps/group-channel-service/**
+        - libs/**
+        - docker/group-channel-service.Dockerfile
+        - package.json
+        - pnpm-lock.yaml
     envVars:
       - { fromGroup: velchat-shared }
       - { key: SERVICE_NAME, value: group-channel-service }
@@ -139,6 +182,13 @@ services:
     dockerfilePath: ./docker/presence-service.Dockerfile
     dockerContext: .
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - apps/presence-service/**
+        - libs/**
+        - docker/presence-service.Dockerfile
+        - package.json
+        - pnpm-lock.yaml
     envVars:
       - { fromGroup: velchat-shared }
       - { key: SERVICE_NAME, value: presence-service }
@@ -150,9 +200,17 @@ services:
     dockerfilePath: ./docker/media-service.Dockerfile
     dockerContext: .
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - apps/media-service/**
+        - libs/**
+        - docker/media-service.Dockerfile
+        - package.json
+        - pnpm-lock.yaml
     envVars:
       - { fromGroup: velchat-shared }
       - { key: SERVICE_NAME, value: media-service }
+
   - type: web
     name: velchat-notification-service
     runtime: docker
@@ -160,6 +218,13 @@ services:
     dockerfilePath: ./docker/notification-service.Dockerfile
     dockerContext: .
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - apps/notification-service/**
+        - libs/**
+        - docker/notification-service.Dockerfile
+        - package.json
+        - pnpm-lock.yaml
     envVars:
       - { fromGroup: velchat-shared }
       - { key: SERVICE_NAME, value: notification-service }
@@ -171,6 +236,13 @@ services:
     dockerfilePath: ./docker/search-service.Dockerfile
     dockerContext: .
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - apps/search-service/**
+        - libs/**
+        - docker/search-service.Dockerfile
+        - package.json
+        - pnpm-lock.yaml
     envVars:
       - { fromGroup: velchat-shared }
       - { key: SERVICE_NAME, value: search-service }
@@ -182,6 +254,13 @@ services:
     dockerfilePath: ./docker/call-service.Dockerfile
     dockerContext: .
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - apps/call-service/**
+        - libs/**
+        - docker/call-service.Dockerfile
+        - package.json
+        - pnpm-lock.yaml
     envVars:
       - { fromGroup: velchat-shared }
       - { key: SERVICE_NAME, value: call-service }
@@ -193,6 +272,13 @@ services:
     dockerfilePath: ./docker/automation-service.Dockerfile
     dockerContext: .
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - apps/automation-service/**
+        - libs/**
+        - docker/automation-service.Dockerfile
+        - package.json
+        - pnpm-lock.yaml
     envVars:
       - { fromGroup: velchat-shared }
       - { key: SERVICE_NAME, value: automation-service }
@@ -204,6 +290,13 @@ services:
     dockerfilePath: ./docker/ai-service.Dockerfile
     dockerContext: .
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - apps/ai-service/**
+        - libs/**
+        - docker/ai-service.Dockerfile
+        - package.json
+        - pnpm-lock.yaml
     envVars:
       - { fromGroup: velchat-shared }
       - { key: SERVICE_NAME, value: ai-service }
