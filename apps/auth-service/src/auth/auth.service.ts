@@ -218,10 +218,19 @@ export class AuthService {
 
   /**
    * Read-only account snapshot for the profile header (identity + verified phone/email +
-   * created/last-active timestamps). No migration, no token/login-path change.
+   * created/last-active timestamps). The account is derived from the VERIFIED access
+   * token — never a caller-supplied id — so a user can only read ITS OWN account (no IDOR
+   * / PII leak). No migration, no change to the token/login path.
    */
-  async getAccountInfo(accountId: string) {
-    if (!accountId) throw new ValidationError('accountId is required');
+  async getAccount(authHeader: string | undefined) {
+    const token = (authHeader ?? '').replace(/^Bearer\s+/i, '').trim();
+    if (!token) throw new UnauthorizedError('Missing access token');
+    let accountId: string;
+    try {
+      accountId = this.tokens.verifyAccess(token).account_id;
+    } catch {
+      throw new UnauthorizedError('Invalid or expired access token');
+    }
     return this.repo.getAccountInfo(accountId);
   }
 
