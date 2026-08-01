@@ -1,6 +1,6 @@
 {
   "name": "@velchat/api-gateway",
-  "version": "0.1.1",
+  "version": "0.2.6",
   "private": true,
   "main": "dist/main.js",
   "scripts": {
@@ -33,5 +33,6 @@
   },
   "devDependencies": {
     "@types/http-proxy": "^1.17.15"
-  }
+  },
+  "buildStamp": "2026-08-01T08:27:39.172Z"
 }

@@ -1,6 +1,6 @@
 {
   "name": "@velchat/group-channel-service",
-  "version": "0.1.1",
+  "version": "0.2.5",
   "private": true,
   "main": "dist/main.js",
   "scripts": {
@@ -35,5 +35,6 @@
   },
   "devDependencies": {
     "@types/pg": "^8.11.10"
-  }
+  },
+  "buildStamp": "2026-08-01T08:27:39.894Z"
 }

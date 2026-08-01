@@ -1,6 +1,6 @@
 {
   "name": "@velchat/auth-service",
-  "version": "0.1.1",
+  "version": "0.1.11",
   "private": true,
   "main": "dist/main.js",
   "scripts": {
@@ -46,5 +46,6 @@
     "@types/pg": "^8.11.10",
     "@types/qrcode": "^1.5.5",
     "testcontainers": "^10.13.2"
-  }
+  },
+  "buildStamp": "2026-08-01T08:27:39.321Z"
 }

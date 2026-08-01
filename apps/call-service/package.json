@@ -1,6 +1,6 @@
 {
   "name": "@velchat/call-service",
-  "version": "0.1.1",
+  "version": "0.3.2",
   "private": true,
   "main": "dist/main.js",
   "scripts": {
@@ -37,5 +37,6 @@
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.7",
     "@types/pg": "^8.11.10"
-  }
+  },
+  "buildStamp": "2026-08-01T08:27:39.609Z"
 }
