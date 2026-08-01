@@ -43,4 +43,6 @@ jobs:
           commit: 'chore(release): version packages'
           title: 'chore(release): version packages'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # If repository settings disallow PR creation from the default workflow token,
+          # provide a PAT in `CHANGESETS_GITHUB_TOKEN` (repo scope) for this action.
+          GITHUB_TOKEN: ${{ secrets.CHANGESETS_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
