@@ -29,6 +29,52 @@ export class AuthRepository implements RefreshStore {
     return accountId;
   }
 
+  /**
+   * Read-only account snapshot for the profile header (§B2.1): identity + the verified
+   * phone/email attributes. No migration — every column already exists (accounts +
+   * identifiers). Never touches the token/login path.
+   */
+  async getAccountInfo(accountId: string): Promise<{
+    accountId: string;
+    status: string;
+    tier: string;
+    createdAt: Date;
+    lastActiveAt: Date;
+    phone: string | null;
+    email: string | null;
+  } | null> {
+    const acc = await this.pg.pool.query(
+      'SELECT account_id, status, tier, created_at, last_active_at FROM accounts WHERE account_id = $1',
+      [accountId],
+    );
+    const row = acc.rows[0] as
+      | {
+          account_id: string;
+          status: string;
+          tier: string;
+          created_at: Date;
+          last_active_at: Date;
+        }
+      | undefined;
+    if (!row) return null;
+    const ids = await this.pg.pool.query(
+      `SELECT kind, value_norm FROM identifiers
+         WHERE account_id = $1 AND verified_at IS NOT NULL
+         ORDER BY is_primary DESC, verified_at DESC`,
+      [accountId],
+    );
+    const idRows = ids.rows as Array<{ kind: string; value_norm: string }>;
+    return {
+      accountId: row.account_id,
+      status: row.status,
+      tier: row.tier,
+      createdAt: row.created_at,
+      lastActiveAt: row.last_active_at,
+      phone: idRows.find((r) => r.kind === 'phone')?.value_norm ?? null,
+      email: idRows.find((r) => r.kind === 'email')?.value_norm ?? null,
+    };
+  }
+
   /** Re-verifiable attribute. `value_hash` powers contact discovery / lookup (§B2.1). */
   async upsertVerifiedIdentifier(
     accountId: string,

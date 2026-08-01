@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Query, HttpCode } from '@nestjs/common';
+import { Controller, Post, Get, Body, Query, Headers, HttpCode } from '@nestjs/common';
 import { AuthService, type RegisterInput } from './auth.service';
 import type { InboundProof } from './reverse-otp/reverse-otp.service';
 import type { RecoveryFactor } from './recovery/recovery.service';
@@ -45,6 +45,17 @@ export class AuthController {
     @Body() body: { phone: string; otp: string; platform: string; devicePubkeyBase64: string },
   ) {
     return this.auth.verifyOtp(body.phone, body.otp, body.platform, body.devicePubkeyBase64);
+  }
+
+  /**
+   * Read-only account snapshot for the profile header — verified phone/email + the
+   * account's created/last-active timestamps (member-since + last-login). The account is
+   * taken from the VERIFIED access token (Authorization header), so a caller can only read
+   * its own account — no IDOR. No migration, no token-path change.
+   */
+  @Get('account')
+  account(@Headers('authorization') authorization?: string) {
+    return this.auth.getAccount(authorization);
   }
 
   /** §B2.5 same-device login (step 1): get a nonce to sign with the device key. */

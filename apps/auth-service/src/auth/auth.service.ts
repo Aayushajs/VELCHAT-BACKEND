@@ -216,6 +216,24 @@ export class AuthService {
     return { sessionId, expiresIn: Math.max(0, Math.floor((expiresAt - Date.now()) / 1000)) };
   }
 
+  /**
+   * Read-only account snapshot for the profile header (identity + verified phone/email +
+   * created/last-active timestamps). The account is derived from the VERIFIED access
+   * token — never a caller-supplied id — so a user can only read ITS OWN account (no IDOR
+   * / PII leak). No migration, no change to the token/login path.
+   */
+  async getAccount(authHeader: string | undefined) {
+    const token = (authHeader ?? '').replace(/^Bearer\s+/i, '').trim();
+    if (!token) throw new UnauthorizedError('Missing access token');
+    let accountId: string;
+    try {
+      accountId = this.tokens.verifyAccess(token).account_id;
+    } catch {
+      throw new UnauthorizedError('Invalid or expired access token');
+    }
+    return this.repo.getAccountInfo(accountId);
+  }
+
   // ── 2Factor.in SMS OTP (additive auth method) ───────────────────────────
   /** Send an SMS OTP via 2Factor (AUTOGEN). 2Factor owns the code; we only track send/lock metadata. */
   async sendOtp(
