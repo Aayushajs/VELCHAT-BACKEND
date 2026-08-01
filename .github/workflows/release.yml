@@ -35,6 +35,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Create Version PR / tag + release
+        if: ${{ secrets.CHANGESETS_GITHUB_TOKEN != '' }}
         uses: changesets/action@v1
         with:
           version: pnpm changeset:version
@@ -43,6 +44,10 @@ jobs:
           commit: 'chore(release): version packages'
           title: 'chore(release): version packages'
         env:
-          # If repository settings disallow PR creation from the default workflow token,
-          # provide a PAT in `CHANGESETS_GITHUB_TOKEN` (repo scope) for this action.
-          GITHUB_TOKEN: ${{ secrets.CHANGESETS_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          # This repository disallows PR creation with the default workflow token.
+          # Use a PAT in `CHANGESETS_GITHUB_TOKEN` (repo scope) for the Changesets action.
+          GITHUB_TOKEN: ${{ secrets.CHANGESETS_GITHUB_TOKEN }}
+      - name: Skip Changesets (missing PAT)
+        if: ${{ secrets.CHANGESETS_GITHUB_TOKEN == '' }}
+        run: |
+          echo "::notice::Skipping changesets release: CHANGESETS_GITHUB_TOKEN is not set, and secrets.GITHUB_TOKEN cannot create PRs in this repository."
