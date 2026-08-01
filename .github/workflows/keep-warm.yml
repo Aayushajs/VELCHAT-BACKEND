@@ -1,0 +1,49 @@
+name: keep-warm
+
+# Keep the Render FREE-tier services awake. Free web services hibernate after ~15 min
+# idle, so the next request eats a 30-50s cold start (and can time out). This pings every
+# service's /health on a schedule so they never sleep.
+#
+# Notes / caveats:
+#  - GitHub scheduled crons are BEST-EFFORT (can lag 5-15 min under load) — */10 leaves
+#    margin under the 15-min hibernation window.
+#  - Scheduled workflows only run from the DEFAULT branch (main) and are auto-disabled
+#    after 60 days with no repo activity — a nudge/commit re-enables them.
+#  - Runs are free for public repos; on a private repo they count against Actions minutes.
+#  - This complements the client-side warm-on-app-open (mobile app pings on launch).
+
+on:
+  schedule:
+    - cron: '*/10 * * * *' # every 10 minutes
+  workflow_dispatch: {} # allow manual "Run workflow"
+
+concurrency:
+  group: keep-warm
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Ping every service /health
+        run: |
+          services="
+            velchat-api-gateway
+            velchat-auth-service
+            velchat-user-service
+            velchat-chat-service
+            velchat-group-channel-service
+            velchat-presence-service
+            velchat-realtime-gateway
+            velchat-media-service
+            velchat-notification-service
+            velchat-search-service
+            velchat-call-service
+            velchat-automation-service
+            velchat-ai-service
+          "
+          for h in $services; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -m 60 "https://$h.onrender.com/health" || echo 000)
+            printf '%-34s -> %s\n' "$h" "$code"
+          done
