@@ -1,5 +1,5 @@
 ---
-"@velchat/api-gateway": patch
+'@velchat/api-gateway': patch
 ---
 
 chore: trigger redeploy with version bump

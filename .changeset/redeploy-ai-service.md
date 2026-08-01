@@ -1,5 +1,5 @@
 ---
-"@velchat/ai-service": patch
+'@velchat/ai-service': patch
 ---
 
 chore: trigger redeploy with version bump

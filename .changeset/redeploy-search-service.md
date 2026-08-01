@@ -1,5 +1,5 @@
 ---
-"@velchat/search-service": patch
+'@velchat/search-service': patch
 ---
 
 chore: trigger redeploy with version bump
