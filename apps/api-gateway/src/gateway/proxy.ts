@@ -10,7 +10,18 @@ import { resolveUpstream } from './routes';
  * to the gateway's own Nest handlers. On an upstream connection error it returns a clean 502.
  */
 export function createProxyMiddleware(logger: Logger) {
-  const proxy = httpProxy.createProxyServer({ xfwd: true, proxyTimeout: 30_000 });
+  // `changeOrigin` rewrites the outgoing Host header to the target's host. This is
+  // REQUIRED behind host-based routers (Render, nginx vhosts, K8s ingress): without it
+  // a proxied request to https://velchat-auth-service.onrender.com keeps
+  // Host: velchat-api-gateway.onrender.com, so the router sends it straight back to the
+  // gateway → infinite loop → HTTP 508. (Locally it works because upstreams are
+  // addressed by localhost:PORT, not by Host.) `proxyTimeout` is generous so a cold
+  // free-tier upstream (spins up in ~30-50s) has time to wake instead of 502-ing.
+  const proxy = httpProxy.createProxyServer({
+    xfwd: true,
+    changeOrigin: true,
+    proxyTimeout: 90_000,
+  });
 
   proxy.on('error', (err, _req, res) => {
     const r = res as ServerResponse;
