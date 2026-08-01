@@ -44,9 +44,10 @@ envVarGroups:
       # ("only the configured dev phone may receive an OTP") for every number.
       - { key: OTP_API_KEY, sync: false } # 2Factor.in API key
       - { key: OTP_TEMPLATE, sync: false } # DLT-approved template name (default: Temp1)
-      # SAFETY: while "true", ONLY OTP_DEV_PHONE receives an OTP (no mass-send / SMS spend).
-      # Flip to "false" for production to let any number verify.
-      - { key: OTP_DEV_MODE, value: 'true' }
+      # SAFETY fuse (code default = "true"): while true, ONLY OTP_DEV_PHONE receives an OTP.
+      # Dashboard-controlled (sync:false) so the blueprint never OVERWRITES your choice on a
+      # redeploy — set "false" to let any number verify (prod), or keep true + set OTP_DEV_PHONE.
+      - { key: OTP_DEV_MODE, sync: false }
       - { key: OTP_DEV_PHONE, sync: false } # the one E.164 number allowed while dev-mode is on
       # Web Push (VAPID) — npx web-push generate-vapid-keys
       - { key: VAPID_PUBLIC_KEY, sync: false }
