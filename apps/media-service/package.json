@@ -1,6 +1,6 @@
 {
   "name": "@velchat/media-service",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "main": "dist/main.js",
   "scripts": {
@@ -38,5 +38,6 @@
   "devDependencies": {
     "@types/multer": "^1.4.12",
     "@types/pg": "^8.11.10"
-  }
+  },
+  "buildStamp": "2026-08-01T08:27:40.040Z"
 }
