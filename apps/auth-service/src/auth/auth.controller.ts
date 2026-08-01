@@ -47,6 +47,17 @@ export class AuthController {
     return this.auth.verifyOtp(body.phone, body.otp, body.platform, body.devicePubkeyBase64);
   }
 
+  /**
+   * Read-only account snapshot for the profile header — verified phone/email + the
+   * account's created/last-active timestamps (member-since + last-login). No migration,
+   * no token-path change. TODO: harden to derive accountId from the verified JWT (like
+   * the other /auth read endpoints) instead of the query param.
+   */
+  @Get('account')
+  account(@Query('accountId') accountId: string) {
+    return this.auth.getAccountInfo(accountId);
+  }
+
   /** §B2.5 same-device login (step 1): get a nonce to sign with the device key. */
   @Post('challenge')
   challenge(@Body() body: { deviceId: string }) {

@@ -216,6 +216,15 @@ export class AuthService {
     return { sessionId, expiresIn: Math.max(0, Math.floor((expiresAt - Date.now()) / 1000)) };
   }
 
+  /**
+   * Read-only account snapshot for the profile header (identity + verified phone/email +
+   * created/last-active timestamps). No migration, no token/login-path change.
+   */
+  async getAccountInfo(accountId: string) {
+    if (!accountId) throw new ValidationError('accountId is required');
+    return this.repo.getAccountInfo(accountId);
+  }
+
   // ── 2Factor.in SMS OTP (additive auth method) ───────────────────────────
   /** Send an SMS OTP via 2Factor (AUTOGEN). 2Factor owns the code; we only track send/lock metadata. */
   async sendOtp(
