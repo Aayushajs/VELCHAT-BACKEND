@@ -11,9 +11,11 @@ export class ChannelsService {
     private readonly events: ChannelsEvents,
   ) {}
 
-  /** 1:1 DM — deterministic id, created at most once (dedupe). */
+  /** 1:1 DM — deterministic id, created at most once (dedupe). `a === b` is a self-chat
+   * ("Message yourself", WhatsApp-style): a single-member DM keyed by the same deterministic id. */
   async createDm(a: string, b: string): Promise<{ conversationId: string; created: boolean }> {
-    if (!a || !b || a === b) throw new ValidationError('two distinct users are required for a DM');
+    if (!a || !b) throw new ValidationError('two user ids are required for a DM');
+    const self = a === b;
     const conversationId = dmConversationId(a, b);
     const created = await this.repo.createConversation({
       conversationId,
@@ -22,8 +24,8 @@ export class ChannelsService {
     });
     if (created) {
       await this.repo.addMember(conversationId, a, 'member');
-      await this.repo.addMember(conversationId, b, 'member');
-      await this.events.conversationCreated(conversationId, 'dm', null, a, [a, b]);
+      if (!self) await this.repo.addMember(conversationId, b, 'member');
+      await this.events.conversationCreated(conversationId, 'dm', null, a, self ? [a] : [a, b]);
     }
     return { conversationId, created };
   }

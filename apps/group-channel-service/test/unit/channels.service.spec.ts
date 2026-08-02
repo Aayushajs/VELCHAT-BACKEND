@@ -41,9 +41,20 @@ describe('ChannelsService (§B7)', () => {
     expect(events.conversationCreated).not.toHaveBeenCalled();
   });
 
-  it('rejects a DM with the same user on both sides', async () => {
+  it('creates a self-chat (Message yourself) — one member, one event', async () => {
+    const { svc, repo, events } = makeChannels();
+    const res = await svc.createDm('a', 'a');
+    expect(res.created).toBe(true);
+    expect(repo.addMember).toHaveBeenCalledTimes(1);
+    expect(repo.addMember).toHaveBeenCalledWith(expect.any(String), 'a', 'member');
+    expect(events.conversationCreated).toHaveBeenCalledWith(expect.any(String), 'dm', null, 'a', [
+      'a',
+    ]);
+  });
+
+  it('rejects a DM with a missing user id', async () => {
     const { svc } = makeChannels();
-    await expect(svc.createDm('a', 'a')).rejects.toBeInstanceOf(ValidationError);
+    await expect(svc.createDm('a', '')).rejects.toBeInstanceOf(ValidationError);
   });
 
   it('creates a group with the creator as owner', async () => {
