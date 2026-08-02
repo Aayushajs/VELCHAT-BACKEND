@@ -39,6 +39,19 @@ export class ChannelsController {
     return this.channels.createDm(body.a, body.b);
   }
 
+  @Get('users/:userId/conversations')
+  @ApiOperation({
+    summary: "List the user's conversations (inbox)",
+    description:
+      'Every DM/group the user is a member of — lets a fresh install re-discover its chats. ' +
+      'No messages here; the client backfills per conversation via chat-service afterSeq.',
+  })
+  @ApiParam({ name: 'userId', description: 'Account_id.' })
+  @ApiOkResponse({ description: 'Conversation rows the user belongs to.' })
+  listUserConversations(@Param('userId') userId: string) {
+    return this.channels.listUserConversations(userId);
+  }
+
   @Post('groups')
   @ApiOperation({
     summary: 'Create a group',

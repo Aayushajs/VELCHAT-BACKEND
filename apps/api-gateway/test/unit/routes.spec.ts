@@ -32,10 +32,13 @@ describe('gateway routing (§A12.1)', () => {
     expect(upstreamPort('/ai/translate')).toBe(portFor('AI'));
   });
 
-  it('splits the shared /users prefix: profile→user, stars/conversations→chat', () => {
+  it('splits the shared /users prefix: profile→user, inbox→group-channel, other conversations→chat', () => {
     expect(upstreamPort('/users/u1/profile')).toBe(portFor('USER'));
     expect(upstreamPort('/users/u1/contacts')).toBe(portFor('USER'));
     expect(upstreamPort('/users/u1/stars/m1')).toBe(portFor('CHAT'));
+    // The bare inbox list is owned by group-channel; its sub-paths stay on chat.
+    expect(upstreamPort('/users/u1/conversations')).toBe(portFor('GROUP_CHANNEL'));
+    expect(upstreamPort('/users/u1/conversations/')).toBe(portFor('GROUP_CHANNEL'));
     expect(upstreamPort('/users/u1/conversations/c1/mute')).toBe(portFor('CHAT'));
     expect(upstreamPort('/users/u1/conversations/archived')).toBe(portFor('CHAT'));
   });
