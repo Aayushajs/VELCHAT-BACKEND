@@ -207,6 +207,31 @@ export class AuthRepository implements RefreshStore {
     return row?.account_id ?? null;
   }
 
+  // ── OPRF contact discovery (§G2) — server-side self-registration ─────────────
+  /** The active OPRF secret key (shared DB with user-service). Null until first generated. */
+  async getActiveOprfKey(): Promise<{
+    n: string;
+    e: string;
+    d: string;
+    version: number;
+  } | null> {
+    const res = await this.pg.pool.query(
+      'SELECT n, e, d, version FROM oprf_keys WHERE is_active LIMIT 1',
+    );
+    return (
+      (res.rows[0] as { n: string; e: string; d: string; version: number } | undefined) ?? null
+    );
+  }
+
+  /** Register (idempotently) a discovery token → account so contacts can find this number. */
+  async registerOprfToken(token: string, accountId: string, keyVersion: number): Promise<void> {
+    await this.pg.pool.query(
+      `INSERT INTO oprf_discoverable(token, account_id, key_version) VALUES ($1, $2, $3)
+       ON CONFLICT (token) DO UPDATE SET account_id = $2, key_version = $3, updated_at = now()`,
+      [token, accountId, keyVersion],
+    );
+  }
+
   /** Atomically re-point the account's phone identifier to a new number on the SAME account_id. */
   async repointPhone(accountId: string, newNorm: string): Promise<void> {
     const client = await this.pg.pool.connect();
