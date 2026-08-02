@@ -10,7 +10,7 @@ import {
 import { AuthRepository, type DeviceRow } from './auth.repository';
 import { TokenService } from './tokens/token.service';
 import { ReverseOtpService, type InboundProof } from './reverse-otp/reverse-otp.service';
-import { OtpService } from './otp/otp.service';
+import { OtpService, normalizePhone } from './otp/otp.service';
 import { DeviceKeyService } from './dapt/device-key.service';
 import { MagicLinkService } from './dapt/magic-link.service';
 import { ApproveDeviceService } from './dapt/approve-device.service';
@@ -267,21 +267,31 @@ export class AuthService {
       throw new ValidationError('devicePubkeyBase64 must be a valid base64 string');
     }
 
-    // Dedup by phone: reuse the account already verified for this number, else provision one.
-    const existing = await this.repo.findVerifiedPhoneAccount(phone);
-    const accountId = existing ?? (await this.repo.createAccount('full'));
-    if (!existing) await this.repo.upsertVerifiedIdentifier(accountId, 'phone', phone);
+    // Dedup by phone on the NORMALIZED number (same normalization the OTP flow uses), so the
+    // same number in any format resolves to ONE account instead of spawning duplicates.
+    const phoneNorm = normalizePhone(phone);
+    let accountId = await this.repo.findVerifiedPhoneAccount(phoneNorm);
+    let isNew = false;
+    if (!accountId) {
+      const created = await this.repo.createAccount('full');
+      // Idempotent insert (ON CONFLICT DO NOTHING). If two first-logins for the same new number
+      // race, the loser's insert no-ops; re-read to adopt the winner's account (never proceed
+      // on the orphan we just created).
+      await this.repo.upsertVerifiedIdentifier(created, 'phone', phoneNorm);
+      accountId = (await this.repo.findVerifiedPhoneAccount(phoneNorm)) ?? created;
+      isNew = accountId === created;
+    }
 
     const deviceId = await this.repo.addDevice({
       accountId,
       platform,
       devicePubkey: Buffer.from(devicePubkeyBase64, 'base64'),
-      trusted: !existing, // first device on a fresh account is trusted (can approve future devices)
+      trusted: isNew, // first device on a fresh account is trusted (can approve future devices)
     });
 
-    await this.repo.audit(existing ? 'login.otp' : 'user.registered', accountId, deviceId);
-    if (!existing) await this.events.userCreated(accountId);
-    await this.events.deviceAdded(accountId, deviceId, !existing);
+    await this.repo.audit(isNew ? 'user.registered' : 'login.otp', accountId, deviceId);
+    if (isNew) await this.events.userCreated(accountId);
+    await this.events.deviceAdded(accountId, deviceId, isNew);
 
     return this.mintTokens(accountId, deviceId);
   }
