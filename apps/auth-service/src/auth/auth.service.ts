@@ -7,6 +7,7 @@ import {
   ConflictError,
   RateLimitError,
 } from '@velchat/common';
+import { deserializeOprfKey, directToken } from '@velchat/crypto';
 import { AuthRepository, type DeviceRow } from './auth.repository';
 import { TokenService } from './tokens/token.service';
 import { ReverseOtpService, type InboundProof } from './reverse-otp/reverse-otp.service';
@@ -293,7 +294,33 @@ export class AuthService {
     if (isNew) await this.events.userCreated(accountId);
     await this.events.deviceAdded(accountId, deviceId, isNew);
 
+    // Make this number discoverable to contacts WITHOUT the user ever opening "New Chat"
+    // (WhatsApp model). The server knows its own users' plaintext numbers, so it derives the
+    // exact same OPRF token a client would (directToken ≡ blind→evaluate→unblind, proven in
+    // @velchat/crypto) and registers it. Best-effort: never blocks or fails login.
+    await this.registerForDiscovery(accountId, phoneNorm);
+
     return this.mintTokens(accountId, deviceId);
+  }
+
+  /** Derive + register this account's OPRF discovery token for its own (plaintext) number, so
+   * contacts can find it. Idempotent + best-effort — a missing key (before user-service ever
+   * generated one) or any error just leaves the client's own opt-in registration as the path. */
+  private async registerForDiscovery(accountId: string, phoneNorm: string): Promise<void> {
+    try {
+      const keyRow = await this.repo.getActiveOprfKey();
+      if (!keyRow) return;
+      const key = deserializeOprfKey({
+        n: keyRow.n,
+        e: keyRow.e,
+        d: keyRow.d,
+        version: keyRow.version,
+      });
+      const token = directToken(phoneNorm, key);
+      await this.repo.registerOprfToken(token, accountId, keyRow.version);
+    } catch {
+      // best-effort: discovery still works via the client's opt-in registration.
+    }
   }
 
   /**

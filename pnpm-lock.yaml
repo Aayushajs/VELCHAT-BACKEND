@@ -220,6 +220,9 @@ importers:
       '@velchat/config':
         specifier: workspace:*
         version: link:../../libs/config
+      '@velchat/crypto':
+        specifier: workspace:^
+        version: link:../../libs/crypto
       '@velchat/database':
         specifier: workspace:*
         version: link:../../libs/database
