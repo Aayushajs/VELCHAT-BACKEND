@@ -297,8 +297,10 @@ export class OtpService {
   }
 }
 
-/** Normalize to E.164: digits only, forced leading '+'. */
-function normalizePhone(raw: string): string {
+/** Normalize to E.164: digits only, forced leading '+'. Exported so the account-dedup path
+ * (auth.service.verifyOtp) keys on the SAME normalized value the OTP flow uses — otherwise the
+ * same number in two formats maps to two accounts. */
+export function normalizePhone(raw: string): string {
   const digits = raw.replace(/[^\d]/g, '');
   return digits ? `+${digits}` : '';
 }

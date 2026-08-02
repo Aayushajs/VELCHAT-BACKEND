@@ -81,9 +81,13 @@ export class AuthRepository implements RefreshStore {
     kind: 'phone' | 'email',
     valueNorm: string,
   ): Promise<void> {
+    // Idempotent: a re-verify (or a concurrent first-login race) must not raise a 23505 unique
+    // violation → 500. The partial unique index is on (kind, value_norm) WHERE verified_at IS
+    // NOT NULL; matching that predicate lets DO NOTHING absorb the duplicate.
     await this.pg.pool.query(
       `INSERT INTO identifiers(account_id, kind, value_norm, value_hash, verified_at, is_primary)
-       VALUES ($1, $2, $3, $4, now(), true)`,
+       VALUES ($1, $2, $3, $4, now(), true)
+       ON CONFLICT (kind, value_norm) WHERE verified_at IS NOT NULL DO NOTHING`,
       [accountId, kind, valueNorm, sha256(valueNorm)],
     );
   }
