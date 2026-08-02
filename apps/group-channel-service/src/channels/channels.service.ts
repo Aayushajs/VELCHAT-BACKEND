@@ -112,6 +112,13 @@ export class ChannelsService {
     await this.repo.updateLastRead(conversationId, userId, seq);
   }
 
+  /** The inbox: every conversation the user belongs to (§M0 — lets a fresh install re-discover
+   * its DMs/groups; the client backfills messages per conversation via chat-service afterSeq). */
+  listUserConversations(userId: string): Promise<Array<Record<string, unknown>>> {
+    if (!userId) throw new ValidationError('userId is required');
+    return this.repo.listConversationsForUser(userId);
+  }
+
   private async assertAdmin(conversationId: string, actorId: string): Promise<void> {
     const role = await this.repo.getMemberRole(conversationId, actorId);
     if (role !== 'owner' && role !== 'admin') {

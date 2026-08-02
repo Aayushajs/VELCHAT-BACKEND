@@ -87,6 +87,26 @@ export class ChannelsRepository {
     return row ? Number(row.sender_key_epoch) : null;
   }
 
+  /**
+   * The inbox: every conversation the user is a member of (§M0 — the client has no other way
+   * to re-enumerate its DMs/groups after a reinstall/cold start; there is no message list here,
+   * the client backfills per conversation). Newest-created first; page-capped.
+   */
+  async listConversationsForUser(
+    userId: string,
+    limit = 500,
+  ): Promise<Array<Record<string, unknown>>> {
+    const res = await this.pg.pool.query(
+      `SELECT c.* FROM conversations c
+         JOIN conversation_members m ON m.conversation_id = c.conversation_id
+        WHERE m.user_id = $1
+        ORDER BY c.created_at DESC
+        LIMIT $2`,
+      [userId, limit],
+    );
+    return res.rows as Array<Record<string, unknown>>;
+  }
+
   // ── conversation details + channel discovery/update (§B7) ──
   async getConversation(conversationId: string): Promise<Record<string, unknown> | null> {
     const res = await this.pg.pool.query('SELECT * FROM conversations WHERE conversation_id = $1', [
