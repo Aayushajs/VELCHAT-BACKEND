@@ -5,8 +5,8 @@ name: keep-warm
 # service's /health on a schedule so they never sleep.
 #
 # Notes / caveats:
-#  - GitHub scheduled crons are BEST-EFFORT (can lag 5-15 min under load) — */10 leaves
-#    margin under the 15-min hibernation window.
+#  - GitHub scheduled crons are BEST-EFFORT (can lag 5-15 min under load) — */5 keeps a
+#    comfortable margin under the 15-min hibernation window even when a run lags.
 #  - Scheduled workflows only run from the DEFAULT branch (main) and are auto-disabled
 #    after 60 days with no repo activity — a nudge/commit re-enables them.
 #  - Runs are free for public repos; on a private repo they count against Actions minutes.
@@ -14,7 +14,7 @@ name: keep-warm
 
 on:
   schedule:
-    - cron: '*/10 * * * *' # every 10 minutes
+    - cron: '*/5 * * * *' # every 5 minutes
   workflow_dispatch: {} # allow manual "Run workflow"
 
 concurrency:
