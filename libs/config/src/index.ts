@@ -229,6 +229,10 @@ export const envSchema = z.object({
     .default('true')
     .transform((v) => v === 'true'),
   OTP_DEV_PHONE: z.string().optional(), // the single phone allowed to receive OTP in dev-mode
+  // Fixed code accepted for OTP_DEV_PHONE while OTP_DEV_MODE is on. Lets local/staging login
+  // testing send + verify with NO real SMS and NO send rate-limits. Ignored in prod, where
+  // OTP_DEV_MODE must be 'false' (then the dev fast-path is fully disabled).
+  OTP_DEV_CODE: z.string().default('123456'),
 });
 
 export type AppConfig = Readonly<z.infer<typeof envSchema>>;

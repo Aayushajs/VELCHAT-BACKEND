@@ -49,6 +49,10 @@ envVarGroups:
       # redeploy — set "false" to let any number verify (prod), or keep true + set OTP_DEV_PHONE.
       - { key: OTP_DEV_MODE, sync: false }
       - { key: OTP_DEV_PHONE, sync: false } # the one E.164 number allowed while dev-mode is on
+      # Fixed code the dev phone verifies against while dev-mode is on (code default = "123456").
+      # With OTP_DEV_MODE=true + OTP_DEV_PHONE set, that number gets an instant OTP with NO real
+      # SMS and NO send rate-limits — enter OTP_DEV_CODE to verify. Fully off when OTP_DEV_MODE=false.
+      - { key: OTP_DEV_CODE, sync: false }
       # Web Push (VAPID) — npx web-push generate-vapid-keys
       - { key: VAPID_PUBLIC_KEY, sync: false }
       - { key: VAPID_PRIVATE_KEY, sync: false }

@@ -52,6 +52,7 @@ export class AuthModule {
       template: deps.config.OTP_TEMPLATE,
       devMode: deps.config.OTP_DEV_MODE,
       devPhone: deps.config.OTP_DEV_PHONE,
+      devCode: deps.config.OTP_DEV_CODE,
     });
     const deviceKey = new DeviceKeyService(deps.redis);
     const baseUrl = process.env.PUBLIC_BASE_URL ?? 'http://localhost:8080';
