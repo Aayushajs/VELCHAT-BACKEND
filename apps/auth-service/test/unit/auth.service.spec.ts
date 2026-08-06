@@ -22,6 +22,7 @@ function makeAuth() {
     accountForDevice: jest.fn(async () => 'acc-1'),
     listDevices: jest.fn(async () => [{ device_id: 'dev-1' }, { device_id: 'dev-2' }]),
     revokeDeviceTokens: jest.fn(async () => undefined),
+    revokeAllAccountTokens: jest.fn(async () => undefined),
     revokeDevice: jest.fn(async () => undefined),
     findVerifiedPhoneAccount: jest.fn(async () => null),
     repointPhone: jest.fn(async () => undefined),
@@ -210,11 +211,13 @@ describe('AuthService orchestration', () => {
     expect(deps.approve.markApproved).toHaveBeenCalled();
   });
 
-  it('recovery completes after 2 factors + cooling-off and revokes all sessions', async () => {
+  it('recovery completes after 2 factors + cooling-off and revokes all sessions using batch query', async () => {
     const { svc, deps } = makeAuth();
     const res = await svc.recoveryComplete('R1');
     expect(res.recovered).toBe(true);
-    expect(deps.repo.revokeDeviceTokens).toHaveBeenCalledTimes(2); // one per device
+    // Batch query eliminates N+1 loop over devices.
+    expect(deps.repo.revokeAllAccountTokens).toHaveBeenCalledTimes(1);
+    expect(deps.repo.revokeAllAccountTokens).toHaveBeenCalledWith('acc-1');
   });
 
   it('recovery via backup code adds the backup-code factor', async () => {

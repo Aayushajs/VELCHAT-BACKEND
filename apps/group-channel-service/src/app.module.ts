@@ -35,7 +35,14 @@ export class AppModule {
       );
       const eventBus = createEventBus(deps.config, deps.logger);
       managed.push(pg, eventBus);
-      imports.push(ChannelsModule.forRoot({ pg, eventBus }));
+      imports.push(
+        ChannelsModule.forRoot({
+          pg,
+          eventBus,
+          jwtPublicKeyPem: process.env.JWT_PUBLIC_KEY ?? '',
+          jwtIssuer: deps.config.JWT_ISSUER ?? 'https://auth.velchat.local',
+        }),
+      );
     }
 
     const lifecycle = new InfraLifecycle(managed, deps.logger);

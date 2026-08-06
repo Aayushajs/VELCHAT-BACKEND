@@ -6,10 +6,12 @@ function makeChannels() {
   const repo = {
     createConversation: jest.fn(async () => true),
     addMember: jest.fn(async () => undefined),
+    addMembersBatch: jest.fn(async () => undefined),
     removeMember: jest.fn(async () => undefined),
     listMemberUserIds: jest.fn(async () => [] as string[]),
     getMemberRole: jest.fn(async (): Promise<MemberRole | null> => 'owner'),
     memberCount: jest.fn(async () => 2),
+    countByRole: jest.fn(async () => 2),
     updateLastRead: jest.fn(async () => undefined),
     bumpSenderKeyEpochIfGroup: jest.fn(async (): Promise<number | null> => 2),
   };
@@ -57,10 +59,19 @@ describe('ChannelsService (§B7)', () => {
     await expect(svc.createDm('a', '')).rejects.toBeInstanceOf(ValidationError);
   });
 
-  it('creates a group with the creator as owner', async () => {
+  it('creates a group with the creator as owner and members via batch insert', async () => {
     const { svc, repo, events } = makeChannels();
     await svc.createGroup('owner', 'Team', ['u2', 'u3']);
-    expect(repo.addMember).toHaveBeenCalledWith(expect.any(String), 'owner', 'owner');
+
+    // Verifies the N+1 fix: it should use a single batch query, not N addMember calls.
+    expect(repo.addMember).not.toHaveBeenCalled();
+    expect(repo.addMembersBatch).toHaveBeenCalledTimes(1);
+    expect(repo.addMembersBatch).toHaveBeenCalledWith(expect.any(String), [
+      { userId: 'owner', role: 'owner' },
+      { userId: 'u2', role: 'member' },
+      { userId: 'u3', role: 'member' },
+    ]);
+
     expect(events.conversationCreated).toHaveBeenCalledWith(
       expect.any(String),
       'group',

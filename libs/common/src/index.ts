@@ -31,6 +31,14 @@ export {
 } from './nest/observability.module';
 export { TenantInterceptor } from './nest/tenant.interceptor';
 export { ResponseInterceptor } from './nest/response.interceptor';
+export {
+  JwtAuthGuard,
+  Public,
+  IS_PUBLIC_KEY,
+  type VerifiedPrincipal,
+  type JwtAuthGuardOptions,
+} from './nest/jwt-auth.guard';
+export { CurrentUser } from './nest/current-user.decorator';
 export { AllExceptionsFilter } from './nest/all-exceptions.filter';
 export { requestIdMiddleware, requestIdOf, type RequestWithId } from './nest/request-id.middleware';
 export { bootstrapService, type BootstrapOptions } from './nest/bootstrap';

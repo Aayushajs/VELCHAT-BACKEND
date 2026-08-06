@@ -264,6 +264,18 @@ export class AuthRepository implements RefreshStore {
   }
 
   /**
+   * Batch-revoke ALL refresh tokens for an account across ALL its devices (§B2.7 recovery).
+   * Single query — eliminates the N+1 loop of revokeDeviceTokens-per-device.
+   */
+  async revokeAllAccountTokens(accountId: string): Promise<void> {
+    await this.pg.pool.query(
+      `UPDATE refresh_tokens SET revoked = true
+       WHERE device_id IN (SELECT device_id FROM devices WHERE account_id = $1)`,
+      [accountId],
+    );
+  }
+
+  /**
    * Mark a device revoked (remote sign-out / lost-stolen). Sets `revoked_at`, so getDevice /
    * getDevicePubkey / listDevices (all filter `revoked_at IS NULL`) stop returning it and
    * device-key login for it fails. Pair with revokeDeviceTokens() to also kill live sessions.
@@ -275,17 +287,24 @@ export class AuthRepository implements RefreshStore {
     );
   }
 
-  // ── Recovery backup codes (§B2.7) ────────────────────────────────────────
+  /** Store backup codes — BATCH INSERT in a single query (§perf: was N+1). */
   async storeBackupCodes(accountId: string, codeHashes: string[]): Promise<void> {
     await this.pg.pool.query('DELETE FROM recovery_backup_codes WHERE account_id = $1', [
       accountId,
     ]);
+    if (codeHashes.length === 0) return;
+    const values: unknown[] = [];
+    const placeholders: string[] = [];
+    let idx = 1;
     for (const codeHash of codeHashes) {
-      await this.pg.pool.query(
-        'INSERT INTO recovery_backup_codes(account_id, code_hash, used) VALUES ($1, $2, false)',
-        [accountId, codeHash],
-      );
+      placeholders.push(`($${idx}, $${idx + 1}, false)`);
+      values.push(accountId, codeHash);
+      idx += 2;
     }
+    await this.pg.pool.query(
+      `INSERT INTO recovery_backup_codes(account_id, code_hash, used) VALUES ${placeholders.join(', ')}`,
+      values,
+    );
   }
 
   /** Consume a backup code (single-use). Returns true if a matching unused code was found. */

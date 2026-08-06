@@ -104,9 +104,9 @@ export class AuthService {
 
   async recoveryComplete(recoveryId: string): Promise<{ recovered: true }> {
     const req = await this.recovery.assertCompletable(recoveryId);
-    // Full session revocation across all the account's devices (§B2.7).
-    const devices = await this.repo.listDevices(req.accountId);
-    for (const d of devices) await this.repo.revokeDeviceTokens(d.device_id);
+    // Full session revocation across ALL the account's devices (§B2.7).
+    // Single batch query — was N+1 (one revokeDeviceTokens per device).
+    await this.repo.revokeAllAccountTokens(req.accountId);
     await this.recovery.consume(recoveryId);
     await this.repo.audit('recovery.complete', req.accountId);
     return { recovered: true };
@@ -219,19 +219,11 @@ export class AuthService {
 
   /**
    * Read-only account snapshot for the profile header (identity + verified phone/email +
-   * created/last-active timestamps). The account is derived from the VERIFIED access
-   * token — never a caller-supplied id — so a user can only read ITS OWN account (no IDOR
-   * / PII leak). No migration, no change to the token/login path.
+   * created/last-active timestamps). The accountId is derived from the VERIFIED JWT by the
+   * controller guard — never a caller-supplied id — so a user can only read ITS OWN account
+   * (no IDOR / PII leak). No migration, no change to the token/login path.
    */
-  async getAccount(authHeader: string | undefined) {
-    const token = (authHeader ?? '').replace(/^Bearer\s+/i, '').trim();
-    if (!token) throw new UnauthorizedError('Missing access token');
-    let accountId: string;
-    try {
-      accountId = this.tokens.verifyAccess(token).account_id;
-    } catch {
-      throw new UnauthorizedError('Invalid or expired access token');
-    }
+  async getAccountById(accountId: string) {
     return this.repo.getAccountInfo(accountId);
   }
 
