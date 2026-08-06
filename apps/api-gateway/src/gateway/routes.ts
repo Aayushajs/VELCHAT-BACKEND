@@ -18,6 +18,11 @@ const R = (test: RegExp, service: string, port: number): Route => ({ test, servi
 
 export const ROUTES: Route[] = [
   R(/^\/(auth|\.well-known)(\/|$)/, 'AUTH', 3002),
+  // The bare inbox list (a user's conversations) is owned by group-channel (it holds the
+  // conversations + membership tables). MUST precede the chat rule below, which otherwise
+  // catches every /users/:id/conversations* — the sub-paths (/archived, /pinned, /:id/state)
+  // stay on chat-service.
+  R(/^\/users\/[^/]+\/conversations\/?$/, 'GROUP_CHANNEL', 3005),
   // chat-service extras reuse the /users prefix — match these BEFORE the user-service catch-all.
   R(/^\/users\/[^/]+\/(stars|conversations)(\/|$)/, 'CHAT', 3004),
   R(/^\/(users|orgs|workspaces|teams|memberships|authorize|admin|discovery)(\/|$)/, 'USER', 3003),

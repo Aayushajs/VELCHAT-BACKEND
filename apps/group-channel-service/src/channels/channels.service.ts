@@ -4,6 +4,9 @@ import { ChannelsEvents } from './channels.events';
 import { dmConversationId } from './dm-id';
 import { MAX_GROUP_MEMBERS, type MemberRole } from './conversation.types';
 
+/** Role rank: higher number = higher privilege. Used for role-rank enforcement. */
+const ROLE_RANK: Record<MemberRole, number> = { member: 0, admin: 1, owner: 2 };
+
 /** Conversation lifecycle + membership (§B7). Emits events that drive fan-out/notify/search. */
 export class ChannelsService {
   constructor(
@@ -11,9 +14,11 @@ export class ChannelsService {
     private readonly events: ChannelsEvents,
   ) {}
 
-  /** 1:1 DM — deterministic id, created at most once (dedupe). */
+  /** 1:1 DM — deterministic id, created at most once (dedupe). `a === b` is a self-chat
+   * ("Message yourself", WhatsApp-style): a single-member DM keyed by the same deterministic id. */
   async createDm(a: string, b: string): Promise<{ conversationId: string; created: boolean }> {
-    if (!a || !b || a === b) throw new ValidationError('two distinct users are required for a DM');
+    if (!a || !b) throw new ValidationError('two user ids are required for a DM');
+    const self = a === b;
     const conversationId = dmConversationId(a, b);
     const created = await this.repo.createConversation({
       conversationId,
@@ -22,12 +27,15 @@ export class ChannelsService {
     });
     if (created) {
       await this.repo.addMember(conversationId, a, 'member');
-      await this.repo.addMember(conversationId, b, 'member');
-      await this.events.conversationCreated(conversationId, 'dm', null, a, [a, b]);
+      if (!self) await this.repo.addMember(conversationId, b, 'member');
+      await this.events.conversationCreated(conversationId, 'dm', null, a, self ? [a] : [a, b]);
     }
     return { conversationId, created };
   }
 
+  /**
+   * §B7 group creation. Creator = owner. Members inserted in a SINGLE batch query (§perf).
+   */
   async createGroup(
     creator: string,
     name: string,
@@ -39,9 +47,16 @@ export class ChannelsService {
     }
     const conversationId = uuidv7();
     await this.repo.createConversation({ conversationId, type: 'group', name, createdBy: creator });
-    await this.repo.addMember(conversationId, creator, 'owner');
-    for (const u of memberIds)
-      if (u !== creator) await this.repo.addMember(conversationId, u, 'member');
+
+    // Batch insert: owner first, then members — single INSERT query (§perf: was N+1).
+    const batch = [
+      { userId: creator, role: 'owner' as MemberRole },
+      ...memberIds
+        .filter((u) => u !== creator)
+        .map((u) => ({ userId: u, role: 'member' as MemberRole })),
+    ];
+    await this.repo.addMembersBatch(conversationId, batch);
+
     await this.events.conversationCreated(conversationId, 'group', null, creator, members, {
       name,
     });
@@ -88,8 +103,22 @@ export class ChannelsService {
     await this.rotateEpoch(conversationId, 'member.added');
   }
 
+  /**
+   * Remove a member — with LAST-OWNER PROTECTION (§D4 audit fix #3):
+   * cannot remove the last owner of a group/channel.
+   */
   async removeMember(conversationId: string, actorId: string, userId: string): Promise<void> {
     await this.assertAdmin(conversationId, actorId);
+
+    // Last-owner protection: if the target is an owner, check that at least 2 owners exist.
+    const targetRole = await this.repo.getMemberRole(conversationId, userId);
+    if (targetRole === 'owner') {
+      const ownerCount = await this.repo.countByRole(conversationId, 'owner');
+      if (ownerCount <= 1) {
+        throw new ForbiddenError('Cannot remove the last owner — transfer ownership first');
+      }
+    }
+
     await this.repo.removeMember(conversationId, userId);
     await this.events.memberRemoved(conversationId, userId, null);
     await this.rotateEpoch(conversationId, 'member.removed');
@@ -112,6 +141,17 @@ export class ChannelsService {
     await this.repo.updateLastRead(conversationId, userId, seq);
   }
 
+  /** The inbox: every conversation the user belongs to (§M0 — lets a fresh install re-discover
+   * its DMs/groups; the client backfills messages per conversation via chat-service afterSeq). */
+  listUserConversations(userId: string): Promise<Array<Record<string, unknown>>> {
+    if (!userId) throw new ValidationError('userId is required');
+    return this.repo.listConversationsForUser(userId);
+  }
+
+  /**
+   * Assert actor is an owner or admin (§B7 membership ACL).
+   * Role hierarchy: owner > admin > member.
+   */
   private async assertAdmin(conversationId: string, actorId: string): Promise<void> {
     const role = await this.repo.getMemberRole(conversationId, actorId);
     if (role !== 'owner' && role !== 'admin') {
@@ -172,19 +212,65 @@ export class ChannelsService {
     return { message: 'Joined channel.' };
   }
 
+  /**
+   * Leave a channel — with LAST-OWNER PROTECTION (§D4 audit fix #3):
+   * the last owner cannot leave without transferring ownership first.
+   */
   async leaveChannel(conversationId: string, userId: string): Promise<{ message: string }> {
+    const role = await this.repo.getMemberRole(conversationId, userId);
+    if (role === 'owner') {
+      const ownerCount = await this.repo.countByRole(conversationId, 'owner');
+      if (ownerCount <= 1) {
+        throw new ForbiddenError('Cannot leave as the last owner — transfer ownership first');
+      }
+    }
     await this.repo.removeMember(conversationId, userId);
     await this.events.memberRemoved(conversationId, userId, null);
     return { message: 'Left channel.' };
   }
 
+  /**
+   * Set a member's role — with LAST-OWNER PROTECTION and ROLE-RANK checks (§D4 audit fix #2 + #3):
+   * 1. Cannot demote the last owner.
+   * 2. Only an owner can promote to owner.
+   * 3. An admin cannot change another admin's or owner's role.
+   */
   async setMemberRole(
     conversationId: string,
     actorId: string,
     userId: string,
     role: MemberRole,
   ): Promise<{ message: string }> {
-    await this.assertAdmin(conversationId, actorId);
+    // Get actor's role for rank checks.
+    const actorRole = await this.repo.getMemberRole(conversationId, actorId);
+    if (!actorRole || ROLE_RANK[actorRole] < ROLE_RANK['admin']) {
+      throw new ForbiddenError('only an owner or admin can manage roles');
+    }
+
+    // Rank check: actor can only set roles BELOW their own rank (except owners, who can do anything).
+    if (actorRole !== 'owner' && ROLE_RANK[role] >= ROLE_RANK[actorRole]) {
+      throw new ForbiddenError('cannot assign a role equal to or above your own');
+    }
+
+    // Only owners can promote to owner.
+    if (role === 'owner' && actorRole !== 'owner') {
+      throw new ForbiddenError('only an owner can promote to owner');
+    }
+
+    // Last-owner protection: if demoting FROM owner → check owner count ≥ 2.
+    const targetRole = await this.repo.getMemberRole(conversationId, userId);
+    if (targetRole === 'owner' && role !== 'owner') {
+      const ownerCount = await this.repo.countByRole(conversationId, 'owner');
+      if (ownerCount <= 1) {
+        throw new ForbiddenError('Cannot demote the last owner — promote another member first');
+      }
+    }
+
+    // Rank check: actor cannot change the role of someone with equal or higher rank (unless owner).
+    if (targetRole && actorRole !== 'owner' && ROLE_RANK[targetRole] >= ROLE_RANK[actorRole]) {
+      throw new ForbiddenError('cannot change the role of a member with equal or higher rank');
+    }
+
     await this.repo.setMemberRole(conversationId, userId, role);
     return { message: `Role updated to ${role}.` };
   }

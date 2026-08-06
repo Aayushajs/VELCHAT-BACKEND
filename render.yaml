@@ -39,6 +39,20 @@ envVarGroups:
       # Reverse-OTP (₹0 verification, §B2.2) — Asterisk/FreeSWITCH webhook
       - { key: REVOTP_WEBHOOK_SECRET, sync: false }
       - { key: REVOTP_DID, sync: false } # owned inbound number users missed-call / SMS
+      # 2Factor.in SMS OTP (§B2) — the PRIMARY phone verification for the mobile app.
+      # Without these the auth-service stays in fail-closed dev-mode and returns 403
+      # ("only the configured dev phone may receive an OTP") for every number.
+      - { key: OTP_API_KEY, sync: false } # 2Factor.in API key
+      - { key: OTP_TEMPLATE, sync: false } # DLT-approved template name (default: Temp1)
+      # SAFETY fuse (code default = "true"): while true, ONLY OTP_DEV_PHONE receives an OTP.
+      # Dashboard-controlled (sync:false) so the blueprint never OVERWRITES your choice on a
+      # redeploy — set "false" to let any number verify (prod), or keep true + set OTP_DEV_PHONE.
+      - { key: OTP_DEV_MODE, sync: false }
+      - { key: OTP_DEV_PHONE, sync: false } # the one E.164 number allowed while dev-mode is on
+      # Fixed code the dev phone verifies against while dev-mode is on (code default = "123456").
+      # With OTP_DEV_MODE=true + OTP_DEV_PHONE set, that number gets an instant OTP with NO real
+      # SMS and NO send rate-limits — enter OTP_DEV_CODE to verify. Fully off when OTP_DEV_MODE=false.
+      - { key: OTP_DEV_CODE, sync: false }
       # Web Push (VAPID) — npx web-push generate-vapid-keys
       - { key: VAPID_PUBLIC_KEY, sync: false }
       - { key: VAPID_PRIVATE_KEY, sync: false }

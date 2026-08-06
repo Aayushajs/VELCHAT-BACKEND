@@ -7,10 +7,11 @@ import {
   ConflictError,
   RateLimitError,
 } from '@velchat/common';
+import { deserializeOprfKey, directToken } from '@velchat/crypto';
 import { AuthRepository, type DeviceRow } from './auth.repository';
 import { TokenService } from './tokens/token.service';
 import { ReverseOtpService, type InboundProof } from './reverse-otp/reverse-otp.service';
-import { OtpService } from './otp/otp.service';
+import { OtpService, normalizePhone } from './otp/otp.service';
 import { DeviceKeyService } from './dapt/device-key.service';
 import { MagicLinkService } from './dapt/magic-link.service';
 import { ApproveDeviceService } from './dapt/approve-device.service';
@@ -103,9 +104,9 @@ export class AuthService {
 
   async recoveryComplete(recoveryId: string): Promise<{ recovered: true }> {
     const req = await this.recovery.assertCompletable(recoveryId);
-    // Full session revocation across all the account's devices (§B2.7).
-    const devices = await this.repo.listDevices(req.accountId);
-    for (const d of devices) await this.repo.revokeDeviceTokens(d.device_id);
+    // Full session revocation across ALL the account's devices (§B2.7).
+    // Single batch query — was N+1 (one revokeDeviceTokens per device).
+    await this.repo.revokeAllAccountTokens(req.accountId);
     await this.recovery.consume(recoveryId);
     await this.repo.audit('recovery.complete', req.accountId);
     return { recovered: true };
@@ -216,6 +217,16 @@ export class AuthService {
     return { sessionId, expiresIn: Math.max(0, Math.floor((expiresAt - Date.now()) / 1000)) };
   }
 
+  /**
+   * Read-only account snapshot for the profile header (identity + verified phone/email +
+   * created/last-active timestamps). The accountId is derived from the VERIFIED JWT by the
+   * controller guard — never a caller-supplied id — so a user can only read ITS OWN account
+   * (no IDOR / PII leak). No migration, no change to the token/login path.
+   */
+  async getAccountById(accountId: string) {
+    return this.repo.getAccountInfo(accountId);
+  }
+
   // ── 2Factor.in SMS OTP (additive auth method) ───────────────────────────
   /** Send an SMS OTP via 2Factor (AUTOGEN). 2Factor owns the code; we only track send/lock metadata. */
   async sendOtp(
@@ -249,23 +260,59 @@ export class AuthService {
       throw new ValidationError('devicePubkeyBase64 must be a valid base64 string');
     }
 
-    // Dedup by phone: reuse the account already verified for this number, else provision one.
-    const existing = await this.repo.findVerifiedPhoneAccount(phone);
-    const accountId = existing ?? (await this.repo.createAccount('full'));
-    if (!existing) await this.repo.upsertVerifiedIdentifier(accountId, 'phone', phone);
+    // Dedup by phone on the NORMALIZED number (same normalization the OTP flow uses), so the
+    // same number in any format resolves to ONE account instead of spawning duplicates.
+    const phoneNorm = normalizePhone(phone);
+    let accountId = await this.repo.findVerifiedPhoneAccount(phoneNorm);
+    let isNew = false;
+    if (!accountId) {
+      const created = await this.repo.createAccount('full');
+      // Idempotent insert (ON CONFLICT DO NOTHING). If two first-logins for the same new number
+      // race, the loser's insert no-ops; re-read to adopt the winner's account (never proceed
+      // on the orphan we just created).
+      await this.repo.upsertVerifiedIdentifier(created, 'phone', phoneNorm);
+      accountId = (await this.repo.findVerifiedPhoneAccount(phoneNorm)) ?? created;
+      isNew = accountId === created;
+    }
 
     const deviceId = await this.repo.addDevice({
       accountId,
       platform,
       devicePubkey: Buffer.from(devicePubkeyBase64, 'base64'),
-      trusted: !existing, // first device on a fresh account is trusted (can approve future devices)
+      trusted: isNew, // first device on a fresh account is trusted (can approve future devices)
     });
 
-    await this.repo.audit(existing ? 'login.otp' : 'user.registered', accountId, deviceId);
-    if (!existing) await this.events.userCreated(accountId);
-    await this.events.deviceAdded(accountId, deviceId, !existing);
+    await this.repo.audit(isNew ? 'user.registered' : 'login.otp', accountId, deviceId);
+    if (isNew) await this.events.userCreated(accountId);
+    await this.events.deviceAdded(accountId, deviceId, isNew);
+
+    // Make this number discoverable to contacts WITHOUT the user ever opening "New Chat"
+    // (WhatsApp model). The server knows its own users' plaintext numbers, so it derives the
+    // exact same OPRF token a client would (directToken ≡ blind→evaluate→unblind, proven in
+    // @velchat/crypto) and registers it. Best-effort: never blocks or fails login.
+    await this.registerForDiscovery(accountId, phoneNorm);
 
     return this.mintTokens(accountId, deviceId);
+  }
+
+  /** Derive + register this account's OPRF discovery token for its own (plaintext) number, so
+   * contacts can find it. Idempotent + best-effort — a missing key (before user-service ever
+   * generated one) or any error just leaves the client's own opt-in registration as the path. */
+  private async registerForDiscovery(accountId: string, phoneNorm: string): Promise<void> {
+    try {
+      const keyRow = await this.repo.getActiveOprfKey();
+      if (!keyRow) return;
+      const key = deserializeOprfKey({
+        n: keyRow.n,
+        e: keyRow.e,
+        d: keyRow.d,
+        version: keyRow.version,
+      });
+      const token = directToken(phoneNorm, key);
+      await this.repo.registerOprfToken(token, accountId, keyRow.version);
+    } catch {
+      // best-effort: discovery still works via the client's opt-in registration.
+    }
   }
 
   /**

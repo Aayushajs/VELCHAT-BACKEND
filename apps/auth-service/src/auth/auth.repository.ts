@@ -29,15 +29,65 @@ export class AuthRepository implements RefreshStore {
     return accountId;
   }
 
+  /**
+   * Read-only account snapshot for the profile header (§B2.1): identity + the verified
+   * phone/email attributes. No migration — every column already exists (accounts +
+   * identifiers). Never touches the token/login path.
+   */
+  async getAccountInfo(accountId: string): Promise<{
+    accountId: string;
+    status: string;
+    tier: string;
+    createdAt: Date;
+    lastActiveAt: Date;
+    phone: string | null;
+    email: string | null;
+  } | null> {
+    const acc = await this.pg.pool.query(
+      'SELECT account_id, status, tier, created_at, last_active_at FROM accounts WHERE account_id = $1',
+      [accountId],
+    );
+    const row = acc.rows[0] as
+      | {
+          account_id: string;
+          status: string;
+          tier: string;
+          created_at: Date;
+          last_active_at: Date;
+        }
+      | undefined;
+    if (!row) return null;
+    const ids = await this.pg.pool.query(
+      `SELECT kind, value_norm FROM identifiers
+         WHERE account_id = $1 AND verified_at IS NOT NULL
+         ORDER BY is_primary DESC, verified_at DESC`,
+      [accountId],
+    );
+    const idRows = ids.rows as Array<{ kind: string; value_norm: string }>;
+    return {
+      accountId: row.account_id,
+      status: row.status,
+      tier: row.tier,
+      createdAt: row.created_at,
+      lastActiveAt: row.last_active_at,
+      phone: idRows.find((r) => r.kind === 'phone')?.value_norm ?? null,
+      email: idRows.find((r) => r.kind === 'email')?.value_norm ?? null,
+    };
+  }
+
   /** Re-verifiable attribute. `value_hash` powers contact discovery / lookup (§B2.1). */
   async upsertVerifiedIdentifier(
     accountId: string,
     kind: 'phone' | 'email',
     valueNorm: string,
   ): Promise<void> {
+    // Idempotent: a re-verify (or a concurrent first-login race) must not raise a 23505 unique
+    // violation → 500. The partial unique index is on (kind, value_norm) WHERE verified_at IS
+    // NOT NULL; matching that predicate lets DO NOTHING absorb the duplicate.
     await this.pg.pool.query(
       `INSERT INTO identifiers(account_id, kind, value_norm, value_hash, verified_at, is_primary)
-       VALUES ($1, $2, $3, $4, now(), true)`,
+       VALUES ($1, $2, $3, $4, now(), true)
+       ON CONFLICT (kind, value_norm) WHERE verified_at IS NOT NULL DO NOTHING`,
       [accountId, kind, valueNorm, sha256(valueNorm)],
     );
   }
@@ -157,6 +207,31 @@ export class AuthRepository implements RefreshStore {
     return row?.account_id ?? null;
   }
 
+  // ── OPRF contact discovery (§G2) — server-side self-registration ─────────────
+  /** The active OPRF secret key (shared DB with user-service). Null until first generated. */
+  async getActiveOprfKey(): Promise<{
+    n: string;
+    e: string;
+    d: string;
+    version: number;
+  } | null> {
+    const res = await this.pg.pool.query(
+      'SELECT n, e, d, version FROM oprf_keys WHERE is_active LIMIT 1',
+    );
+    return (
+      (res.rows[0] as { n: string; e: string; d: string; version: number } | undefined) ?? null
+    );
+  }
+
+  /** Register (idempotently) a discovery token → account so contacts can find this number. */
+  async registerOprfToken(token: string, accountId: string, keyVersion: number): Promise<void> {
+    await this.pg.pool.query(
+      `INSERT INTO oprf_discoverable(token, account_id, key_version) VALUES ($1, $2, $3)
+       ON CONFLICT (token) DO UPDATE SET account_id = $2, key_version = $3, updated_at = now()`,
+      [token, accountId, keyVersion],
+    );
+  }
+
   /** Atomically re-point the account's phone identifier to a new number on the SAME account_id. */
   async repointPhone(accountId: string, newNorm: string): Promise<void> {
     const client = await this.pg.pool.connect();
@@ -189,6 +264,18 @@ export class AuthRepository implements RefreshStore {
   }
 
   /**
+   * Batch-revoke ALL refresh tokens for an account across ALL its devices (§B2.7 recovery).
+   * Single query — eliminates the N+1 loop of revokeDeviceTokens-per-device.
+   */
+  async revokeAllAccountTokens(accountId: string): Promise<void> {
+    await this.pg.pool.query(
+      `UPDATE refresh_tokens SET revoked = true
+       WHERE device_id IN (SELECT device_id FROM devices WHERE account_id = $1)`,
+      [accountId],
+    );
+  }
+
+  /**
    * Mark a device revoked (remote sign-out / lost-stolen). Sets `revoked_at`, so getDevice /
    * getDevicePubkey / listDevices (all filter `revoked_at IS NULL`) stop returning it and
    * device-key login for it fails. Pair with revokeDeviceTokens() to also kill live sessions.
@@ -200,17 +287,24 @@ export class AuthRepository implements RefreshStore {
     );
   }
 
-  // ── Recovery backup codes (§B2.7) ────────────────────────────────────────
+  /** Store backup codes — BATCH INSERT in a single query (§perf: was N+1). */
   async storeBackupCodes(accountId: string, codeHashes: string[]): Promise<void> {
     await this.pg.pool.query('DELETE FROM recovery_backup_codes WHERE account_id = $1', [
       accountId,
     ]);
+    if (codeHashes.length === 0) return;
+    const values: unknown[] = [];
+    const placeholders: string[] = [];
+    let idx = 1;
     for (const codeHash of codeHashes) {
-      await this.pg.pool.query(
-        'INSERT INTO recovery_backup_codes(account_id, code_hash, used) VALUES ($1, $2, false)',
-        [accountId, codeHash],
-      );
+      placeholders.push(`($${idx}, $${idx + 1}, false)`);
+      values.push(accountId, codeHash);
+      idx += 2;
     }
+    await this.pg.pool.query(
+      `INSERT INTO recovery_backup_codes(account_id, code_hash, used) VALUES ${placeholders.join(', ')}`,
+      values,
+    );
   }
 
   /** Consume a backup code (single-use). Returns true if a matching unused code was found. */

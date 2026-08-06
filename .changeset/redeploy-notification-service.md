@@ -1,5 +1,5 @@
 ---
-"@velchat/notification-service": patch
+'@velchat/notification-service': patch
 ---
 
 chore: trigger redeploy with version bump

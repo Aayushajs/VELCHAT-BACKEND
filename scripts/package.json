@@ -1,6 +1,6 @@
 {
   "name": "@velchat/scripts",
-  "version": "0.1.1",
+  "version": "0.1.5",
   "private": true,
   "type": "module",
   "description": "Operational check scripts — verify env-driven integrations (mail, push/FCM, calls/LiveKit, OTP) actually work with the keys in .env.",

@@ -198,10 +198,11 @@ describe('OtpService (2Factor.in SMS OTP)', () => {
     await expect(svc.send(PHONE)).rejects.toMatchObject({ code: 'CONFLICT', httpStatus: 409 });
   });
 
-  it('dev-mode allows only the configured dev phone', async () => {
+  it('dev-mode allows only the configured dev phone (via the no-SMS fast-path)', async () => {
     const { svc } = makeService({ devMode: true });
     const res = await svc.send(DEV_PHONE);
-    expect(res.message).toBe('OTP sent');
+    expect(res.message).toBe('OTP sent (dev)');
+    expect(mockedAxios.get).not.toHaveBeenCalled();
   });
 
   it('dev-mode rejects any other phone with 403 (no SMS spent)', async () => {
@@ -224,5 +225,41 @@ describe('OtpService (2Factor.in SMS OTP)', () => {
   it('returns a clean error when OTP_API_KEY is not configured', async () => {
     const { svc } = makeService({ apiKey: undefined });
     await expect(svc.send(PHONE)).rejects.toMatchObject({ code: 'OTP_NOT_CONFIGURED' });
+  });
+
+  // ── dev fast-path (OTP_DEV_MODE=true, dev phone): no SMS, no rate-limit, fixed code ──
+  it('dev phone: send skips 2Factor + send rate-limits and verifies with the fixed devCode', async () => {
+    const { svc } = makeService({
+      devMode: true,
+      devPhone: DEV_PHONE,
+      devCode: '000111',
+      apiKey: undefined, // dev path must work even without an SMS key
+    });
+    const res = await svc.send(DEV_PHONE);
+    expect(res).toEqual({ message: 'OTP sent (dev)', resendAfter: 0, expiresIn: 900 });
+    // Rapid resends are NOT throttled for the dev phone, and no SMS provider is ever hit.
+    await svc.send(DEV_PHONE);
+    await svc.send(DEV_PHONE);
+    await svc.send(DEV_PHONE);
+    expect(mockedAxios.get).not.toHaveBeenCalled();
+    const v = await svc.verify(DEV_PHONE, '000111');
+    expect(v).toEqual({ verified: true });
+    expect(mockedAxios.get).not.toHaveBeenCalled();
+  });
+
+  it('dev phone: verify rejects a wrong code with 401 and never calls 2Factor', async () => {
+    const { svc } = makeService({ devMode: true, devPhone: DEV_PHONE, devCode: '000111' });
+    await svc.send(DEV_PHONE);
+    await expect(svc.verify(DEV_PHONE, '999999')).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+      httpStatus: 401,
+    });
+    expect(mockedAxios.get).not.toHaveBeenCalled();
+  });
+
+  it('dev-mode fuse still blocks any NON-dev number (no fast-path leak, no SMS)', async () => {
+    const { svc } = makeService({ devMode: true, devPhone: DEV_PHONE });
+    await expect(svc.send(PHONE)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockedAxios.get).not.toHaveBeenCalled();
   });
 });

@@ -41,6 +41,7 @@ export interface OtpServiceOptions {
   template?: string;
   devMode?: boolean;
   devPhone?: string;
+  devCode?: string; // fixed code the dev phone verifies against in dev-mode — default '123456'
   otpTtlSec?: number; // OTP lifetime — default 15 min
   resendAfterSec?: number; // min gap between sends — default 2 min
   maxSendsPerWindow?: number; // sends allowed per window — default 3
@@ -71,6 +72,7 @@ export class OtpService {
   private readonly template: string;
   private readonly devMode: boolean;
   private readonly devPhone?: string;
+  private readonly devCode: string;
   private readonly otpTtlSec: number;
   private readonly resendAfterSec: number;
   private readonly maxSendsPerWindow: number;
@@ -89,6 +91,7 @@ export class OtpService {
     this.template = opts.template ?? 'Temp1';
     this.devMode = opts.devMode ?? true; // fail-closed: default to dev-mode so we never mass-send
     this.devPhone = opts.devPhone;
+    this.devCode = opts.devCode ?? '123456';
     this.otpTtlSec = opts.otpTtlSec ?? 15 * 60;
     this.resendAfterSec = opts.resendAfterSec ?? 2 * 60;
     this.maxSendsPerWindow = opts.maxSendsPerWindow ?? 3;
@@ -104,6 +107,17 @@ export class OtpService {
   ): Promise<{ message: string; resendAfter: number; expiresIn: number }> {
     const phone = this.requireValidPhone(phoneRaw);
     this.assertDevPhoneAllowed(phone);
+
+    // Dev fast-path: for the configured dev phone in dev-mode, skip the SMS provider AND the
+    // resend/send-rate guards entirely — no real SMS is spent and repeated login testing is
+    // never throttled. `verify()` accepts the fixed `devCode`. Disabled in prod (devMode=false).
+    if (this.isDevPhone(phone)) {
+      await this.store.putActive(phone, { phone, sentAt: Date.now() }, this.otpTtlSec);
+      await this.store.delAttempts(phone);
+      this.logger.info({ phone, action: 'otp.send', status: 'dev' }, 'OTP dev-mode send (no SMS)');
+      return { message: 'OTP sent (dev)', resendAfter: 0, expiresIn: this.otpTtlSec };
+    }
+
     const apiKey = this.requireApiKey();
 
     // Serialise concurrent send() for this phone → blocks parallel/duplicate OTP generation (race-safe).
@@ -170,7 +184,6 @@ export class OtpService {
     if (!/^\d{4,8}$/.test(otp)) {
       throw new ValidationError('otp must be a 4–8 digit code');
     }
-    const apiKey = this.requireApiKey();
 
     // Brute-force lock: reject while a verification lock is active.
     const lockTtl = await this.store.verifyLockTtl(phone);
@@ -201,10 +214,20 @@ export class OtpService {
       });
     }
 
-    const resp = await this.call(
-      `${TWO_FACTOR_BASE}/${apiKey}/SMS/VERIFY3/${encodeURIComponent(phone)}/${encodeURIComponent(otp)}`,
-    );
-    if (resp.Status !== 'Success') {
+    // Dev phone verifies against the fixed `devCode` (no 2Factor, no SMS); every other
+    // number goes to 2Factor VERIFY3. The lock / attempt-count / single-active rules above
+    // apply to BOTH paths, so the dev phone still gets brute-force protection.
+    let ok: boolean;
+    if (this.isDevPhone(phone)) {
+      ok = otp === this.devCode;
+    } else {
+      const apiKey = this.requireApiKey();
+      const resp = await this.call(
+        `${TWO_FACTOR_BASE}/${apiKey}/SMS/VERIFY3/${encodeURIComponent(phone)}/${encodeURIComponent(otp)}`,
+      );
+      ok = resp.Status === 'Success';
+    }
+    if (!ok) {
       this.logger.info(
         { phone, action: 'otp.verify', status: 'invalid' },
         'OTP verification failed',
@@ -255,6 +278,13 @@ export class OtpService {
     return phone;
   }
 
+  /** True for the configured dev phone while dev-mode is on → the OTP fast-path (no SMS, no
+   * send rate-limit, fixed `devCode`). Always false in prod (OTP_DEV_MODE='false'). */
+  private isDevPhone(phone: string): boolean {
+    if (!this.devMode || !this.devPhone) return false;
+    return phone === normalizePhone(this.devPhone);
+  }
+
   /** Dev-mode fuse: while on, only OTP_DEV_PHONE may receive an OTP — no SMS spent on other numbers. */
   private assertDevPhoneAllowed(phone: string): void {
     if (!this.devMode) return;
@@ -267,8 +297,10 @@ export class OtpService {
   }
 }
 
-/** Normalize to E.164: digits only, forced leading '+'. */
-function normalizePhone(raw: string): string {
+/** Normalize to E.164: digits only, forced leading '+'. Exported so the account-dedup path
+ * (auth.service.verifyOtp) keys on the SAME normalized value the OTP flow uses — otherwise the
+ * same number in two formats maps to two accounts. */
+export function normalizePhone(raw: string): string {
   const digits = raw.replace(/[^\d]/g, '');
   return digits ? `+${digits}` : '';
 }

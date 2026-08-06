@@ -28,4 +28,8 @@ On push to `main`, the **release** GitHub Action:
 2. When that PR is merged → the action creates **git tags** (`<pkg>@<version>`) and **GitHub
    Releases**. No npm publish (all packages are `private`).
 
+> If your repository disables “Allow GitHub Actions to create and approve pull requests”, set a
+> `CHANGESETS_GITHUB_TOKEN` secret (PAT with repo permissions) so the release workflow can open
+> the version PR.
+
 You never edit versions or changelogs by hand.

@@ -1,5 +1,51 @@
 # @velchat/scripts
 
+## 0.1.5
+
+### Patch Changes
+
+- Updated dependencies [e1a4b61]
+  - @velchat/config@0.3.0
+  - @velchat/common@0.3.1
+  - @velchat/mail@0.2.4
+  - @velchat/push@0.2.4
+  - @velchat/storage@0.2.1
+
+## 0.1.4
+
+### Patch Changes
+
+- Updated dependencies [2b1d811]
+- Updated dependencies [0ec403d]
+- Updated dependencies [bb29628]
+  - @velchat/storage@0.2.0
+  - @velchat/common@0.3.0
+  - @velchat/config@0.2.0
+  - @velchat/mail@0.2.3
+  - @velchat/push@0.2.3
+
+## 0.1.3
+
+### Patch Changes
+
+- Updated dependencies [676071e]
+  - @velchat/common@0.2.1
+  - @velchat/mail@0.2.2
+  - @velchat/push@0.2.2
+  - @velchat/storage@0.1.3
+
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [d9578ad]
+- Updated dependencies [c3d39ff]
+  - @velchat/common@0.2.0
+  - @velchat/config@0.1.2
+  - @velchat/mail@0.2.1
+  - @velchat/push@0.2.1
+  - @velchat/storage@0.1.2
+
 ## 0.1.1
 
 ### Patch Changes
