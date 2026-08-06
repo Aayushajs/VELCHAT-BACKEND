@@ -1,28 +1,34 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsBoolean, IsIn, IsOptional, IsString, IsNotEmpty } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsNotEmpty,
+  IsUUID,
+} from 'class-validator';
 import type { MemberRole } from './conversation.types';
 
 /** Request bodies for the conversation/membership API (§B7). Classes (not interfaces) so Swagger
- * reads the @ApiProperty schema and the global ValidationPipe enforces class-validator rules. */
+ * reads the @ApiProperty schema and the global ValidationPipe enforces class-validator rules.
+ *
+ * §D4 principal binding: `actorId` / `creator` / self-action `userId` fields have been REMOVED.
+ * The acting user is now derived from the VERIFIED JWT (@CurrentUser decorator) — never from the
+ * request body. Fields that remain in DTOs are TARGET identifiers (e.g., the user to add/remove).
+ */
 
 export class CreateDmDto {
   @ApiProperty({ description: 'First participant account_id (UUIDv7).' })
-  @IsString()
-  @IsNotEmpty()
+  @IsUUID()
   a!: string;
 
   @ApiProperty({ description: 'Second participant account_id (UUIDv7).' })
-  @IsString()
-  @IsNotEmpty()
+  @IsUUID()
   b!: string;
 }
 
 export class CreateGroupDto {
-  @ApiProperty({ description: 'Creator account_id — becomes the group owner.' })
-  @IsString()
-  @IsNotEmpty()
-  creator!: string;
-
   @ApiProperty({ description: 'Group display name.', example: 'Weekend Trip' })
   @IsString()
   @IsNotEmpty()
@@ -34,20 +40,14 @@ export class CreateGroupDto {
   })
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
+  @IsUUID(undefined, { each: true })
   members?: string[];
 }
 
 export class CreateChannelDto {
   @ApiProperty({ description: 'Owning tenant (org/workspace) id — channels are tenant-scoped.' })
-  @IsString()
-  @IsNotEmpty()
+  @IsUUID()
   tenantId!: string;
-
-  @ApiProperty({ description: 'Creator account_id — becomes the channel owner.' })
-  @IsString()
-  @IsNotEmpty()
-  creator!: string;
 
   @ApiProperty({ description: 'Channel name.', example: 'engineering' })
   @IsString()
@@ -69,14 +69,8 @@ export class CreateChannelDto {
 }
 
 export class AddMemberDto {
-  @ApiProperty({ description: 'Acting user — must be an owner or admin of the conversation.' })
-  @IsString()
-  @IsNotEmpty()
-  actorId!: string;
-
   @ApiProperty({ description: 'Account_id of the user to add.' })
-  @IsString()
-  @IsNotEmpty()
+  @IsUUID()
   userId!: string;
 
   @ApiPropertyOptional({ enum: ['owner', 'admin', 'member'], default: 'member' })
@@ -86,11 +80,6 @@ export class AddMemberDto {
 }
 
 export class UpdateChannelDto {
-  @ApiProperty({ description: 'Acting user — owner/admin only.' })
-  @IsString()
-  @IsNotEmpty()
-  actorId!: string;
-
   @ApiPropertyOptional() @IsOptional() @IsString() name?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() topic?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() avatarMediaId?: string;
@@ -104,30 +93,13 @@ export class UpdateChannelDto {
   isAnnouncement?: boolean;
 }
 
-export class JoinLeaveDto {
-  @ApiProperty({ description: 'Account_id joining/leaving.' })
-  @IsString()
-  @IsNotEmpty()
-  userId!: string;
-}
-
 export class SetRoleDto {
-  @ApiProperty({ description: 'Acting user — owner/admin only.' })
-  @IsString()
-  @IsNotEmpty()
-  actorId!: string;
-
   @ApiProperty({ enum: ['owner', 'admin', 'member'] })
   @IsIn(['owner', 'admin', 'member'])
   role!: MemberRole;
 }
 
 export class SetNotifDto {
-  @ApiProperty({ description: 'The member setting their own level.' })
-  @IsString()
-  @IsNotEmpty()
-  userId!: string;
-
   @ApiProperty({ enum: ['all', 'mentions', 'none'] })
   @IsIn(['all', 'mentions', 'none'])
   level!: string;
@@ -139,25 +111,14 @@ export class CreateCommunityDto {
   @IsNotEmpty()
   name!: string;
 
-  @ApiProperty({ description: 'Creator account_id.' })
-  @IsString()
-  @IsNotEmpty()
-  creator!: string;
-
   @ApiPropertyOptional({ description: 'Owning org id (optional).' })
   @IsOptional()
-  @IsString()
+  @IsUUID()
   orgId?: string;
 }
 
 export class AttachChannelDto {
   @ApiProperty({ description: 'Channel (conversation) id to add to the community.' })
-  @IsString()
-  @IsNotEmpty()
+  @IsUUID()
   conversationId!: string;
-
-  @ApiProperty({ description: 'Acting user — owner/admin of the channel.' })
-  @IsString()
-  @IsNotEmpty()
-  actorId!: string;
 }
