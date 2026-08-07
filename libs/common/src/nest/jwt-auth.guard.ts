@@ -3,11 +3,18 @@ import {
   CanActivate,
   ExecutionContext,
   SetMetadata,
+  Inject,
   type CustomDecorator,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { createVerify, createPublicKey } from 'node:crypto';
 import { UnauthorizedError } from '../errors/errors';
+
+/**
+ * Injection token for {@link JwtAuthGuardOptions}.
+ * Register this in each module's providers so NestJS DI can construct the guard.
+ */
+export const JWT_GUARD_OPTIONS_TOKEN = Symbol('JWT_GUARD_OPTIONS');
 
 /**
  * Verified principal attached to `request.user` after JWT validation.
@@ -87,7 +94,7 @@ function verifyRS256(token: string, publicKeyPem: string, issuer: string): Recor
 export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly opts: JwtAuthGuardOptions,
+    @Inject(JWT_GUARD_OPTIONS_TOKEN) private readonly opts: JwtAuthGuardOptions,
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
