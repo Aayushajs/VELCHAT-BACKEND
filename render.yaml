@@ -28,6 +28,13 @@ envVarGroups:
       - { key: CLOUDINARY_URL, sync: false } # cloudinary://key:secret@cloud
       - { key: OTEL_EXPORTER_OTLP_ENDPOINT, sync: false } # https://otlp-gateway-<region>.grafana.net/otlp
       - { key: OTEL_EXPORTER_OTLP_HEADERS, sync: false } # Authorization=Basic <base64 id:token>
+      # RS256 JWT signing keypair (§B2.3/§D4). auth-service SIGNS access tokens with the private
+      # key; every guarded service (group-channel, …) VERIFIES with the public key. MUST be set —
+      # if unset, auth falls back to an EPHEMERAL per-boot key that no other service can verify, so
+      # every guarded call (e.g. POST /conversations/dm) returns 401 and messaging can't start.
+      # Generate once (see scripts) and paste BOTH — multi-line PEM or single-line with \n escapes.
+      - { key: JWT_PRIVATE_KEY, sync: false }
+      - { key: JWT_PUBLIC_KEY, sync: false }
       # ── Feature integrations (all OPTIONAL — unset ⇒ safe dev fallback; verify with scripts/) ──
       # Mail (auth magic-link/welcome + notification digests). Brevo/Postfix: smtp://user:pass@host:587
       - { key: SMTP_URL, sync: false } # URL-encode @/: in user+pass (@ → %40)

@@ -10,15 +10,24 @@ export interface SigningKeyPair {
  * Load the RS256 signing keypair from env (prod: rotated via JWKS / secrets manager) or generate
  * an ephemeral dev keypair. The access token is RS256 so verifiers only need the public JWKS.
  */
+/** Accept a PEM from an env var whether pasted multi-line OR single-line with `\n` escapes
+ * (dashboards vary) — normalize the escapes so RS256 verify/sign always gets a valid PEM. */
+function pemFromEnv(v: string | undefined): string | undefined {
+  const s = v?.replace(/\\n/g, '\n').trim();
+  return s || undefined;
+}
+
 export function loadOrGenerateKeyPair(env: {
   privatePem?: string;
   publicPem?: string;
 }): SigningKeyPair {
-  if (env.privatePem && env.publicPem) {
+  const priv = pemFromEnv(env.privatePem);
+  const pub = pemFromEnv(env.publicPem);
+  if (priv && pub) {
     return {
-      privateKeyPem: env.privatePem,
-      publicKeyPem: env.publicPem,
-      kid: kidFor(env.publicPem),
+      privateKeyPem: priv,
+      publicKeyPem: pub,
+      kid: kidFor(pub),
     };
   }
   const { privateKey, publicKey } = generateKeyPairSync('rsa', {
