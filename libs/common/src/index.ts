@@ -33,6 +33,7 @@ export { TenantInterceptor } from './nest/tenant.interceptor';
 export { ResponseInterceptor } from './nest/response.interceptor';
 export {
   JwtAuthGuard,
+  JWT_GUARD_OPTIONS_TOKEN,
   Public,
   IS_PUBLIC_KEY,
   type VerifiedPrincipal,
