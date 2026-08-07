@@ -62,4 +62,19 @@ export class OprfRepository {
     );
     return res.rows as Array<{ token: string; account_id: string }>;
   }
+
+  /** Record the owner's contact tokens as edges (reverse index for registered-after-sync). Each
+   * edge resolves peer_id from the current discoverable set, so already-registered contacts link
+   * immediately; future joins link via auth-service `linkContactEdges`. Idempotent bulk upsert. */
+  async upsertEdges(ownerId: string, tokens: string[]): Promise<void> {
+    if (tokens.length === 0) return;
+    await this.pg.pool.query(
+      `INSERT INTO contact_edges(owner_id, peer_token, peer_id)
+       SELECT $1, t, (SELECT account_id FROM oprf_discoverable WHERE token = t)
+         FROM unnest($2::text[]) AS t
+       ON CONFLICT (owner_id, peer_token)
+         DO UPDATE SET peer_id = EXCLUDED.peer_id, updated_at = now()`,
+      [ownerId, tokens],
+    );
+  }
 }

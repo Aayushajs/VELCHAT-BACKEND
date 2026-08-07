@@ -232,6 +232,18 @@ export class AuthRepository implements RefreshStore {
     );
   }
 
+  /** Resolve every contact_edge that holds this token → set peer_id + return the owners, so the
+   * fan-out can tell exactly those users "your contact just joined VelChat" (§contact-sync). */
+  async linkContactEdges(peerToken: string, peerId: string): Promise<string[]> {
+    const res = await this.pg.pool.query(
+      `UPDATE contact_edges SET peer_id = $2, updated_at = now()
+        WHERE peer_token = $1 AND (peer_id IS DISTINCT FROM $2)
+      RETURNING owner_id`,
+      [peerToken, peerId],
+    );
+    return (res.rows as Array<{ owner_id: string }>).map((r) => r.owner_id);
+  }
+
   /** Atomically re-point the account's phone identifier to a new number on the SAME account_id. */
   async repointPhone(accountId: string, newNorm: string): Promise<void> {
     const client = await this.pg.pool.connect();
