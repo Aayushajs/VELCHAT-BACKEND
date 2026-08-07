@@ -39,7 +39,8 @@ export class AppModule {
         ChannelsModule.forRoot({
           pg,
           eventBus,
-          jwtPublicKeyPem: process.env.JWT_PUBLIC_KEY ?? '',
+          // Accept the PEM whether pasted multi-line or single-line with \n escapes.
+          jwtPublicKeyPem: (process.env.JWT_PUBLIC_KEY ?? '').replace(/\\n/g, '\n'),
           jwtIssuer: deps.config.JWT_ISSUER ?? 'https://auth.velchat.local',
         }),
       );
