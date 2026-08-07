@@ -12,8 +12,11 @@ import {
 import { OprfRepository } from './oprf.repository';
 
 const MAX_BATCH = 2000; // §G2: cap per-request batch size (full-resync throttle)
-const EVALUATE_LIMIT = 5; // evaluate batches per account per hour
-const MATCH_LIMIT = 10; // match batches per account per hour
+// Per-account hourly caps on discovery. The original 5/10 were far too tight for real use — a
+// couple of New-Chat opens / app restarts (each a batch) tripped a 429. Generous defaults so
+// normal use never 429s; env-tunable to clamp back down for production anti-enumeration.
+const EVALUATE_LIMIT = Number(process.env.OPRF_EVALUATE_LIMIT) || 500;
+const MATCH_LIMIT = Number(process.env.OPRF_MATCH_LIMIT) || 1000;
 const WINDOW_SEC = 3600;
 
 export interface PublicOprfKey {
