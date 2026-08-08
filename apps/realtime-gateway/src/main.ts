@@ -43,7 +43,7 @@ async function main(): Promise<void> {
       podId: process.env.POD_ID ?? hostname(),
       jwtPublicKey: process.env.JWT_PUBLIC_KEY,
       // Inbound delivered/read acks → durable receipt events (§B4.4).
-      sink: bus ? new ReceiptPublisher(bus) : undefined,
+      sink: bus ? new ReceiptPublisher(bus, projection) : undefined,
       skdm,
       typing,
     });

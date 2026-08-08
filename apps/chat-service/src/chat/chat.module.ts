@@ -20,7 +20,7 @@ export interface ChatModuleDeps {
 export class ChatModule {
   static forRoot(deps: ChatModuleDeps): DynamicModule {
     const repo = new ChatRepository(deps.mongo);
-    const seq = new SeqService(deps.valkey.redis);
+    const seq = new SeqService(deps.valkey.redis, deps.mongo);
     const events = new ChatEvents(deps.eventBus);
     const service = new ChatService(repo, seq, events);
 

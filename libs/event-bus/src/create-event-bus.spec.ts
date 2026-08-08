@@ -2,6 +2,7 @@ import { loadConfig } from '@velchat/config';
 import { createEventBus } from './create-event-bus';
 import { RedisStreamsEventBus } from './adapters/redis-streams.bus';
 import { KafkaEventBus } from './adapters/kafka.bus';
+import { InMemoryEventBus } from './adapters/in-memory.bus';
 
 const logger = { error() {}, warn() {}, info() {}, debug() {}, fatal() {} } as never;
 
@@ -24,6 +25,16 @@ describe('createEventBus (provider selection)', () => {
     } as NodeJS.ProcessEnv);
     const bus = createEventBus(cfg, logger);
     expect(bus).toBeInstanceOf(KafkaEventBus);
+  });
+
+  it('selects memory when EVENT_BUS=memory', () => {
+    const cfg = loadConfig({
+      SERVICE_NAME: 't',
+      EVENT_BUS: 'memory',
+    } as NodeJS.ProcessEnv);
+    const bus = createEventBus(cfg, logger);
+    expect(bus).toBeInstanceOf(InMemoryEventBus);
+    expect(bus.name).toBe('event-bus:in-memory');
   });
 
   it('fails closed when redis-streams selected without VALKEY_URL', () => {

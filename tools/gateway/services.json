@@ -32,14 +32,14 @@
     "http": 3004,
     "grpc": 50055,
     "ws": false,
-    "routes": ["/chat", "/messages", "/conversations", "/polls"]
+    "routes": ["/chat", "/messages", "/polls"]
   },
   {
     "name": "group-channel-service",
     "http": 3005,
     "grpc": 50056,
     "ws": false,
-    "routes": ["/channels", "/groups", "/communities"]
+    "routes": ["/conversations", "/channels", "/groups", "/communities"]
   },
   {
     "name": "presence-service",

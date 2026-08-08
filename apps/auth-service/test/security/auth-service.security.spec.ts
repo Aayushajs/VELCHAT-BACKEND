@@ -1,10 +1,5 @@
-import {
-  requireTenant,
-  TenantContextMissingError,
-  UnauthorizedError,
-  ForbiddenError,
-} from '@velchat/common';
-import { JwtAuthGuard, type JwtAuthGuardOptions } from '@velchat/common';
+import { requireTenant, TenantContextMissingError, UnauthorizedError } from '@velchat/common';
+import { JwtAuthGuard } from '@velchat/common';
 import { Reflector } from '@nestjs/core';
 import { generateKeyPairSync } from 'node:crypto';
 import jwt from 'jsonwebtoken';
@@ -33,7 +28,7 @@ function createGuard(): JwtAuthGuard {
   });
 }
 
-function mockExecutionContext(headers: Record<string, string> = {}, isPublic = false) {
+function mockExecutionContext(headers: Record<string, string> = {}, _isPublic = false) {
   const request = { headers, user: undefined as unknown };
   return {
     switchToHttp: () => ({

@@ -45,7 +45,7 @@ describe('TranslateService', () => {
     let calls = 0;
     const provider: TranslationProvider = {
       name: 'test',
-      translate: async (text, target) => {
+      translate: async (text, _target) => {
         calls++;
         return { text: `T(${text})`, detectedSource: 'en' };
       },

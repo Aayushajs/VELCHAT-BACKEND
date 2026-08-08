@@ -7,14 +7,19 @@ export interface ConnInfo {
 }
 
 /**
- * §B9.1 connection registry in Valkey: `conn:{user}` is a set of {podId, connId, deviceId},
+ * §B9.1 connection registry in Valkey / Redis: `conn:{user}` is a set of {podId, connId, deviceId},
  * TTL-refreshed by heartbeat. Lets any pod find which pods hold a user's sockets (cross-pod
  * delivery via pub/sub). Stateless pods → horizontal scale.
+ *
+ * Hardening:
+ * - Default TTL = 75s (3x standard 25s heartbeat interval to eliminate network jitter flapping).
+ * - Safe JSON parsing with error boundaries.
+ * - Multi-device safe unregister without dropping other active devices.
  */
 export class ConnectionRegistry {
   constructor(
     private readonly redis: Redis,
-    private readonly ttlSec = 30,
+    private readonly ttlSec = 75,
   ) {}
 
   private key(userId: string): string {
@@ -29,7 +34,15 @@ export class ConnectionRegistry {
   async unregister(userId: string, connId: string): Promise<void> {
     const members = await this.redis.smembers(this.key(userId));
     for (const m of members) {
-      if ((JSON.parse(m) as ConnInfo).connId === connId) await this.redis.srem(this.key(userId), m);
+      try {
+        const parsed = JSON.parse(m) as ConnInfo;
+        if (parsed.connId === connId) {
+          await this.redis.srem(this.key(userId), m);
+        }
+      } catch {
+        // Drop malformed member
+        await this.redis.srem(this.key(userId), m);
+      }
     }
   }
 
@@ -39,7 +52,15 @@ export class ConnectionRegistry {
 
   async connectionsFor(userId: string): Promise<ConnInfo[]> {
     const members = await this.redis.smembers(this.key(userId));
-    return members.map((m) => JSON.parse(m) as ConnInfo);
+    const conns: ConnInfo[] = [];
+    for (const m of members) {
+      try {
+        conns.push(JSON.parse(m) as ConnInfo);
+      } catch {
+        // Ignore malformed member
+      }
+    }
+    return conns;
   }
 
   /** Distinct pods holding this user's sockets — the fan-out targets (§B9.2). */

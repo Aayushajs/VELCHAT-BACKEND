@@ -128,9 +128,8 @@ export const envSchema = z.object({
   // Valkey (cache / presence / seq)
   VALKEY_URL: z.string().min(1).optional(),
 
-  // ── Provider selection (free-tier MVP defaults; switch to self-host at scale) ──
-  // event bus: redis-streams (Upstash, ₹0) | kafka (self-host scale)
-  EVENT_BUS: z.enum(['redis-streams', 'kafka']).default('redis-streams'),
+  // event bus: redis-streams (Upstash, ₹0) | kafka (self-host scale) | memory (in-process zero-dependency)
+  EVENT_BUS: z.enum(['redis-streams', 'kafka', 'memory']).default('redis-streams'),
   // object storage: cloudinary (₹0) | s3 (MinIO/AWS self-host)
   STORAGE_PROVIDER: z.enum(['cloudinary', 's3']).default('cloudinary'),
   // search: atlas (MongoDB Atlas Search, ₹0) | opensearch (self-host)
