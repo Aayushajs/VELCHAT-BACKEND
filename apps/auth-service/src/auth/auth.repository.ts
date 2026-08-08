@@ -207,6 +207,16 @@ export class AuthRepository implements RefreshStore {
     return row?.account_id ?? null;
   }
 
+  /** The account that owns a verified email (for the uniqueness check), or null if unclaimed. */
+  async findVerifiedEmailAccount(emailNorm: string): Promise<string | null> {
+    const res = await this.pg.pool.query(
+      "SELECT account_id FROM identifiers WHERE kind = 'email' AND value_norm = $1 AND verified_at IS NOT NULL",
+      [emailNorm],
+    );
+    const row = res.rows[0] as { account_id: string } | undefined;
+    return row?.account_id ?? null;
+  }
+
   // ── OPRF contact discovery (§G2) — server-side self-registration ─────────────
   /** The active OPRF secret key (shared DB with user-service). Null until first generated. */
   async getActiveOprfKey(): Promise<{
