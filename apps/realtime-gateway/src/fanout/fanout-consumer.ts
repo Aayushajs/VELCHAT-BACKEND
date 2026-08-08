@@ -3,6 +3,7 @@ import type { EventBus } from '@velchat/event-bus';
 import type {
   CallCaptionPayload,
   ChannelMemberPayload,
+  ContactRegisteredPayload,
   ConversationCreatedPayload,
   MessageReceiptPayload,
   MessageSentPayload,
@@ -48,6 +49,16 @@ export class FanoutConsumer {
     });
     this.bus.subscribe<MessageReceiptPayload>('message.read', GROUP, async (e) => {
       await this.onReceipt('receipt', e.payload);
+    });
+    // A contact of these owners just joined VelChat (§contact-sync) → nudge each online owner to
+    // flip that contact "on VelChat" (their client re-resolves it). Ephemeral: offline owners
+    // catch it on their next discovery/backfill.
+    this.bus.subscribe<ContactRegisteredPayload>('contact.registered', GROUP, async (e) => {
+      await this.router.route(e.payload.owner_ids, {
+        kind: 'ephemeral',
+        type: 'contact.registered',
+        data: { account_id: e.payload.account_id },
+      });
     });
     // Live translated call captions (§A26.3): route each to the single listener it's for. Ephemeral
     // (a UI/audio cue) — never durable; a missed partial is superseded by the next segment.

@@ -5,6 +5,7 @@ import type {
   DeviceAddedPayload,
   DeviceListChangedPayload,
   IdentifierChangedPayload,
+  ContactRegisteredPayload,
 } from '@velchat/shared-types';
 
 /** Auth domain events (§A11 / §B2). Every state change emits a standard-envelope event. */
@@ -63,6 +64,26 @@ export class AuthEvents {
         producer: 'auth-service',
         tenantId: null,
         payload: { account_id: accountId, kind, changed_at: new Date().toISOString() },
+      }),
+    );
+  }
+
+  /** A newly-discoverable account → tell the owners who hold its number so their contact list
+   * flips "on VelChat" live (§contact-sync). No-op when nobody has them as a contact. */
+  async contactRegistered(accountId: string, ownerIds: string[]): Promise<void> {
+    if (ownerIds.length === 0) return;
+    await this.bus.publish<ContactRegisteredPayload>(
+      'contact.registered',
+      buildEnvelope({
+        eventType: 'contact.registered',
+        key: accountId,
+        producer: 'auth-service',
+        tenantId: null,
+        payload: {
+          account_id: accountId,
+          owner_ids: ownerIds,
+          registered_at: new Date().toISOString(),
+        },
       }),
     );
   }

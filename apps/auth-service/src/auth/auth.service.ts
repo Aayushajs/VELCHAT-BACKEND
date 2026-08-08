@@ -310,6 +310,10 @@ export class AuthService {
       });
       const token = directToken(phoneNorm, key);
       await this.repo.registerOprfToken(token, accountId, keyRow.version);
+      // Live "contact joined": link every owner who already holds this number → notify them so
+      // their contact list flips "on VelChat" without a re-scan (§contact-sync fan-out).
+      const owners = await this.repo.linkContactEdges(token, accountId);
+      await this.events.contactRegistered(accountId, owners);
     } catch {
       // best-effort: discovery still works via the client's opt-in registration.
     }

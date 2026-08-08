@@ -103,6 +103,22 @@ export class OprfService {
     return { message: 'Removed from contact discovery.' };
   }
 
+  /** Record the caller's contact tokens as edges (§contact-sync reverse index) so that when any
+   * of those numbers later joins VelChat, the owner is notified live. Tokens are opaque OPRF
+   * digests — never plaintext numbers. Idempotent; capped + validated like match. */
+  async registerEdges(accountId: string, tokens: string[]): Promise<{ message: string }> {
+    if (!accountId) throw new ValidationError('accountId is required');
+    const unique = [
+      ...new Set((tokens ?? []).filter((t) => typeof t === 'string' && /^[0-9a-f]{64}$/.test(t))),
+    ];
+    if (unique.length > MAX_BATCH) {
+      throw new ValidationError(`too many tokens in one request (max ${MAX_BATCH})`);
+    }
+    if (unique.length === 0) return { message: 'No edges to register.' };
+    await this.repo.upsertEdges(accountId, unique);
+    return { message: 'Contact edges registered.' };
+  }
+
   /** Match client-derived tokens (address book, post-unblind) against the discoverable set. */
   async match(accountId: string, tokens: string[]): Promise<{ matches: Record<string, string> }> {
     if (!accountId) throw new ValidationError('accountId is required');

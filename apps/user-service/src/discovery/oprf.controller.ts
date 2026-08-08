@@ -80,4 +80,15 @@ export class OprfController {
   match(@Body() body: MatchOprfDto) {
     return this.oprf.match(body.accountId, body.tokens);
   }
+
+  @Put('edges')
+  @ApiOperation({
+    summary: 'Register the caller’s contact tokens as discovery edges',
+    description:
+      'Reverse index so that when any of these numbers later joins VelChat, the owner is notified live. Tokens are opaque OPRF digests, never plaintext numbers.',
+  })
+  @ApiOkResponse({ description: '{ message }' })
+  registerEdges(@Body() body: { accountId: string; tokens: string[] }) {
+    return this.oprf.registerEdges(body.accountId, body.tokens);
+  }
 }

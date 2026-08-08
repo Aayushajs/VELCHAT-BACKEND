@@ -37,6 +37,7 @@ describe('FanoutConsumer (§B9.2)', () => {
       'call.caption',
       'channel.member.added',
       'channel.member.removed',
+      'contact.registered',
       'conversation.created',
       'message.delivered',
       'message.read',
@@ -60,6 +61,25 @@ describe('FanoutConsumer (§B9.2)', () => {
     expect(router.route).toHaveBeenCalledWith(
       ['listener'],
       expect.objectContaining({ kind: 'ephemeral', type: 'caption' }),
+    );
+  });
+
+  it('nudges the owners when a contact registers (§contact-sync)', async () => {
+    const { handlers, router } = setup([]);
+    await handlers.get('contact.registered')!(
+      envelope({
+        account_id: 'joiner',
+        owner_ids: ['owner-1', 'owner-2'],
+        registered_at: 'now',
+      }),
+    );
+    expect(router.route).toHaveBeenCalledWith(
+      ['owner-1', 'owner-2'],
+      expect.objectContaining({
+        kind: 'ephemeral',
+        type: 'contact.registered',
+        data: { account_id: 'joiner' },
+      }),
     );
   });
 
