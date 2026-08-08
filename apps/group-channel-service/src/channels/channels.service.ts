@@ -28,8 +28,10 @@ export class ChannelsService {
     if (created) {
       await this.repo.addMember(conversationId, a, 'member');
       if (!self) await this.repo.addMember(conversationId, b, 'member');
-      await this.events.conversationCreated(conversationId, 'dm', null, a, self ? [a] : [a, b]);
     }
+    // Always emit so the realtime-gateway's membership projection is seeded — Redis SADD is
+    // idempotent, so re-emitting for an existing DM is safe and covers Redis-restart / cold-start.
+    await this.events.conversationCreated(conversationId, 'dm', null, a, self ? [a] : [a, b]);
     return { conversationId, created };
   }
 
