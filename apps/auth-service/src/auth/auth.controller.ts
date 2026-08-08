@@ -70,6 +70,20 @@ export class AuthController {
     return this.auth.getAccountById(accountId);
   }
 
+  /**
+   * Attach/confirm the account's email (§B2.1). @gmail.com only for now, globally unique
+   * (409 on a duplicate). accountId comes from the verified token — a caller can only set its
+   * own. Persisted so the client never re-prompts for email after the first time.
+   */
+  @Post('email')
+  @HttpCode(200)
+  setEmail(
+    @CurrentUser('accountId') accountId: string,
+    @Body() body: { email: string },
+  ): Promise<{ email: string }> {
+    return this.auth.setEmail(accountId, body.email);
+  }
+
   /** §B2.5 same-device login (step 1): get a nonce to sign with the device key. */
   @Public()
   @Post('challenge')
