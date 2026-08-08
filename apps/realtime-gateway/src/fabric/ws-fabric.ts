@@ -110,26 +110,32 @@ export class WsFabric {
 
   /** §B9.3 inbound: typing / read-ack / sync. (Routed to chat/presence services off this in P2c/P7.) */
   private async onInbound(ctx: SocketCtx, raw: string): Promise<void> {
-    let msg: { type?: string; [k: string]: unknown };
+    let msg: { type?: string; data?: Record<string, unknown>; [k: string]: unknown };
     try {
       msg = JSON.parse(raw) as typeof msg;
     } catch {
       return;
     }
+    // Helper: read a field from msg.data (enveloped) first, then msg (flat). The frontend sends
+    // durable frames as `{ kind, type, data: { conversationId, … } }` via socket.send(), but
+    // ephemeral frames as `{ kind, type, conversationId, … }` via sendEphemeral(). Accept both.
+    const d = msg.data && typeof msg.data === 'object' ? msg.data : msg;
     switch (msg.type) {
       case 'ping':
         await this.registry.heartbeat(ctx.userId);
         this.write(ctx, { kind: 'ephemeral', type: 'pong', data: {} });
         break;
-      case 'sync':
+      case 'sync': {
         // Reconnect (C16): client sends last cursor → directs it to backfill missed via chat history.
-        this.write(ctx, { kind: 'durable', type: 'sync', data: { cursor: msg.cursor ?? null } });
+        const cursor = d.cursor ?? msg.cursor ?? null;
+        this.write(ctx, { kind: 'durable', type: 'sync', data: { cursor } });
         break;
+      }
       case 'delivered':
       case 'read': {
         // §B4.4 compact receipt: covers every message at or below `seq`. Server-truth, not client-trusted.
-        const conv = typeof msg.conversationId === 'string' ? msg.conversationId : null;
-        const seq = typeof msg.seq === 'number' ? msg.seq : null;
+        const conv = typeof d.conversationId === 'string' ? d.conversationId : null;
+        const seq = typeof d.seq === 'number' ? d.seq : null;
         if (!conv || seq === null || !this.opts.sink) break;
         const op = msg.type === 'read' ? this.opts.sink.read : this.opts.sink.delivered;
         await op.call(this.opts.sink, ctx.userId, conv, seq);
@@ -137,25 +143,25 @@ export class WsFabric {
       }
       case 'skdm': {
         // §G1-2: a member distributes the group's epoch sender key (ciphertext per recipient device).
-        const conv = typeof msg.conversationId === 'string' ? msg.conversationId : null;
-        const epoch = typeof msg.epoch === 'number' ? msg.epoch : null;
-        const targets = Array.isArray(msg.targets) ? (msg.targets as SkdmTarget[]) : null;
+        const conv = typeof d.conversationId === 'string' ? d.conversationId : null;
+        const epoch = typeof d.epoch === 'number' ? d.epoch : null;
+        const targets = Array.isArray(d.targets) ? (d.targets as SkdmTarget[]) : null;
         if (!conv || epoch === null || !targets || !this.opts.skdm) break;
         await this.opts.skdm.distribute(conv, epoch, ctx.userId, targets);
         break;
       }
       case 'skdm-request': {
         // §G1-2: this device can't decrypt the epoch → ask the other members to re-send the SKDM.
-        const conv = typeof msg.conversationId === 'string' ? msg.conversationId : null;
-        const epoch = typeof msg.epoch === 'number' ? msg.epoch : null;
+        const conv = typeof d.conversationId === 'string' ? d.conversationId : null;
+        const epoch = typeof d.epoch === 'number' ? d.epoch : null;
         if (!conv || epoch === null || !this.opts.skdm) break;
         await this.opts.skdm.request(conv, epoch, ctx.userId, ctx.deviceId);
         break;
       }
       case 'typing': {
         // §C4 ephemeral typing → fan out to the other members; never stored, dropped under pressure.
-        const conv = typeof msg.conversationId === 'string' ? msg.conversationId : null;
-        const state = msg.state === 'stop' ? 'stop' : 'start';
+        const conv = typeof d.conversationId === 'string' ? d.conversationId : null;
+        const state = d.state === 'stop' ? 'stop' : 'start';
         if (!conv || !this.opts.typing) break;
         await this.opts.typing.relay(ctx.userId, conv, state);
         break;

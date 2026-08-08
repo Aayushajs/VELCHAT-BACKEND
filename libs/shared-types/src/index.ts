@@ -123,6 +123,14 @@ export interface MessageSentPayload {
   conversation_id: ConversationId;
   message_id: string;
   seq: number;
+  /** Client-generated idempotency key — carried in fan-out so the sender can reconcile its
+   *  optimistic bubble without a REST round-trip (§L6). */
+  client_msg_id?: string;
+  /** Message type (text, image, …) — carried in fan-out for recipient rendering. */
+  type?: string;
+  /** Full message content — carried in fan-out so recipients can render immediately.
+   *  For personal E2EE this is the ciphertext blob; the server never interprets it. */
+  content?: string | Record<string, unknown>;
   /** Ciphertext for personal (E2EE) conversations; the server never reads it. */
   ciphertext_ref?: string;
   /**
@@ -132,6 +140,10 @@ export interface MessageSentPayload {
   text?: string;
   sender_account_id: AccountId;
   sent_at: Iso8601;
+  /** Reply-to message id — carried in fan-out for recipient threading UI. */
+  reply_to?: string | null;
+  /** Mentions — carried in fan-out for recipient notification/highlight. */
+  mentions?: Array<{ user_id: string; type: string }>;
 }
 
 /** A reaction was added/removed on a message (§B15) → realtime fan-out to conversation members. */

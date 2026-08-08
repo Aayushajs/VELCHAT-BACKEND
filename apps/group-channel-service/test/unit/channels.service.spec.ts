@@ -34,13 +34,15 @@ describe('ChannelsService (§B7)', () => {
     expect(events.conversationCreated).toHaveBeenCalledTimes(1);
   });
 
-  it('dedupes an existing DM (no extra members or events)', async () => {
+  it('dedupes an existing DM (no extra members, but re-seeds membership projection)', async () => {
     const { svc, repo, events } = makeChannels();
     repo.createConversation.mockResolvedValueOnce(false); // already existed
     const res = await svc.createDm('a', 'b');
     expect(res.created).toBe(false);
     expect(repo.addMember).not.toHaveBeenCalled();
-    expect(events.conversationCreated).not.toHaveBeenCalled();
+    // Always emits conversationCreated so the realtime-gateway membership projection is
+    // reseeded after Redis restarts / cold starts (Redis SADD is idempotent).
+    expect(events.conversationCreated).toHaveBeenCalledTimes(1);
   });
 
   it('creates a self-chat (Message yourself) — one member, one event', async () => {

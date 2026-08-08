@@ -33,7 +33,8 @@ async function main(): Promise<void> {
     const registry = new ConnectionRegistry(valkey.redis);
     const bus = app.get<EventBus>(EVENT_BUS, { strict: false });
     const router = new EventRouter(registry, new ValkeyPodPublisher(valkey.redis));
-    const projection = new MembershipProjection(valkey.redis);
+    const groupChannelUrl = process.env.UPSTREAM_GROUP_CHANNEL || 'http://localhost:3005';
+    const projection = new MembershipProjection(valkey.redis, groupChannelUrl);
     // Sender-key distribution relay (§G1-2) — Valkey-backed, independent of the event bus.
     const skdm = new SkdmService(new SkdmStore(valkey.redis), router, projection, logger);
     // Ephemeral typing fan-out (§C4) — fans to conversation members via the membership projection.
