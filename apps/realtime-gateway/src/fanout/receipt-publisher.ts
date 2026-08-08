@@ -1,6 +1,7 @@
 import { buildEnvelope } from '@velchat/common';
 import type { EventBus } from '@velchat/event-bus';
 import type { MessageReceiptPayload } from '@velchat/shared-types';
+import type { MembershipProjection } from './membership-projection';
 
 /**
  * Inbound receipt signals from a socket (§B9.3). WsFabric stays transport-only and forwards
@@ -14,13 +15,28 @@ export interface InboundSink {
 
 /** Publishes message.delivered / message.read (keyed by conversation_id for per-conv order). */
 export class ReceiptPublisher implements InboundSink {
-  constructor(private readonly bus: EventBus) {}
+  constructor(
+    private readonly bus: EventBus,
+    private readonly projection?: MembershipProjection,
+  ) {}
 
-  delivered(userId: string, conversationId: string, upToSeq: number): Promise<void> {
+  async delivered(userId: string, conversationId: string, upToSeq: number): Promise<void> {
+    if (this.projection) {
+      const members = await this.projection.members(conversationId);
+      if (members.length > 0 && !members.includes(userId)) {
+        return; // Unauthorized actor
+      }
+    }
     return this.emit('message.delivered', 'delivered', userId, conversationId, upToSeq);
   }
 
-  read(userId: string, conversationId: string, upToSeq: number): Promise<void> {
+  async read(userId: string, conversationId: string, upToSeq: number): Promise<void> {
+    if (this.projection) {
+      const members = await this.projection.members(conversationId);
+      if (members.length > 0 && !members.includes(userId)) {
+        return; // Unauthorized actor
+      }
+    }
     return this.emit('message.read', 'read', userId, conversationId, upToSeq);
   }
 

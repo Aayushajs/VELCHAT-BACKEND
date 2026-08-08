@@ -7,7 +7,6 @@ import {
 import { ChannelsService } from '../../src/channels/channels.service';
 import type { ChannelsRepository } from '../../src/channels/channels.repository';
 import type { ChannelsEvents } from '../../src/channels/channels.events';
-import type { MemberRole } from '../../src/channels/conversation.types';
 
 // ── Minimal mock factories ──
 function mockRepo(overrides: Partial<ChannelsRepository> = {}): ChannelsRepository {

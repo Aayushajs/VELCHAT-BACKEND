@@ -62,19 +62,24 @@ function fakeRedis() {
       if (!e) return -2;
       return e.expireAt === null ? -1 : Math.ceil((e.expireAt - Date.now()) / 1000);
     },
-  } as never;
+  };
 }
 
 function makeService(overrides: Record<string, unknown> = {}) {
   const redis = fakeRedis();
   const logger = { info: jest.fn(), warn: jest.fn() } as unknown as Logger;
-  const svc = new OtpService(new RedisOtpStore(redis), new RateLimiter(redis), logger, {
-    apiKey: 'test-key',
-    template: 'Temp1',
-    devMode: false,
-    devPhone: DEV_PHONE,
-    ...overrides,
-  });
+  const svc = new OtpService(
+    new RedisOtpStore(redis as never),
+    new RateLimiter(redis as never),
+    logger,
+    {
+      apiKey: 'test-key',
+      template: 'Temp1',
+      devMode: false,
+      devPhone: DEV_PHONE,
+      ...overrides,
+    },
+  );
   return { svc, redis };
 }
 

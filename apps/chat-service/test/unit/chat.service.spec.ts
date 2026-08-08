@@ -5,7 +5,7 @@ import type { MessageDoc } from '../../src/chat/message.types';
 function makeChat() {
   const repo = {
     findByClientMsgId: jest.fn(async (): Promise<MessageDoc | null> => null),
-    insert: jest.fn(async () => undefined),
+    insert: jest.fn(async (_doc: MessageDoc) => undefined),
     history: jest.fn(async (): Promise<MessageDoc[]> => []),
   };
   const seq = { next: jest.fn(async () => 42) };
