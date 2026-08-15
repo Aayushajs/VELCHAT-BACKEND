@@ -37,6 +37,31 @@ export default tseslint.config(
     },
   },
   {
+    // Feature boundary (§A10.5). A feature library must not reach into another feature library:
+    // cross-feature communication goes through the event bus, or through a port declared in
+    // @velchat/feature-contracts and wired by the composition root.
+    //
+    // This rule is what keeps the 6-service topology reversible. Without it the libraries grow
+    // direct references to each other within weeks, and splitting a combined service back out (or
+    // merging two more together) stops being a config change and becomes a refactor.
+    files: ['libs/feature-*/src/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@velchat/feature-*', '!@velchat/feature-contracts'],
+              message:
+                'Feature libs must not import each other. Use the event bus, or a port from ' +
+                '@velchat/feature-contracts that the composition root wires up.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Tests may relax a couple of rules for fixtures/mocks.
     files: ['**/*.spec.ts', '**/*.test.ts', '**/test/**/*.ts'],
     rules: {

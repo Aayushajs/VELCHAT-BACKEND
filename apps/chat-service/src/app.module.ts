@@ -11,13 +11,15 @@ import {
 import { createEventBus } from '@velchat/event-bus';
 import { MongoClient } from '@velchat/database';
 import { ValkeyClient } from '@velchat/cache';
-import { ChatModule } from './chat/chat.module';
-import { ChatRepository } from './chat/chat.repository';
-import { ReceiptsRepository } from './chat/receipts.repository';
-import { ReceiptsConsumer } from './chat/receipts.consumer';
-import { PollsModule } from './polls/polls.module';
-import { ResendModule } from './resend/resend.module';
-import { ExtrasModule } from './extras/extras.module';
+import {
+  ChatModule,
+  ChatRepository,
+  ReceiptsRepository,
+  ReceiptsConsumer,
+  PollsModule,
+  ResendModule,
+  ExtrasModule,
+} from '@velchat/feature-chat';
 
 export interface AppDeps {
   config: AppConfig;
