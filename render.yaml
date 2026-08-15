@@ -21,6 +21,13 @@ envVarGroups:
       - { key: EVENT_BUS, value: redis-streams }
       - { key: STORAGE_PROVIDER, value: cloudinary }
       - { key: SEARCH_PROVIDER, value: atlas }
+      # Auth (DEF-02/DEF-13) — REQUIRED. Every service verifies access tokens itself, so each one
+      # needs JWT_PUBLIC_PEM or it refuses to boot. JWT_PRIVATE_PEM is auth-service's signing key.
+      # Unset ⇒ auth-service mints an ephemeral keypair per boot and every restart logs everyone out.
+      # Generate: openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out jwt.key
+      #           openssl rsa -in jwt.key -pubout -out jwt.pub
+      - { key: JWT_PRIVATE_PEM, sync: false }
+      - { key: JWT_PUBLIC_PEM, sync: false }
       # Secrets — set in the Render dashboard (sync:false keeps them out of git)
       - { key: POSTGRES_URL, sync: false } # Neon (sslmode=require)
       - { key: MONGO_URL, sync: false } # MongoDB Atlas SRV

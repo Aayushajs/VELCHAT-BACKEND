@@ -3,6 +3,7 @@ import { requireMongoUrl, requireValkeyUrl, type AppConfig } from '@velchat/conf
 import type { Logger } from 'pino';
 import {
   ObservabilityModule,
+  GlobalAuthModule,
   InfraLifecycle,
   type ServiceMetrics,
   type ManagedResource,
@@ -77,6 +78,9 @@ export class AppModule {
     return {
       module: AppModule,
       imports: [
+        // Default-deny authentication (DEF-02). Throws at boot if this service cannot verify
+        // tokens, so a misconfigured chat-service does not come up serving open endpoints.
+        GlobalAuthModule.forRoot(deps.config, deps.logger),
         ObservabilityModule.forRoot({
           serviceName: deps.config.SERVICE_NAME,
           version: deps.config.SERVICE_VERSION,

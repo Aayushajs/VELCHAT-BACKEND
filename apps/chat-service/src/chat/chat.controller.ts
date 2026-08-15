@@ -8,10 +8,19 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
+import { CurrentUser, actingAccountId } from '@velchat/common';
 import { ChatService } from './chat.service';
 import { SendMessageDto, ReactionDto, EditMessageDto, DeleteMessageDto } from './chat.dto';
 
-/** Chat REST surface (§B4 / flow C2). Content is opaque ciphertext for personal conversations. */
+/**
+ * Chat REST surface (§B4 / flow C2). Content is opaque ciphertext for personal conversations.
+ *
+ * Every endpoint takes its acting identity from the VERIFIED token via `@CurrentUser`, never from
+ * the request body (§D4). The body ids (`senderId`, `userId`, `editorId`, `actorId`) are still
+ * accepted because the mobile client sends them and the global ValidationPipe runs with
+ * `forbidNonWhitelisted` — but `actingAccountId` refuses any that disagree with the token.
+ * Authentication itself is enforced by the global guard registered in AppModule (DEF-02).
+ */
 @ApiTags('chat')
 @ApiBearerAuth('access-token')
 @Controller('chat')
@@ -25,8 +34,8 @@ export class ChatController {
       'Hot path (§B4.2): validate → dedupe by clientMsgId → assign per-conversation seq → persist → emit message.sent → ACK.',
   })
   @ApiCreatedResponse({ description: 'Send ack: { messageId, seq, serverTs }.' })
-  send(@Body() body: SendMessageDto) {
-    return this.chat.send(body);
+  send(@CurrentUser('accountId') accountId: string, @Body() body: SendMessageDto) {
+    return this.chat.send({ ...body, senderId: actingAccountId(accountId, body.senderId) });
   }
 
   @Get('conversations/:id/messages')
@@ -52,11 +61,15 @@ export class ChatController {
     description: 'Idempotent per (user, emoji) (§B15). Emits message.reaction.added.',
   })
   @ApiParam({ name: 'id', description: 'Message id.' })
-  react(@Param('id') id: string, @Body() body: ReactionDto) {
+  react(
+    @Param('id') id: string,
+    @CurrentUser('accountId') accountId: string,
+    @Body() body: ReactionDto,
+  ) {
     return this.chat.react({
       messageId: id,
       conversationId: body.conversationId,
-      userId: body.userId,
+      userId: actingAccountId(accountId, body.userId),
       emoji: body.emoji,
     });
   }
@@ -67,11 +80,15 @@ export class ChatController {
     description: 'Emits message.reaction.removed (§B15).',
   })
   @ApiParam({ name: 'id', description: 'Message id.' })
-  unreact(@Param('id') id: string, @Body() body: ReactionDto) {
+  unreact(
+    @Param('id') id: string,
+    @CurrentUser('accountId') accountId: string,
+    @Body() body: ReactionDto,
+  ) {
     return this.chat.unreact({
       messageId: id,
       conversationId: body.conversationId,
-      userId: body.userId,
+      userId: actingAccountId(accountId, body.userId),
       emoji: body.emoji,
     });
   }
@@ -85,11 +102,15 @@ export class ChatController {
   })
   @ApiParam({ name: 'id', description: 'Message id.' })
   @ApiOkResponse({ description: 'Edit ack: { messageId, editedAt }.' })
-  edit(@Param('id') id: string, @Body() body: EditMessageDto) {
+  edit(
+    @Param('id') id: string,
+    @CurrentUser('accountId') accountId: string,
+    @Body() body: EditMessageDto,
+  ) {
     return this.chat.edit({
       messageId: id,
       conversationId: body.conversationId,
-      editorId: body.editorId,
+      editorId: actingAccountId(accountId, body.editorId),
       content: body.content,
       tenantId: body.tenantId,
       encrypted: body.encrypted,
@@ -105,11 +126,15 @@ export class ChatController {
   })
   @ApiParam({ name: 'id', description: 'Message id.' })
   @ApiOkResponse({ description: 'Delete ack.' })
-  del(@Param('id') id: string, @Body() body: DeleteMessageDto) {
+  del(
+    @Param('id') id: string,
+    @CurrentUser('accountId') accountId: string,
+    @Body() body: DeleteMessageDto,
+  ) {
     return this.chat.delete({
       messageId: id,
       conversationId: body.conversationId,
-      actorId: body.actorId,
+      actorId: actingAccountId(accountId, body.actorId),
       scope: body.scope,
     });
   }
