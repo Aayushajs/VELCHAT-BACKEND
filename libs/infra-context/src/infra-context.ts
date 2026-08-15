@@ -53,7 +53,11 @@ function configured(kind: InfraKind, config: AppConfig): boolean {
     case 'storage':
       return !!(config.STORAGE_PROVIDER === 's3' ? config.S3_ENDPOINT : config.CLOUDINARY_URL);
     case 'search':
-      return true; // the search port always resolves to an adapter (Mongo text / OpenSearch)
+      // The port has an adapter either way, but each adapter needs its own backing store — the
+      // Atlas/Mongo-text adapter reads MONGO_URL and throws without it.
+      return !!(config.SEARCH_PROVIDER === 'opensearch'
+        ? config.OPENSEARCH_NODE
+        : config.MONGO_URL);
   }
 }
 
