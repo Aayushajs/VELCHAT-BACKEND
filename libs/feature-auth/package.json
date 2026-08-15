@@ -1,0 +1,35 @@
+{
+  "name": "@velchat/feature-auth",
+  "version": "0.1.0",
+  "private": true,
+  "description": "auth feature library — runtime-agnostic; the composition root injects infra.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "jest",
+    "clean": "rimraf dist .turbo coverage"
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.4.15",
+    "@nestjs/core": "^10.4.15",
+    "@simplewebauthn/server": "^11.0.0",
+    "@velchat/cache": "workspace:*",
+    "@velchat/common": "workspace:*",
+    "@velchat/config": "workspace:*",
+    "@velchat/crypto": "workspace:*",
+    "@velchat/database": "workspace:*",
+    "@velchat/event-bus": "workspace:*",
+    "@velchat/mail": "workspace:*",
+    "@velchat/shared-types": "workspace:*",
+    "axios": "^1.7.9",
+    "ioredis": "^5.4.2",
+    "jsonwebtoken": "^9.0.2",
+    "pino": "^9.6.0"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.7"
+  }
+}

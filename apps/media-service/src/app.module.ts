@@ -10,8 +10,8 @@ import {
 import { createEventBus, type EventBus } from '@velchat/event-bus';
 import { createStorage, type ObjectStorage } from '@velchat/storage';
 import { PostgresClient } from '@velchat/database';
-import { MediaModule } from './media/media.module';
-import { BackupModule } from './backup/backup.module';
+import { MediaModule } from '@velchat/feature-media';
+import { BackupModule } from '@velchat/feature-media';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const PG_CLIENT = Symbol('PG_CLIENT');

@@ -10,10 +10,10 @@ import {
 import { createEventBus, type EventBus } from '@velchat/event-bus';
 import { PostgresClient } from '@velchat/database';
 import { ValkeyClient } from '@velchat/cache';
-import { TenancyModule } from './tenancy/tenancy.module';
-import { DirectoryModule } from './directory/directory.module';
-import { AdminModule } from './admin/admin.module';
-import { OprfModule } from './discovery/oprf.module';
+import { TenancyModule } from '@velchat/feature-user';
+import { DirectoryModule } from '@velchat/feature-user';
+import { AdminModule } from '@velchat/feature-user';
+import { OprfModule } from '@velchat/feature-user';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const PG_CLIENT = Symbol('PG_CLIENT');

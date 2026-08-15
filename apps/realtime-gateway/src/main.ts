@@ -6,16 +6,16 @@ import { createLogger, createMetrics, bootstrapService } from '@velchat/common';
 import { ValkeyClient } from '@velchat/cache';
 import type { EventBus } from '@velchat/event-bus';
 import { AppModule, EVENT_BUS } from './app.module';
-import { ConnectionRegistry } from './fabric/connection-registry';
-import { EventRouter } from './fabric/event-router';
-import { WsFabric } from './fabric/ws-fabric';
-import { MembershipProjection } from './fanout/membership-projection';
-import { ValkeyPodPublisher } from './fanout/valkey-pod-publisher';
-import { FanoutConsumer } from './fanout/fanout-consumer';
-import { ReceiptPublisher } from './fanout/receipt-publisher';
-import { SkdmStore } from './fanout/skdm-store';
-import { SkdmService } from './fanout/skdm.service';
-import { TypingRelay } from './fanout/typing-relay';
+import { ConnectionRegistry } from '@velchat/feature-realtime';
+import { EventRouter } from '@velchat/feature-realtime';
+import { WsFabric } from '@velchat/feature-realtime';
+import { MembershipProjection } from '@velchat/feature-realtime';
+import { ValkeyPodPublisher } from '@velchat/feature-realtime';
+import { FanoutConsumer } from '@velchat/feature-realtime';
+import { ReceiptPublisher } from '@velchat/feature-realtime';
+import { SkdmStore } from '@velchat/feature-realtime';
+import { SkdmService } from '@velchat/feature-realtime';
+import { TypingRelay } from '@velchat/feature-realtime';
 
 async function main(): Promise<void> {
   const config = loadConfig();

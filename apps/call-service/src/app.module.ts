@@ -9,8 +9,8 @@ import {
 } from '@velchat/common';
 import { createEventBus, type EventBus } from '@velchat/event-bus';
 import { PostgresClient } from '@velchat/database';
-import { CallsModule } from './calls/calls.module';
-import { ScreenControlModule } from './screen-control/screen-control.module';
+import { CallsModule } from '@velchat/feature-call';
+import { ScreenControlModule } from '@velchat/feature-call';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const PG_CLIENT = Symbol('PG_CLIENT');

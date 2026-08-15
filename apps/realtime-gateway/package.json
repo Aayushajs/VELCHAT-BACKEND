@@ -23,6 +23,7 @@
     "@velchat/common": "workspace:*",
     "@velchat/config": "workspace:*",
     "@velchat/event-bus": "workspace:*",
+    "@velchat/feature-realtime": "workspace:*",
     "@velchat/shared-types": "workspace:*",
     "axios": "^1.7.9",
     "class-transformer": "^0.5.1",

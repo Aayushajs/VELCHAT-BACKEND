@@ -12,8 +12,8 @@ import { PostgresClient } from '@velchat/database';
 import { ValkeyClient } from '@velchat/cache';
 import { createPushRouter } from '@velchat/push';
 import { createMailer } from '@velchat/mail';
-import { NotificationModule } from './notify/notification.module';
-import { CampaignModule } from './campaigns/campaign.module';
+import { NotificationModule } from '@velchat/feature-notification';
+import { CampaignModule } from '@velchat/feature-notification';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const PG_CLIENT = Symbol('PG_CLIENT');

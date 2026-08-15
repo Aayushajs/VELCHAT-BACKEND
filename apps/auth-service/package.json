@@ -27,6 +27,7 @@
     "@velchat/crypto": "workspace:^",
     "@velchat/database": "workspace:*",
     "@velchat/event-bus": "workspace:*",
+    "@velchat/feature-auth": "workspace:*",
     "@velchat/mail": "workspace:*",
     "@velchat/shared-types": "workspace:*",
     "axios": "^1.7.9",

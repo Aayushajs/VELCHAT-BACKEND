@@ -98,6 +98,9 @@ importers:
       '@velchat/event-bus':
         specifier: workspace:*
         version: link:../../libs/event-bus
+      '@velchat/feature-ai':
+        specifier: workspace:*
+        version: link:../../libs/feature-ai
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
@@ -229,6 +232,9 @@ importers:
       '@velchat/event-bus':
         specifier: workspace:*
         version: link:../../libs/event-bus
+      '@velchat/feature-auth':
+        specifier: workspace:*
+        version: link:../../libs/feature-auth
       '@velchat/mail':
         specifier: workspace:*
         version: link:../../libs/mail
@@ -320,6 +326,9 @@ importers:
       '@velchat/event-bus':
         specifier: workspace:*
         version: link:../../libs/event-bus
+      '@velchat/feature-automation':
+        specifier: workspace:*
+        version: link:../../libs/feature-automation
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
@@ -387,6 +396,9 @@ importers:
       '@velchat/event-bus':
         specifier: workspace:*
         version: link:../../libs/event-bus
+      '@velchat/feature-call':
+        specifier: workspace:*
+        version: link:../../libs/feature-call
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
@@ -523,6 +535,9 @@ importers:
       '@velchat/event-bus':
         specifier: workspace:*
         version: link:../../libs/event-bus
+      '@velchat/feature-group-channel':
+        specifier: workspace:*
+        version: link:../../libs/feature-group-channel
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
@@ -587,6 +602,9 @@ importers:
       '@velchat/event-bus':
         specifier: workspace:*
         version: link:../../libs/event-bus
+      '@velchat/feature-media':
+        specifier: workspace:*
+        version: link:../../libs/feature-media
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
@@ -663,6 +681,9 @@ importers:
       '@velchat/event-bus':
         specifier: workspace:*
         version: link:../../libs/event-bus
+      '@velchat/feature-notification':
+        specifier: workspace:*
+        version: link:../../libs/feature-notification
       '@velchat/mail':
         specifier: workspace:*
         version: link:../../libs/mail
@@ -739,6 +760,12 @@ importers:
       '@velchat/event-bus':
         specifier: workspace:*
         version: link:../../libs/event-bus
+      '@velchat/feature-presence':
+        specifier: workspace:*
+        version: link:../../libs/feature-presence
+      '@velchat/feature-status':
+        specifier: workspace:*
+        version: link:../../libs/feature-status
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
@@ -796,6 +823,9 @@ importers:
       '@velchat/event-bus':
         specifier: workspace:*
         version: link:../../libs/event-bus
+      '@velchat/feature-realtime':
+        specifier: workspace:*
+        version: link:../../libs/feature-realtime
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
@@ -863,6 +893,9 @@ importers:
       '@velchat/event-bus':
         specifier: workspace:*
         version: link:../../libs/event-bus
+      '@velchat/feature-search':
+        specifier: workspace:*
+        version: link:../../libs/feature-search
       '@velchat/search':
         specifier: workspace:*
         version: link:../../libs/search
@@ -926,6 +959,9 @@ importers:
       '@velchat/event-bus':
         specifier: workspace:*
         version: link:../../libs/event-bus
+      '@velchat/feature-user':
+        specifier: workspace:*
+        version: link:../../libs/feature-user
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../../libs/shared-types
@@ -1075,6 +1111,155 @@ importers:
         specifier: ^9.6.0
         version: 9.14.0
 
+  libs/feature-ai:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^10.4.15
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^7.4.2
+        version: 7.4.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../common
+      '@velchat/config':
+        specifier: workspace:*
+        version: link:../config
+      '@velchat/database':
+        specifier: workspace:*
+        version: link:../database
+      '@velchat/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      '@velchat/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+      ioredis:
+        specifier: ^5.4.2
+        version: 5.11.1
+      pino:
+        specifier: ^9.6.0
+        version: 9.14.0
+
+  libs/feature-auth:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^10.4.15
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^10.4.15
+        version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@simplewebauthn/server':
+        specifier: ^11.0.0
+        version: 11.0.0
+      '@velchat/cache':
+        specifier: workspace:*
+        version: link:../cache
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../common
+      '@velchat/config':
+        specifier: workspace:*
+        version: link:../config
+      '@velchat/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@velchat/database':
+        specifier: workspace:*
+        version: link:../database
+      '@velchat/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      '@velchat/mail':
+        specifier: workspace:*
+        version: link:../mail
+      '@velchat/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      axios:
+        specifier: ^1.7.9
+        version: 1.18.0
+      ioredis:
+        specifier: ^5.4.2
+        version: 5.11.1
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.3
+      pino:
+        specifier: ^9.6.0
+        version: 9.14.0
+    devDependencies:
+      '@types/jsonwebtoken':
+        specifier: ^9.0.7
+        version: 9.0.10
+
+  libs/feature-automation:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^10.4.15
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^7.4.2
+        version: 7.4.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../common
+      '@velchat/database':
+        specifier: workspace:*
+        version: link:../database
+      '@velchat/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      '@velchat/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+      ioredis:
+        specifier: ^5.4.2
+        version: 5.11.1
+      pino:
+        specifier: ^9.6.0
+        version: 9.14.0
+
+  libs/feature-call:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^10.4.15
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^7.4.2
+        version: 7.4.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../common
+      '@velchat/database':
+        specifier: workspace:*
+        version: link:../database
+      '@velchat/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      '@velchat/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.3
+      pino:
+        specifier: ^9.6.0
+        version: 9.14.0
+    devDependencies:
+      '@types/jsonwebtoken':
+        specifier: ^9.0.7
+        version: 9.0.10
+
   libs/feature-chat:
     dependencies:
       '@nestjs/common':
@@ -1089,6 +1274,241 @@ importers:
       '@velchat/common':
         specifier: workspace:*
         version: link:../common
+      '@velchat/database':
+        specifier: workspace:*
+        version: link:../database
+      '@velchat/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      '@velchat/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+      ioredis:
+        specifier: ^5.4.2
+        version: 5.11.1
+      pino:
+        specifier: ^9.6.0
+        version: 9.14.0
+
+  libs/feature-group-channel:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^10.4.15
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^10.4.15
+        version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^7.4.2
+        version: 7.4.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../common
+      '@velchat/database':
+        specifier: workspace:*
+        version: link:../database
+      '@velchat/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      '@velchat/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+
+  libs/feature-media:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^10.4.15
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/platform-express':
+        specifier: ^10.4.15
+        version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)
+      '@nestjs/swagger':
+        specifier: ^7.4.2
+        version: 7.4.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../common
+      '@velchat/database':
+        specifier: workspace:*
+        version: link:../database
+      '@velchat/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      '@velchat/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      '@velchat/storage':
+        specifier: workspace:*
+        version: link:../storage
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+      pino:
+        specifier: ^9.6.0
+        version: 9.14.0
+
+  libs/feature-notification:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^10.4.15
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^7.4.2
+        version: 7.4.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../common
+      '@velchat/database':
+        specifier: workspace:*
+        version: link:../database
+      '@velchat/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      '@velchat/mail':
+        specifier: workspace:*
+        version: link:../mail
+      '@velchat/push':
+        specifier: workspace:*
+        version: link:../push
+      '@velchat/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+      ioredis:
+        specifier: ^5.4.2
+        version: 5.11.1
+      pino:
+        specifier: ^9.6.0
+        version: 9.14.0
+
+  libs/feature-presence:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^10.4.15
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^7.4.2
+        version: 7.4.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../common
+      '@velchat/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      '@velchat/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+      ioredis:
+        specifier: ^5.4.2
+        version: 5.11.1
+
+  libs/feature-realtime:
+    dependencies:
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../common
+      '@velchat/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      '@velchat/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      ioredis:
+        specifier: ^5.4.2
+        version: 5.11.1
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.3
+      ws:
+        specifier: ^8.18.0
+        version: 8.21.0
+    devDependencies:
+      '@types/jsonwebtoken':
+        specifier: ^9.0.7
+        version: 9.0.10
+      '@types/ws':
+        specifier: ^8.5.13
+        version: 8.18.1
+
+  libs/feature-search:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^10.4.15
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^7.4.2
+        version: 7.4.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../common
+      '@velchat/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      '@velchat/search':
+        specifier: workspace:*
+        version: link:../search
+      '@velchat/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+
+  libs/feature-status:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^10.4.15
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^7.4.2
+        version: 7.4.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../common
+      '@velchat/database':
+        specifier: workspace:*
+        version: link:../database
+      '@velchat/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      '@velchat/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+      pino:
+        specifier: ^9.6.0
+        version: 9.14.0
+
+  libs/feature-user:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^10.4.15
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^7.4.2
+        version: 7.4.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@velchat/cache':
+        specifier: workspace:*
+        version: link:../cache
+      '@velchat/common':
+        specifier: workspace:*
+        version: link:../common
+      '@velchat/crypto':
+        specifier: workspace:*
+        version: link:../crypto
       '@velchat/database':
         specifier: workspace:*
         version: link:../database

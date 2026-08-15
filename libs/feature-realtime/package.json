@@ -1,0 +1,27 @@
+{
+  "name": "@velchat/feature-realtime",
+  "version": "0.1.0",
+  "private": true,
+  "description": "realtime feature library — runtime-agnostic; the composition root injects infra.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "jest",
+    "clean": "rimraf dist .turbo coverage"
+  },
+  "dependencies": {
+    "@velchat/common": "workspace:*",
+    "@velchat/event-bus": "workspace:*",
+    "@velchat/shared-types": "workspace:*",
+    "ioredis": "^5.4.2",
+    "jsonwebtoken": "^9.0.2",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/ws": "^8.5.13"
+  }
+}

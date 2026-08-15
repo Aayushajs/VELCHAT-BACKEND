@@ -51,3 +51,5 @@ CLAUDE.md
 .claude/
 
 .early.coverage
+# Jest per-package transform cache (see jest.preset.cjs)
+.jest-cache/

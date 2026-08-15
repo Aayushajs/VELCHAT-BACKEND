@@ -10,10 +10,10 @@ import {
 import { createEventBus, type EventBus } from '@velchat/event-bus';
 import { PostgresClient, MongoClient } from '@velchat/database';
 import { ValkeyClient } from '@velchat/cache';
-import { AutomationModule } from './automation/automation.module';
-import { ListsModule } from './lists/lists.module';
-import { CollabModule } from './collab/collab.module';
-import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
+import { AutomationModule } from '@velchat/feature-automation';
+import { ListsModule } from '@velchat/feature-automation';
+import { CollabModule } from '@velchat/feature-automation';
+import { FeatureFlagsModule } from '@velchat/feature-automation';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const PG_CLIENT = Symbol('PG_CLIENT');

@@ -10,8 +10,8 @@ import {
 import { createEventBus, type EventBus } from '@velchat/event-bus';
 import { ValkeyClient } from '@velchat/cache';
 import { PostgresClient } from '@velchat/database';
-import { StatusModule } from './status/status.module';
-import { PresenceModule } from './presence/presence.module';
+import { StatusModule } from '@velchat/feature-status';
+import { PresenceModule } from '@velchat/feature-presence';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const VALKEY_CLIENT = Symbol('VALKEY_CLIENT');

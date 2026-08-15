@@ -9,7 +9,7 @@ import {
 } from '@velchat/common';
 import { createEventBus } from '@velchat/event-bus';
 import { PostgresClient } from '@velchat/database';
-import { ChannelsModule } from './channels/channels.module';
+import { ChannelsModule } from '@velchat/feature-group-channel';
 
 export interface AppDeps {
   config: AppConfig;

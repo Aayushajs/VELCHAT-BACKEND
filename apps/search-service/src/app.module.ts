@@ -9,7 +9,7 @@ import {
 } from '@velchat/common';
 import { createEventBus, type EventBus } from '@velchat/event-bus';
 import { createSearchIndex, type SearchIndex } from '@velchat/search';
-import { SearchModule } from './search/search.module';
+import { SearchModule } from '@velchat/feature-search';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const SEARCH_INDEX = Symbol('SEARCH_INDEX');

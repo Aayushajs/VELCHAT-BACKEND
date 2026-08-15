@@ -10,9 +10,9 @@ import {
 import { createEventBus, type EventBus } from '@velchat/event-bus';
 import { ValkeyClient } from '@velchat/cache';
 import { PostgresClient } from '@velchat/database';
-import { TranslateModule } from './translate/translate.module';
-import { createAiGateway } from './ai-gateway/create-ai-gateway';
-import { CaptionModule } from './realtime-translate/caption.module';
+import { TranslateModule } from '@velchat/feature-ai';
+import { createAiGateway } from '@velchat/feature-ai';
+import { CaptionModule } from '@velchat/feature-ai';
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 export const VALKEY_CLIENT = Symbol('VALKEY_CLIENT');

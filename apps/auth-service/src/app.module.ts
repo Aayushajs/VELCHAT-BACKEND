@@ -10,7 +10,7 @@ import {
 import { createEventBus } from '@velchat/event-bus';
 import { PostgresClient } from '@velchat/database';
 import { ValkeyClient } from '@velchat/cache';
-import { AuthModule } from './auth/auth.module';
+import { AuthModule } from '@velchat/feature-auth';
 
 export interface AppDeps {
   config: AppConfig;
