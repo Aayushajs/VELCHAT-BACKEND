@@ -1,0 +1,25 @@
+{
+  "name": "@velchat/infra-context",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Need-declared infrastructure construction — a composition root opens exactly the clients it asks for, and nothing else.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "jest",
+    "clean": "rimraf dist .turbo coverage"
+  },
+  "dependencies": {
+    "@velchat/cache": "workspace:*",
+    "@velchat/common": "workspace:*",
+    "@velchat/config": "workspace:*",
+    "@velchat/database": "workspace:*",
+    "@velchat/event-bus": "workspace:*",
+    "@velchat/search": "workspace:*",
+    "@velchat/storage": "workspace:*",
+    "pino": "^9.6.0"
+  }
+}
