@@ -361,14 +361,15 @@ the $300 credits expire**, because the credits are never used.
 
 ### 4.1 Two Oracle risks that change the design
 
-**ORA-01 — Idle reclamation (S1).** Oracle deems a compute instance idle when **95th-percentile CPU
-is under 20% across a 7-day window**, and Always Free idle instances may be reclaimed. An idle chat
-backend sits far below that. This would reproduce, on Oracle, the exact suspension problem we are
-leaving Render to escape.
+**Operating constraint set by the project owner:** strictly Always Free. **No PAYG, no use of the
+$300 trial credits, and no artificial CPU load.** These are hard constraints, not preferences.
 
-p95 ≥ 20% requires CPU above 20% for **more than 5% of the week ≈ 8.4 hours**. That is met with
-*genuinely useful* scheduled work rather than a busy-loop — a `maintenance` container running roughly
-90 minutes a day:
+**ORA-01 — Idle reclamation (S1, NOT fully mitigable).** Oracle deems a compute instance idle when
+**95th-percentile CPU is under 20% across a 7-day window**, and idle Always Free compute instances
+may be reclaimed. A low-traffic chat backend sits far below that threshold.
+
+A `maintenance` container runs roughly 90 minutes a day of **genuinely useful** work. Every line
+below would be worth running even if reclamation did not exist:
 
 ```
 02:00  pg_dump + mongodump + gzip -9        → Object Storage    (~25 min, CPU-bound on gzip)
@@ -380,20 +381,25 @@ p95 ≥ 20% requires CPU above 20% for **more than 5% of the week ≈ 8.4 hours*
 04:00  image prune, log rotate, integration suite               (~15 min)
 ```
 
-Every line is work worth doing. Keeping the instance alive is a by-product, not the purpose.
+**This is explicitly NOT claimed as protection from reclamation.** Two reasons to distrust it:
 
-The alternative mitigation — upgrading to Pay-As-You-Go while staying inside Always Free limits —
-exempts the instance from idle reclamation and improves A1 capacity priority, at ₹0 as long as usage
-stays within the free allowances. It requires a card and therefore an OCI **budget alert at $1** plus
-hard service limits. Offered as an explicit choice (see ORA-01 in §7) — not assumed by this design.
+1. The published rule is p95 CPU over a 7-day window, but Oracle does not publish how CPU is
+   sampled, whether memory and network are also weighed, or whether the threshold changes. The
+   allocation itself changed on 2026-06-15 with no announcement.
+2. Even if the arithmetic holds today (≈10.5 h/week above 20% against an 8.4 h requirement), it is
+   a side effect of useful work, not a contract.
+
+Therefore ORA-01 is treated as an **unmitigable residual risk**, and the design's answer is not
+prevention but **fast, automated, tested recovery** (§4.4). PAYG — which does exempt an instance from
+idle reclamation — is **excluded by owner decision** and will not be used without explicit approval.
 
 **ORA-02 — A1 "Out of host capacity" (S1).** A1 capacity is heavily constrained in most regions;
-provisioning frequently fails outright. This is a *deployment blocker*, not a performance issue.
-Mitigations, in order: (1) an OCI-CLI launch-retry script (`oci compute instance launch` in a
-backoff loop — this is the standard workaround and usually succeeds within hours); (2) try every
-availability domain in the region; (3) PAYG upgrade for capacity priority; (4) as a stopgap only, the
-2 × AMD `E2.1.Micro` Always Free instances — 1/8 OCPU and 1 GB RAM each, enough for Caddy plus a
-watchdog but **not** for this stack.
+provisioning frequently fails outright. This is a *deployment and recovery* blocker, not a
+performance issue. Mitigations, in order: (1) the OCI-CLI launch-retry loop in §4.4 — the standard
+workaround, usually successful within hours; (2) every availability domain in the region; (3) as a
+stopgap only, the 2 × AMD `E2.1.Micro` Always Free instances (1/8 OCPU, 1 GB RAM each) — enough for
+Caddy plus a maintenance page, **not** for this stack. PAYG capacity priority is excluded by owner
+decision.
 
 ### 4.2 Region: Mumbai vs Hyderabad
 
@@ -406,10 +412,10 @@ in the tenancy's home region, and the home region is fixed at signup.**
 - **Hyderabad** — newer, less contested, so typically easier A1 provisioning; adds roughly 10–20 ms
   for north and west India users.
 
-**Recommendation: Mumbai.** Capacity is a *temporary* obstacle with a known workaround (retry
-script, PAYG priority), whereas the latency penalty and the home-region choice are effectively
-**permanent**. Trading a permanent cost for a temporary one is the wrong trade. Choose Hyderabad only
-if a Mumbai retry script fails to obtain A1 within about 72 hours.
+**Decision: `ap-mumbai-1` (owner-approved).** Capacity is a *temporary* obstacle with a known
+workaround (retry loop across all ADs), whereas the latency penalty and the home-region choice are
+effectively **permanent**. Trading a permanent cost for a temporary one is the wrong trade. Fall back
+to Hyderabad only if the Mumbai retry loop fails to obtain A1 within about 72 hours.
 
 I could not find hard published A1-availability data per India region; the Mumbai-is-more-contested
 point is inference from its size and general community reports, so treat it as a judgement call
@@ -423,6 +429,108 @@ rather than a measured fact.
 | Kafka 3.8 | ~1,200 MB | Redis Streams on local Valkey (already the default) |
 | MinIO | ~200 MB | Oracle Object Storage via the **existing** `s3` adapter |
 | | **~3.9 GB** | |
+
+### 4.4 Reclaim / capacity-loss recovery (the real answer to ORA-01 and ORA-02)
+
+Because reclamation cannot be reliably prevented within Always Free, the design assumes the VM
+**will** disappear at some point and makes that a recoverable, rehearsed event.
+
+**Step 1 — Classify state by what it costs to lose.**
+
+| State | Lives in | Survives VM loss? | Recovery |
+|---|---|---|---|
+| Messages, receipts, reactions | Mongo | ❌ on the VM | restore from Object Storage |
+| Accounts, devices, keys, orgs, channels, status, media meta | Postgres | ❌ on the VM | restore from Object Storage |
+| Media blobs | **Object Storage** | ✅ independent service | nothing to do |
+| Backups | **Object Storage** | ✅ independent service | the recovery source itself |
+| `seq:*` counters | Valkey | ❌ | **reseeded from `MAX(seq)` in Mongo** — the DEF-01 fix |
+| Connection registry, typing, presence, rate-limit counters, idempotency set | Valkey | ❌ | rebuild on reconnect; ephemeral by definition |
+
+A consequence worth stating: **after the DEF-01 fix, Valkey holds no durable state and needs no
+backup.** Everything in it is either ephemeral or derivable from Mongo. That removes a whole class of
+recovery work.
+
+**Step 2 — Continuous backup to Object Storage** (a service independent of the compute instance):
+
+| Source | Method | Cadence | RPO |
+|---|---|---|---|
+| Postgres | `archive_command` → Object Storage, `archive_timeout = 300` + nightly base backup | WAL every 5 min | **~5 min** |
+| Mongo append-only (`messages`) | incremental export using `_id` as the watermark — `_id` is UUIDv7, so it is time-sortable and `find({_id: {$gt: lastId}})` is an exact "everything new" query | every 15 min | **~15 min** |
+| Mongo mutable (`receipts`, `reactions`) | watermark on `ts` / `updated_at` (added where missing); replay is idempotent because receipts upsert with `$max: { up_to_seq }` | every 15 min | **~15 min** |
+| Valkey | none required (see Step 1) | — | n/a |
+
+**Step 3 — The recovery driver lives OFF Oracle.** A reclaimed instance cannot detect or repair
+itself, and a custodian inside the same tenancy is subject to the same reclamation. So detection and
+re-provisioning run in **GitHub Actions** (free tier):
+
+```
+.github/workflows/oracle-watchdog.yml     cron: */15 * * * *
+  1. probe https://<host>/health  (3 attempts, 10s timeout)
+  2. healthy → exit
+  3. unhealthy twice in a row → open an issue + notify, then:
+       a. oci compute instance launch  (retry loop, all ADs in ap-mumbai-1,
+          from the saved custom image — not from scratch)
+       b. on success: attach block volume, docker compose up, restore latest
+          base backup + replay WAL + replay Mongo increments
+       c. re-point DNS, run the k6 smoke test, verify, close the issue
+```
+
+Cost check: 96 runs/day × ~20 s ≈ **960 minutes/month** against GitHub's 2,000 free
+minutes for private repositories. Detection latency ≈ 15–30 min. (An external free uptime
+monitor can cut detection to ~5 min and is optional — it is a monitor, not part of the data tier.)
+
+**Step 4 — Make the rebuild fast and pre-staged.** Provisioned in Phase 5, before any crisis, because
+none of it can be obtained *during* one:
+
+- A **custom image** of the fully configured VM (Always Free includes 5 volume backups) so rebuild is
+  "launch from image", not "install everything". Bootstrap drops from ~15 min to ~5 min.
+- The **2 × AMD `E2.1.Micro`** Always Free instances, provisioned and idle, running Caddy plus a
+  maintenance page. They cannot run the stack, but they keep DNS resolving to something honest
+  instead of failing, during a capacity wait.
+- `deploy/oracle/bootstrap.sh` + `restore.sh`, both exercised by the nightly restore drill — so the
+  recovery path is tested every single day rather than discovered during an outage.
+
+**Step 5 — Honest RTO.**
+
+```
+detect  15-30 min   (GitHub Actions cron)
+relaunch 0 - hours  ← UNBOUNDED if A1 capacity is unavailable (ORA-02)
+rebuild ~5 min      (custom image)
+restore ~10 min     (base backup + WAL + Mongo increments)
+─────────────────────────────────────────────────────────────
+RTO ≈ 35-45 min  when A1 capacity is available
+RTO   unbounded  when it is not
+```
+
+The unbounded case is the residual risk that **cannot be eliminated inside Always Free**. What makes
+it survivable rather than catastrophic: **RPO stays at 5–15 min regardless** (backups are in a
+service that was never on the VM), and the mobile client is offline-first — the outbox holds unsent
+messages and `afterSeq` catch-up reconciles everything when service returns. An outage becomes a
+delay, not data loss.
+
+**Optional off-tenancy hardening** (not required, and external — flagged because a tenancy-level
+loss would take Object Storage with it): a weekly encrypted copy of the latest dump to a second free
+object store (Cloudflare R2 10 GB / Backblaze B2 10 GB). Pure disaster insurance; the primary path
+never depends on it.
+
+### 4.5 Portability — AWS / Azure without touching application code
+
+The portability layer is the **container image plus the env contract**, not the orchestrator. Nothing
+in `apps/**` or `libs/**` imports a cloud SDK; every cloud-specific choice is an adapter selected by
+an environment variable.
+
+| Target | Orchestration | Adapter changes needed |
+|---|---|---|
+| Oracle Always Free (now) | Docker Compose on one A1 VM | `STORAGE_PROVIDER=s3` → Oracle Object Storage S3-compatible endpoint |
+| AWS EC2 | same `compose.yml` | `STORAGE_PROVIDER=s3` → S3. **Zero code change.** |
+| AWS ECS | task definitions from the same images | zero |
+| AWS EKS | `deploy/helm` (6 values files) | zero; `EVENT_BUS=kafka` available if MSK is ever wanted |
+| Azure VM | same `compose.yml` | ⚠️ Azure Blob is **not** S3-compatible → needs either a small `azure-blob` adapter alongside the existing `s3`/`cloudinary` ones, or MinIO in S3-gateway mode |
+| Azure AKS | `deploy/helm` | same caveat as Azure VM |
+
+Guarded in CI so this does not rot: images are built `--platform linux/amd64,linux/arm64` from
+Phase 3, and an env-parity test asserts `compose.oracle.yml` and the Helm values expose an identical
+env key set (DEP-01).
 
 ---
 
@@ -606,11 +714,13 @@ Move DNS. After 7 more days clean, delete the 13 old `apps/`, their Dockerfiles,
 
 | ID | Risk | Sev | Likelihood | Mitigation | Residual |
 |---|---|---|---|---|---|
-| ORA-01 | Idle reclamation, p95 CPU < 20% / 7 days | S1 | High if unmitigated | Useful ~90 min/day maintenance workload (§4.1); CPU p95 alert at 25%; optional PAYG exemption | Low |
-| ORA-02 | A1 out of host capacity | S1 | High | Launch-retry script; all ADs; PAYG priority; Hyderabad fallback after 72h | Medium — schedule risk only, not a design flaw |
-| ORA-03 | 20 GB object storage ceiling | S2 | Medium at scale | Alert at 16 GB; documented switch to block-volume media | Low |
-| ORA-04 | Single VM = SPOF | S2 | Certain by design | Nightly dump + boot-volume snapshot; weekly restore drill; `deploy/ORACLE.md` rebuild is ~30 min | Accepted: RTO ~30 min, RPO ~24 h. Worse than §D2's 5 min / 30 min — **an explicit free-tier trade-off** |
-| ORA-05 | Free-tier terms change again (they did on 2026-06-15) | S2 | Medium | Everything is a portable container + env contract; §4 re-check quarterly | Low |
+| ORA-01 | Idle reclamation, p95 CPU < 20% / 7 days | S1 | High | **Not preventable inside Always Free.** Useful ~90 min/day maintenance work (§4.1) probably clears the published threshold but is explicitly **not** relied on. Real answer: automated tested recovery (§4.4). PAYG exemption **excluded by owner decision.** | **Medium — accepted and unmitigable.** Impact bounded to an availability gap, never data loss (RPO 5–15 min holds because backups live off the VM) |
+| ORA-02 | A1 out of host capacity — blocks both first deploy **and** recovery | S1 | High | OCI-CLI launch-retry loop across all ADs; launch from a pre-saved custom image; AMD micros hold DNS with a maintenance page; Hyderabad fallback if Mumbai fails > 72 h. PAYG capacity priority **excluded by owner decision.** | **Medium-High — RTO is unbounded while capacity is unavailable.** The single largest residual risk in this design |
+| ORA-03 | 20 GB object storage ceiling (media + backups share it) | S2 | Medium at scale | Alert at 16 GB; documented switch of media to the block volume (~90 GB) behind a `local` storage adapter | Low |
+| ORA-04 | Single VM = SPOF, no HA possible on Always Free | S2 | Certain by design | Postgres WAL every 5 min + Mongo increments every 15 min → Object Storage; custom image; **nightly restore drill so the recovery path is tested daily** | Accepted: **RPO 5–15 min** (meets §D2's ≤5 min for Postgres, close for Mongo), **RTO 35–45 min** subject to ORA-02. No HA — an explicit free-tier trade-off |
+| ORA-05 | Free-tier terms change again (they did, unannounced, on 2026-06-15) | S2 | Medium | Everything is a portable image + env contract (§4.5); quarterly §4 re-check; AWS path needs zero code change | Low |
+| ORA-06 | Tenancy-level loss would take Object Storage backups with it | S2 | Low | Optional weekly encrypted copy to a second free object store (§4.4); primary path never depends on it | Low if adopted, Medium if not |
+| ORA-07 | GitHub Actions watchdog exhausts free minutes or is itself unavailable | S3 | Low | 960 of 2,000 free min/month used; manual `workflow_dispatch` fallback; optional external uptime monitor | Low |
 | DAT-01 | Valkey loss resets `seq` ⇒ silent client-side message drop | **S1** | High today | DEF-01 fix: durable seed + `noeviction` + AOF + duplicate-key retry | Low |
 | DAT-02 | Event marked processed then lost on crash | S1 | Medium | DEF-03 fix: mark after handling | Low |
 | DAT-03 | Events stuck in the PEL forever | S1 | Medium | DEF-04 fix: `XAUTOCLAIM` reclaim loop | Low |
@@ -786,13 +896,25 @@ directly, so **Phase 0 fixes them first, on the current topology**, before any f
 ordering is deliberate: each fix gets verified in isolation instead of being entangled with the
 restructure.
 
-**Deployment.** Oracle Always Free fits with 7.5 GB of RAM headroom, and the design uses **none** of
-the $300 credits, so nothing changes when they expire. Two Oracle-specific risks are real and are
-designed around rather than assumed away: idle reclamation (ORA-01, answered with a genuinely useful
-90-min/day maintenance window that keeps p95 CPU above 20%) and A1 capacity (ORA-02, a schedule risk
-with a known retry workaround). Region: **Mumbai**, because the latency and home-region choices are
-permanent while capacity scarcity is temporary.
+**Deployment.** Oracle Always Free fits with 7.5 GB of RAM headroom. The design uses **none** of the
+$300 credits and **no PAYG**, so nothing changes when the trial expires. Region: **Mumbai**, because
+latency and the home-region choice are permanent while capacity scarcity is temporary.
 
-**Accepted trade-off, stated plainly.** A single VM gives RTO ≈ 30 min and RPO ≈ 24 h, against
-§D2's targets of 30 min and 5 min. RPO is worse by design — that is the price of ₹0, and the honest
-mitigation is the nightly dump plus a *tested* restore drill, not a claim of high availability.
+**What cannot be fixed inside Always Free — stated plainly.**
+
+- **Idle reclamation (ORA-01) is not preventable.** The maintenance window does ~90 minutes a day of
+  genuinely useful work and probably clears the published p95-CPU threshold, but Oracle does not
+  document how it samples, the allocation already changed unannounced once, and PAYG — the only real
+  exemption — is excluded by owner decision. So the design does not claim prevention. It claims
+  **tested recovery**: §4.4 keeps all durable state in Object Storage (a service that was never on
+  the VM), drives detection and re-provisioning from **GitHub Actions outside Oracle**, and rehearses
+  the restore **every night**.
+- **A1 capacity (ORA-02) makes RTO unbounded.** If Oracle has no A1 capacity when recovery runs, the
+  service stays down until it does. This is the single largest residual risk and there is no free fix.
+- **No HA.** One VM, no failover. RPO **5–15 min**, RTO **35–45 min** when capacity exists.
+
+What makes those survivable rather than catastrophic: RPO holds regardless of how long the VM is
+gone, and the mobile client is offline-first — the outbox retains unsent messages and `afterSeq`
+catch-up reconciles on return. **An outage degrades to a delay, not data loss.** That is the honest
+shape of a ₹0 deployment, and it is a better shape than the current Render + Neon + Upstash setup,
+where quota exhaustion causes suspensions *and* the non-durable `seq` (DEF-01) causes silent loss.
