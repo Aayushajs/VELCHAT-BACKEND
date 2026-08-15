@@ -179,6 +179,18 @@ export const envSchema = z.object({
   // Auth
   JWT_ISSUER: z.string().optional(),
   JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+  // RS256 signing keypair. The PUBLIC half is needed by EVERY service so each can verify access
+  // tokens itself (§B2.3) — it is a public key, safe to distribute. Absent in production ⇒ the
+  // service refuses to boot rather than serving unauthenticated traffic (DEF-02).
+  // Absent in auth-service ⇒ an EPHEMERAL keypair is generated, so every restart invalidates all
+  // outstanding tokens and no other service can verify them (DEF-13). Always set both in prod.
+  JWT_PRIVATE_PEM: z.string().optional(),
+  JWT_PUBLIC_PEM: z.string().optional(),
+  // Explicit, greppable dev escape hatch: run without JWT verification. Refused in production.
+  AUTH_DEV_INSECURE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
 
   // Mail (self-hosted Postfix SMTP). Unset → mail is logged only (dev).
   SMTP_URL: z.string().optional(),
