@@ -96,3 +96,58 @@ describe('ChatService.send (§B4.2 hot path)', () => {
     expect(text).toBeUndefined();
   });
 });
+
+/** Mongo duplicate-key error, as the driver raises it for either unique index on `messages`. */
+const duplicateKey = () => Object.assign(new Error('E11000 duplicate key'), { code: 11000 });
+
+describe('ChatService.send — seq collision backstop (DEF-01)', () => {
+  it('retries with a fresh seq when the insert collides on (conversation_id, seq)', async () => {
+    const { svc, repo, seq } = makeChat();
+    // A duplicate-key with NO matching client_msg_id row can only be the seq index: the counter
+    // handed out a value already taken (a cold-start race, or a counter restored behind reality).
+    repo.insert.mockRejectedValueOnce(duplicateKey());
+    seq.next.mockResolvedValueOnce(42).mockResolvedValueOnce(43);
+
+    const ack = await svc.send(input);
+
+    expect(ack.seq).toBe(43);
+    expect(repo.insert).toHaveBeenCalledTimes(2);
+  });
+
+  it('still returns the existing message when the collision IS a duplicate client_msg_id', async () => {
+    const { svc, repo, seq } = makeChat();
+    repo.insert.mockRejectedValueOnce(duplicateKey());
+    repo.findByClientMsgId
+      .mockResolvedValueOnce(null) // pre-insert dedupe check finds nothing
+      .mockResolvedValueOnce({
+        _id: 'm-winner',
+        seq: 7,
+        server_ts: '2026-01-01T00:00:00Z',
+      } as MessageDoc);
+
+    const ack = await svc.send(input);
+
+    expect(ack).toEqual({ messageId: 'm-winner', seq: 7, serverTs: '2026-01-01T00:00:00Z' });
+    expect(repo.insert).toHaveBeenCalledTimes(1);
+    expect(seq.next).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives up after bounded retries rather than looping forever', async () => {
+    const { svc, repo } = makeChat();
+    repo.insert.mockRejectedValue(duplicateKey());
+
+    await expect(svc.send(input)).rejects.toThrow();
+
+    expect(repo.insert.mock.calls.length).toBeGreaterThan(1);
+    expect(repo.insert.mock.calls.length).toBeLessThanOrEqual(4);
+  });
+
+  it('does not retry a non-duplicate insert failure', async () => {
+    const { svc, repo } = makeChat();
+    repo.insert.mockRejectedValue(new Error('connection reset'));
+
+    await expect(svc.send(input)).rejects.toThrow('connection reset');
+
+    expect(repo.insert).toHaveBeenCalledTimes(1);
+  });
+});

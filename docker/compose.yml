@@ -34,9 +34,27 @@ services:
       timeout: 5s
       retries: 10
 
+  # Durability matters here even though Valkey is "just a cache": it also holds the per-conversation
+  # `seq:*` counters. `noeviction` is the load-bearing flag — under memory pressure a `seq` key must
+  # NEVER be silently evicted (DEF-01); writes failing loudly is the correct behaviour, because a
+  # reissued seq is silent message loss on the client. AOF makes a restart survivable; SeqService
+  # re-seeds from Mongo if it is lost anyway.
   valkey:
     image: valkey/valkey:8-alpine
-    command: ['valkey-server', '--save', '', '--appendonly', 'no']
+    command:
+      [
+        'valkey-server',
+        '--appendonly',
+        'yes',
+        '--appendfsync',
+        'everysec',
+        '--maxmemory',
+        '256mb',
+        '--maxmemory-policy',
+        'noeviction',
+      ]
+    volumes:
+      - valkeydata:/data
     ports:
       - '6379:6379'
     healthcheck:
@@ -114,6 +132,7 @@ services:
 
 volumes:
   pgdata:
+  valkeydata:
   mongodata:
   osdata:
   miniodata:

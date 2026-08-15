@@ -13,6 +13,9 @@ import type {
   DeleteMessageInput,
 } from './message.types';
 
+/** Bounded seq-collision retries (DEF-01 backstop). Beyond this a collision is a real fault. */
+const MAX_SEQ_ATTEMPTS = 3;
+
 /**
  * Send-message hot path (§B4.2) — does the MINIMUM sync work then emits, for low p99:
  * validate → dedupe(client_msg_id) → assign seq → persist → emit message.sent → ACK.
@@ -34,15 +37,11 @@ export class ChatService {
     const existing = await this.repo.findByClientMsgId(input.conversationId, input.clientMsgId);
     if (existing) return ack(existing);
 
-    // 3. assign seq (atomic per-conversation).
-    const seq = await this.seq.next(input.conversationId);
-
-    // 4. persist (only required sync work).
+    // 3. build the document (everything except the seq, which is assigned per attempt below).
     const now = new Date().toISOString();
-    const doc: MessageDoc = {
+    const base = {
       _id: uuidv7(),
       conversation_id: input.conversationId,
-      seq,
       sender_id: input.senderId,
       client_msg_id: input.clientMsgId,
       type: input.type ?? 'text',
@@ -61,25 +60,37 @@ export class ChatService {
       server_ts: now,
     };
 
-    try {
-      await this.repo.insert(doc);
-    } catch (err) {
-      // Concurrent duplicate (unique index on conversation_id+client_msg_id) → return the winner.
-      if (isDuplicateKey(err)) {
+    // 4. assign seq (atomic per-conversation) and persist. `messages` carries two unique indexes,
+    //    so a duplicate-key here means one of two very different things:
+    //      • client_msg_id → a concurrent send of the SAME message won the race; return its result.
+    //      • conversation_id+seq → the counter handed out a value already taken. This is the
+    //        DEF-01 backstop: it can only happen in a cold-start race or if the counter was
+    //        restored behind reality, and the fix is simply to take a fresh seq and retry.
+    //    Retries are bounded — a persistent collision is a real fault and must surface, not spin.
+    for (let attempt = 1; attempt <= MAX_SEQ_ATTEMPTS; attempt++) {
+      const doc: MessageDoc = { ...base, seq: await this.seq.next(input.conversationId) };
+      try {
+        await this.repo.insert(doc);
+      } catch (err) {
+        if (!isDuplicateKey(err)) throw err;
         const winner = await this.repo.findByClientMsgId(input.conversationId, input.clientMsgId);
         if (winner) return ack(winner);
+        if (attempt === MAX_SEQ_ATTEMPTS) throw err;
+        continue; // seq collision → fresh seq, try again
       }
-      throw err;
+
+      // 5. emit (fan-out, notify, index happen off this event). Carry plaintext for full-text search
+      //    ONLY when server-readable (enterprise/channel + not encrypted); personal E2EE stays opaque.
+      const serverReadable = !!input.tenantId && !input.encrypted;
+      const searchText =
+        serverReadable && typeof doc.content === 'string' ? doc.content : undefined;
+      await this.events.messageSent(doc, input.tenantId ?? null, searchText);
+
+      // 6. fast ACK.
+      return ack(doc);
     }
-
-    // 5. emit (fan-out, notify, index happen off this event). Carry plaintext for full-text search
-    //    ONLY when server-readable (enterprise/channel + not encrypted); personal E2EE stays opaque.
-    const serverReadable = !!input.tenantId && !input.encrypted;
-    const searchText = serverReadable && typeof doc.content === 'string' ? doc.content : undefined;
-    await this.events.messageSent(doc, input.tenantId ?? null, searchText);
-
-    // 6. fast ACK.
-    return ack(doc);
+    /* c8 ignore next */ // unreachable: the loop either returns or throws on the final attempt
+    throw new Error('send: exhausted seq attempts');
   }
 
   async history(conversationId: string, afterSeq = 0, limit = 50): Promise<MessageDoc[]> {

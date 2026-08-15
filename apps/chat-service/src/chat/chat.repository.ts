@@ -25,6 +25,19 @@ export class ChatRepository {
     await col.createIndex({ 'mentions.user_id': 1 });
   }
 
+  /**
+   * Highest persisted seq for a conversation, or 0 when it has none — the durable floor
+   * `SeqService` re-seeds from after a Valkey restart/eviction (DEF-01). Served by a reverse scan
+   * of the existing `{conversation_id: 1, seq: 1}` index, so it costs one index seek.
+   */
+  async maxSeq(conversationId: string): Promise<number> {
+    const doc = await this.collection().findOne(
+      { conversation_id: conversationId },
+      { sort: { seq: -1 }, projection: { seq: 1 } },
+    );
+    return (doc as { seq?: number } | null)?.seq ?? 0;
+  }
+
   async findByClientMsgId(conversationId: string, clientMsgId: string): Promise<MessageDoc | null> {
     const doc = await this.collection().findOne({
       conversation_id: conversationId,
