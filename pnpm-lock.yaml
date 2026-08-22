@@ -300,6 +300,9 @@ importers:
       '@velchat/config':
         specifier: workspace:*
         version: link:../../libs/config
+      '@velchat/feature-contracts':
+        specifier: workspace:*
+        version: link:../../libs/feature-contracts
       '@velchat/feature-realtime':
         specifier: workspace:*
         version: link:../../libs/feature-realtime
@@ -866,6 +869,9 @@ importers:
       '@velchat/event-bus':
         specifier: workspace:*
         version: link:../event-bus
+      '@velchat/feature-contracts':
+        specifier: workspace:*
+        version: link:../feature-contracts
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../shared-types

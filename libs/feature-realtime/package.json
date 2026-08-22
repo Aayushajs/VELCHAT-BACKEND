@@ -15,6 +15,7 @@
   "dependencies": {
     "@velchat/common": "workspace:*",
     "@velchat/event-bus": "workspace:*",
+    "@velchat/feature-contracts": "workspace:*",
     "@velchat/shared-types": "workspace:*",
     "ioredis": "^5.4.2",
     "jsonwebtoken": "^9.0.2",

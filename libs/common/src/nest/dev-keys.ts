@@ -1,4 +1,4 @@
-import { generateKeyPairSync } from 'node:crypto';
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
@@ -99,4 +99,46 @@ function readExisting(privatePath: string, publicPath: string, dir: string): Dev
       /* spin briefly */
     }
   }
+}
+
+/**
+ * Shared internal service-to-service secret for local development.
+ *
+ * Same reasoning as the keypair: the WebSocket fabric refuses inbound receipts and typing unless it
+ * can verify membership, and verifying membership needs this credential. Leaving it unset locally
+ * would make `pnpm start:all` look healthy while receipts were silently refused — a confusing
+ * failure that only shows up as missing blue ticks. Every service on the machine reads the same
+ * file, so the caller and the callee agree.
+ *
+ * Never reachable in production: `resolveInternalSecret` only falls back outside production.
+ */
+export function loadOrCreateDevInternalSecret(): string {
+  const dir = join(repoRoot(), DIR_NAME);
+  const file = join(dir, 'internal.secret');
+  if (existsSync(file)) return readFileSync(file, 'utf8').trim();
+
+  mkdirSync(dir, { recursive: true });
+  const secret = randomBytes(32).toString('base64url');
+  try {
+    // Exclusive create, so concurrently booting services adopt one value instead of each keeping
+    // its own — a mismatch here means the caller is refused by the callee.
+    writeFileSync(file, secret, { mode: 0o600, flag: 'wx' });
+  } catch {
+    return readFileSync(file, 'utf8').trim();
+  }
+  return secret;
+}
+
+/**
+ * The internal secret this process should use: configured in production, generated locally.
+ * Production without one leaves the internal path closed rather than open — endpoints marked
+ * `@AllowInternal()` simply keep requiring a user token.
+ */
+export function resolveInternalSecret(config: {
+  NODE_ENV: string;
+  INTERNAL_API_SECRET?: string;
+}): string | undefined {
+  if (config.INTERNAL_API_SECRET?.trim()) return config.INTERNAL_API_SECRET.trim();
+  if (config.NODE_ENV === 'production') return undefined;
+  return loadOrCreateDevInternalSecret();
 }

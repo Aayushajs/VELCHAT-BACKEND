@@ -34,14 +34,22 @@ export { ResponseInterceptor } from './nest/response.interceptor';
 export {
   JwtAuthGuard,
   Public,
+  AllowInternal,
   IS_PUBLIC_KEY,
+  ALLOW_INTERNAL_KEY,
+  INTERNAL_HEADER,
   type VerifiedPrincipal,
   type JwtAuthGuardOptions,
 } from './nest/jwt-auth.guard';
 export { CurrentUser } from './nest/current-user.decorator';
 export { GlobalAuthModule } from './nest/global-auth.module';
 export { resolveAuthMode, type AuthMode } from './nest/auth-mode';
-export { loadOrCreateDevKeyPair, type DevKeyPair } from './nest/dev-keys';
+export {
+  loadOrCreateDevKeyPair,
+  loadOrCreateDevInternalSecret,
+  resolveInternalSecret,
+  type DevKeyPair,
+} from './nest/dev-keys';
 export { actingAccountId } from './nest/principal';
 export { AllExceptionsFilter } from './nest/all-exceptions.filter';
 export { requestIdMiddleware, requestIdOf, type RequestWithId } from './nest/request-id.middleware';

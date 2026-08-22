@@ -8,7 +8,7 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { CurrentUser, ForbiddenError } from '@velchat/common';
+import { AllowInternal, CurrentUser, ForbiddenError } from '@velchat/common';
 import { ChannelsService } from './channels.service';
 import {
   AddMemberDto,
@@ -137,6 +137,13 @@ export class ChannelsController {
     return this.channels.removeMember(id, actorId, userId);
   }
 
+  /**
+   * Read by the mobile app AND by realtime-service, which resolves membership before it will act on
+   * an inbound receipt/typing/skdm frame and has no user token to present. @AllowInternal() lets it
+   * authenticate with the shared internal secret instead; without that it received 401, read `[]`,
+   * and messages were silently not delivered whenever the Valkey projection was cold (DEF-14).
+   */
+  @AllowInternal()
   @Get('conversations/:id/members')
   @ApiOperation({ summary: 'List member account_ids' })
   @ApiParam({ name: 'id', description: 'Conversation id.' })

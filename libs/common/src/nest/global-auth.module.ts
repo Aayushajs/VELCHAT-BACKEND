@@ -4,6 +4,7 @@ import type { AppConfig } from '@velchat/config';
 import type { Logger } from 'pino';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { resolveAuthMode } from './auth-mode';
+import { resolveInternalSecret } from './dev-keys';
 
 /**
  * Registers {@link JwtAuthGuard} as a GLOBAL guard, so every route in the importing service is
@@ -33,6 +34,9 @@ export class GlobalAuthModule {
     const guard = new JwtAuthGuard(new Reflector(), {
       publicKeyPem: mode.publicKeyPem,
       issuer: mode.issuer,
+      // Enables @AllowInternal() endpoints for service-to-service calls. Unset ⇒ that path stays
+      // closed, and the WebSocket fabric's membership lookups will be refused rather than trusted.
+      internalSecret: resolveInternalSecret(config),
     });
 
     return {

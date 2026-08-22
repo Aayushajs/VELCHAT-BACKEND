@@ -194,6 +194,20 @@ export const envSchema = z.object({
   JWT_PRIVATE_PEM: z.string().optional(),
   JWT_PUBLIC_PEM: z.string().optional(),
   // Explicit, greppable dev escape hatch: run without JWT verification. Refused in production.
+  // Shared secret for service-to-service calls, sent as `x-velchat-internal`. Required by the
+  // membership lookup the WebSocket fabric depends on: that endpoint is user-guarded, so an
+  // internal caller needs its own credential rather than borrowing a user's token (DEF-14).
+  INTERNAL_API_SECRET: z.string().optional(),
+
+  // WebSocket abuse limits (§B9.4). Conservative on purpose: `ws` itself defaults to a 100 MB
+  // frame, which is a memory-exhaustion lever.
+  WS_MAX_PAYLOAD_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(64 * 1024),
+  WS_INBOUND_PER_SECOND: z.coerce.number().int().positive().default(40),
+
   AUTH_DEV_INSECURE: z
     .enum(['true', 'false'])
     .default('false')

@@ -3,7 +3,14 @@ import '@velchat/common/dist/telemetry-bootstrap';
 import 'reflect-metadata';
 import { hostname } from 'node:os';
 import { loadConfig } from '@velchat/config';
-import { createLogger, createMetrics, bootstrapService } from '@velchat/common';
+import { HttpMembershipResolver } from '@velchat/feature-contracts';
+import {
+  createLogger,
+  createMetrics,
+  bootstrapService,
+  resolveInternalSecret,
+  resolveAuthMode,
+} from '@velchat/common';
 import type { InfraContext } from '@velchat/infra-context';
 import {
   ConnectionRegistry,
@@ -48,15 +55,41 @@ async function main(): Promise<void> {
   const skdm = new SkdmService(new SkdmStore(valkey.redis), router, projection, logger);
   const typing = new TypingRelay(projection, router);
 
+  // Authorizes inbound receipts/typing/skdm. Without it the fabric refuses every frame that names a
+  // conversation — fail-closed by design, since a valid token says nothing about membership.
+  const internalSecret = resolveInternalSecret(config);
+  const membership = internalSecret
+    ? new HttpMembershipResolver({
+        baseUrl: process.env.UPSTREAM_IDENTITY || 'http://localhost:3002',
+        secret: internalSecret,
+      })
+    : undefined;
+  if (!membership) {
+    logger.warn(
+      'INTERNAL_API_SECRET is not set in production: inbound receipts, typing and sender-key ' +
+        'frames will be REFUSED because membership cannot be verified. Live delivery still works.',
+    );
+  }
+
   const fabric = new WsFabric(app.getHttpServer(), valkey.redis, registry, logger, {
     podId: process.env.POD_ID ?? hostname(),
-    // Schema-backed key. Undefined here would make the fabric fall back to `jwt.decode` and
-    // accept forged tokens (DEF-06), so a production deployment must set it — GlobalAuthModule
-    // already refuses to boot without it.
-    jwtPublicKey: config.JWT_PUBLIC_PEM,
+    // The SAME key the HTTP guard verifies with. Reading config.JWT_PUBLIC_PEM directly was wrong:
+    // outside production that is unset and the real key comes from the shared dev pair, so the
+    // fabric ended up with no key — and, now that it fails closed rather than falling back to
+    // `jwt.decode` (DEF-06), it rejected every socket while HTTP requests worked fine.
+    jwtPublicKey: resolveAuthMode(config).publicKeyPem,
     sink: bus ? new ReceiptPublisher(bus) : undefined,
     skdm,
     typing,
+    membership,
+    maxPayloadBytes: config.WS_MAX_PAYLOAD_BYTES,
+    inboundPerSecond: config.WS_INBOUND_PER_SECOND,
+    // '*' means "no origin restriction" (native clients send no Origin at all); an explicit list
+    // restricts browser clients to the app's own origins.
+    allowedOrigins:
+      config.CORS_ORIGINS.trim() === '*'
+        ? undefined
+        : config.CORS_ORIGINS.split(',').map((o) => o.trim()),
   });
   await fabric.start();
 
