@@ -107,11 +107,19 @@ apps/                         # 6 runtime services — thin composition roots (~
   platform-service/           #  call + automation + ai                     Postgres · Valkey · Mongo
   velchat-mono/               #  every group in ONE process (for a 1 GB box; SPLIT_PROFILE=mono)
 libs/
-  feature-*/                  # 13 domain libraries — where the actual features live.
-                              #   auth user group-channel chat notification search
-                              #   realtime presence status media call automation ai
-                              #   A feature lib NEVER imports another (enforced by eslint):
-                              #   cross-feature talk is the event bus or a feature-contracts port.
+  feature-auth/               # 13 domain libraries — where the features actually live.
+  feature-user/               #   A feature lib NEVER imports another (enforced by eslint):
+  feature-group-channel/      #   cross-feature talk goes through the event bus, or a port in
+  feature-chat/               #   feature-contracts wired by the composition root. That rule is
+  feature-notification/       #   what keeps the process layout a config choice.
+  feature-search/
+  feature-realtime/
+  feature-presence/
+  feature-status/
+  feature-media/
+  feature-call/
+  feature-automation/
+  feature-ai/
   composition/                # feature groups as data + the assembler that builds a service
   infra-context/              # need-declared infra: a process opens only what it asks for
   feature-contracts/          # cross-feature ports (MembershipResolver), interfaces only
@@ -120,7 +128,7 @@ libs/
   crypto/                     # libsignal wrappers, OPRF contact discovery
   database/                   # Postgres (RLS) + Mongo clients
   cache/                      # Valkey client + rate limiter
-  event-bus/                  # Redis Streams / Kafka abstraction
+  event-bus/                  # Redis Streams · Kafka · in-memory (no broker) — chosen by EVENT_BUS
   storage/                    # object storage ports: s3 (AWS/Oracle/MinIO) · azure-blob · cloudinary
   mail/  push/  search/       # SMTP templates · push transports · search adapters
   proto/  shared-types/       # gRPC contracts (buf) + generated TS types
@@ -197,6 +205,10 @@ pnpm build
 ```bash
 cp .env.example .env          # connection strings / secrets — never commit real secrets
 ```
+
+No broker required either: `EVENT_BUS=memory` runs the event bus in-process, which is what the
+single-process `mono` profile uses and what makes offline development possible. `redis-streams`
+(the default) and `kafka` are the other two.
 
 You do **not** need to configure JWT keys for local work. Outside production, a missing
 `JWT_PUBLIC_PEM` falls back to a shared keypair generated once into `.velchat-dev-keys/` (gitignored)
