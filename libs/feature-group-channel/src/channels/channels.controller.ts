@@ -1,15 +1,4 @@
-import {
-  Controller,
-  Post,
-  Delete,
-  Get,
-  Patch,
-  Put,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Post, Delete, Get, Patch, Put, Body, Param, Query } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -19,7 +8,7 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { JwtAuthGuard, CurrentUser, ForbiddenError } from '@velchat/common';
+import { CurrentUser, ForbiddenError } from '@velchat/common';
 import { ChannelsService } from './channels.service';
 import {
   AddMemberDto,
@@ -42,7 +31,6 @@ import {
  */
 @ApiTags('channels')
 @ApiBearerAuth('access-token')
-@UseGuards(JwtAuthGuard)
 @Controller()
 export class ChannelsController {
   constructor(private readonly channels: ChannelsService) {}

@@ -1,0 +1,183 @@
+# VelChat on Oracle Cloud Always Free — one A1 VM (2 OCPU / 12 GB), zero paid resources,
+# zero use of the $300 trial credits.
+#
+# Every limit below is deliberate. Two are load-bearing on this box:
+#   * mongo --wiredTigerCacheSizeGB=0.5 — the DEFAULT is ~50% of (RAM - 1GB), i.e. ~5.5 GB here,
+#     which would crowd out everything else.
+#   * valkey --maxmemory-policy noeviction — Valkey holds the per-conversation `seq:*` counters.
+#     Silently evicting one reissues sequence numbers, and the mobile client SKIPS those as
+#     already-held: message loss with no error anywhere (DEF-01). Failing writes loudly is correct.
+#
+# Bring up:  docker compose -f docker/compose.oracle.yml --env-file .env.oracle up -d
+name: velchat
+
+x-app: &app
+  restart: always
+  env_file: [../.env.oracle]
+  depends_on:
+    postgres: { condition: service_healthy }
+    valkey: { condition: service_healthy }
+  logging:
+    driver: json-file
+    options: { max-size: '10m', max-file: '3' }
+
+services:
+  # ── edge: TLS + routing. WebSockets go STRAIGHT to realtime-service (see Caddyfile): proxying
+  #    sockets through the Node gateway would double per-connection memory for no benefit.
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports: ['80:80', '443:443']
+    volumes:
+      - ../deploy/oracle/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on: [edge-gateway, realtime-service]
+    deploy: { resources: { limits: { memory: 64M } } }
+
+  # ── the six services ───────────────────────────────────────────────────────────────────────
+  edge-gateway:
+    <<: *app
+    image: ghcr.io/aayushajs/velchat-edge-gateway:${TAG:-latest}
+    environment:
+      SERVICE_NAME: edge-gateway
+      HTTP_PORT: 3001
+      NODE_OPTIONS: --max-old-space-size=192
+      UPSTREAM_IDENTITY: http://identity-service:3002
+      UPSTREAM_MESSAGING: http://messaging-service:3004
+      UPSTREAM_REALTIME: http://realtime-service:3006
+      UPSTREAM_CONTENT: http://content-service:3008
+      UPSTREAM_PLATFORM: http://platform-service:3010
+    deploy: { resources: { limits: { memory: 256M, cpus: '0.5' }, reservations: { cpus: '0.10' } } }
+
+  identity-service:
+    <<: *app
+    image: ghcr.io/aayushajs/velchat-identity-service:${TAG:-latest}
+    environment:
+      SERVICE_NAME: identity-service
+      HTTP_PORT: 3002
+      NODE_OPTIONS: --max-old-space-size=288
+    deploy: { resources: { limits: { memory: 384M, cpus: '0.5' }, reservations: { cpus: '0.10' } } }
+
+  messaging-service:
+    <<: *app
+    image: ghcr.io/aayushajs/velchat-messaging-service:${TAG:-latest}
+    environment:
+      SERVICE_NAME: messaging-service
+      HTTP_PORT: 3004
+      NODE_OPTIONS: --max-old-space-size=384
+    depends_on:
+      postgres: { condition: service_healthy }
+      valkey: { condition: service_healthy }
+      mongo: { condition: service_healthy }
+    # Reserved CPU, not just capped: this is the message hot path.
+    deploy: { resources: { limits: { memory: 512M, cpus: '1.0' }, reservations: { cpus: '0.30' } } }
+
+  # Highest-priority latency path and the leanest process — Valkey only, no Postgres pool.
+  realtime-service:
+    <<: *app
+    image: ghcr.io/aayushajs/velchat-realtime-service:${TAG:-latest}
+    environment:
+      SERVICE_NAME: realtime-service
+      HTTP_PORT: 3006
+      NODE_OPTIONS: --max-old-space-size=384
+      UPSTREAM_IDENTITY: http://identity-service:3002
+      POD_ID: realtime-1
+    depends_on:
+      valkey: { condition: service_healthy }
+    deploy: { resources: { limits: { memory: 512M, cpus: '1.0' }, reservations: { cpus: '0.40' } } }
+
+  # ffmpeg lives here. The CPU cap is what stops a transcode from starving the socket process.
+  content-service:
+    <<: *app
+    image: ghcr.io/aayushajs/velchat-content-service:${TAG:-latest}
+    environment:
+      SERVICE_NAME: content-service
+      HTTP_PORT: 3008
+      NODE_OPTIONS: --max-old-space-size=256
+    deploy: { resources: { limits: { memory: 512M, cpus: '0.5' }, reservations: { cpus: '0.10' } } }
+
+  platform-service:
+    <<: *app
+    image: ghcr.io/aayushajs/velchat-platform-service:${TAG:-latest}
+    environment:
+      SERVICE_NAME: platform-service
+      HTTP_PORT: 3010
+      NODE_OPTIONS: --max-old-space-size=256
+    depends_on:
+      postgres: { condition: service_healthy }
+      valkey: { condition: service_healthy }
+      mongo: { condition: service_healthy }
+    deploy: { resources: { limits: { memory: 384M, cpus: '0.5' }, reservations: { cpus: '0.10' } } }
+
+  # ── data tier: local, so there is no external quota to exhaust and no internet hop per query ──
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - max_connections=60
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_timeout=300 # 5-minute WAL segments → the RPO floor (§4.4)
+      - -c
+      - archive_command=/bin/true # replaced by the shipper in deploy/oracle/backup.sh
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-velchat}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.oracle}
+      POSTGRES_DB: ${POSTGRES_DB:-velchat}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-velchat}']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    deploy: { resources: { limits: { memory: 768M, cpus: '0.8' }, reservations: { cpus: '0.15' } } }
+
+  mongo:
+    image: mongo:7
+    restart: always
+    command: ['mongod', '--wiredTigerCacheSizeGB', '0.5']
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-velchat}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?set MONGO_PASSWORD in .env.oracle}
+    volumes: [mongodata:/data/db]
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    deploy:
+      { resources: { limits: { memory: 1280M, cpus: '0.8' }, reservations: { cpus: '0.15' } } }
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: always
+    command:
+      - valkey-server
+      - --appendonly
+      - 'yes'
+      - --appendfsync
+      - everysec
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - noeviction
+    volumes: [valkeydata:/data]
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    deploy: { resources: { limits: { memory: 384M, cpus: '0.8' }, reservations: { cpus: '0.15' } } }
+
+volumes:
+  pgdata:
+  mongodata:
+  valkeydata:
+  caddydata:
+  caddyconfig:

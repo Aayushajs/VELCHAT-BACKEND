@@ -1,10 +1,8 @@
 import { Module, type DynamicModule } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
 import type { Logger } from 'pino';
 import type { AppConfig } from '@velchat/config';
 import type { EventBus } from '@velchat/event-bus';
 import type { Redis } from 'ioredis';
-import { JwtAuthGuard } from '@velchat/common';
 import { AuthController, JwksController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AuthRepository } from './auth.repository';
@@ -90,19 +88,10 @@ export class AuthModule {
       deps.config.JWT_ACCESS_TTL_SECONDS,
     );
 
-    // JwtAuthGuard — verifies RS256 access JWTs on protected endpoints (§B2.3 / §D4).
-    const jwtGuard = new JwtAuthGuard(new Reflector(), {
-      publicKeyPem: keyPair.publicKeyPem,
-      issuer: deps.config.JWT_ISSUER ?? 'https://auth.velchat.local',
-    });
-
     return {
       module: AuthModule,
       controllers: [AuthController, JwksController],
-      providers: [
-        { provide: AuthService, useValue: service },
-        { provide: JwtAuthGuard, useValue: jwtGuard },
-      ],
+      providers: [{ provide: AuthService, useValue: service }],
     };
   }
 }

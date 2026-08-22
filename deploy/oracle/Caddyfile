@@ -1,0 +1,41 @@
+# VelChat edge — TLS (Let's Encrypt, free) + routing, on the Oracle Always Free VM.
+#
+# Set DOMAIN in .env.oracle. Without a domain, use `:80` instead of {$DOMAIN} and Caddy serves
+# plain HTTP — fine for a first smoke test, not for the mobile app (it needs wss://).
+
+{$DOMAIN:localhost} {
+	encode zstd gzip
+
+	# WebSockets bypass the Node gateway and go straight to realtime-service. Proxying sockets
+	# through an extra Node process doubles per-connection memory and adds a failure point; the
+	# fabric authenticates the JWT itself, so nothing is skipped by taking the short path.
+	@ws path /ws /ws/*
+	reverse_proxy @ws realtime-service:3006
+
+	# /metrics exposes route names and error rates. It is @Public() so Prometheus can scrape it
+	# from inside the network — it must NOT be reachable from the internet.
+	@metrics path /metrics /metrics/*
+	respond @metrics 404
+
+	# Everything else goes through the gateway, which owns rate limiting and routing.
+	reverse_proxy edge-gateway:3001 {
+		header_up X-Real-IP {remote_host}
+		# Long enough for resumable uploads, short enough to release a hung upstream.
+		transport http {
+			read_timeout 300s
+			write_timeout 300s
+		}
+	}
+
+	# Cap request bodies at the edge. Media goes to object storage via a signed URL, so the API
+	# itself never needs large payloads.
+	request_body {
+		max_size 12MB
+	}
+
+	log {
+		output stdout
+		format console
+		# Never log Authorization / Cookie — they carry access tokens.
+	}
+}

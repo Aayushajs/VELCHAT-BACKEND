@@ -1,16 +1,19 @@
-import { Controller, Post, Get, Body, HttpCode, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, HttpCode } from '@nestjs/common';
 import { AuthService, type RegisterInput } from './auth.service';
 import type { InboundProof } from './reverse-otp/reverse-otp.service';
 import type { RecoveryFactor } from './recovery/recovery.service';
-import { JwtAuthGuard, Public, CurrentUser } from '@velchat/common';
+import { Public, CurrentUser } from '@velchat/common';
 
 /**
  * REST surface for auth (§B2 / flow C1). gRPC contract lives in libs/proto (P-later).
  *
  * Principal binding: every protected endpoint derives the accountId/deviceId from the
  * VERIFIED JWT (via @CurrentUser), not from the request body — defeats IDOR (§D4).
+ *
+ * Authentication is enforced by the GLOBAL guard registered in the composition root, not by a
+ * class-level @UseGuards here: a class guard has to be constructed by Nest, and this one takes a
+ * plain options object it cannot inject. @Public() marks the endpoints that must stay open.
  */
-@UseGuards(JwtAuthGuard)
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}

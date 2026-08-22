@@ -53,3 +53,6 @@ CLAUDE.md
 .early.coverage
 # Jest per-package transform cache (see jest.preset.cjs)
 .jest-cache/
+
+# Oracle deployment env (secrets) — template is .env.oracle.example
+.env.oracle

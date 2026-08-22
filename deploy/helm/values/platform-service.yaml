@@ -1,0 +1,11 @@
+# @velchat/platform-service — Kubernetes values (AWS EKS / Azure AKS / OKE).
+# Same image the compose deployment runs; only the orchestrator differs.
+name: platform-service
+image:
+  repository: ghcr.io/aayushajs/velchat-platform-service
+  tag: latest
+service:
+  port: 3010
+env:
+  SERVICE_NAME: platform-service
+  HTTP_PORT: '3010'

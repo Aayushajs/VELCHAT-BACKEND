@@ -16,7 +16,9 @@ export class MembershipProjection {
 
   /**
    * @param redis      The shared Valkey client.
-   * @param fallbackUrl Base URL of the group-channel-service (e.g. `http://localhost:3005`).
+   * @param fallbackUrl Base URL of the service that owns conversations — identity-service under
+   *                    the 6-service topology (e.g. `http://localhost:3002`), injected by the
+   *                    composition root from `UPSTREAM_IDENTITY`.
    *                    When undefined, fallback is disabled (tests / dev without group-channel).
    */
   constructor(
