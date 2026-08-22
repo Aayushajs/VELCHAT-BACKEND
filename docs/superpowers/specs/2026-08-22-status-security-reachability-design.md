@@ -28,7 +28,7 @@ realtime fan-out, and media pipeline are Phase 2 and are explicit non-goals belo
 | F4 | S1 | No blocked-user check on any access path |
 | F5 | S2 | No lifecycle state; delete is a hard `DELETE` that cascades the viewer list away |
 | F6 | S2 | Expiry is never actioned — `purgeExpired()` exists but nothing calls it |
-| F7 | S2 | No rate limiting or idempotency, despite both helpers existing in the repo |
+| F7 | S2 | No rate limiting, despite `RateLimiter` already existing in the repo |
 
 **F1 — wrong upstream.** [`routes.ts:40`](../../../apps/edge-gateway/src/gateway/routes.ts) maps
 `/status` onto the logical service `PRESENCE`, and
@@ -70,6 +70,7 @@ Deferred deliberately, so Phase 1 stays reviewable:
   `PROCESSING`/`FAILED` transitions
 - Mute/unmute (`status_mutes`) and status archive — preference features that do not gate access
 - Reaction aggregation, reaction removal, per-status audience update
+- Idempotent create (`clientStatusId` + a uniqueness constraint) — see §3.6
 - Load tests and the `docs/status/{HLD,LLD,PERFORMANCE,OPERATIONS}.md` set
 
 Phase 1 does ship `docs/status/SECURITY.md` and corrects `docs/API-ENDPOINTS.md`, because both
@@ -118,17 +119,41 @@ A new port in `libs/feature-contracts`, mirroring the existing `MembershipResolv
 6-service topology stays re-splittable and `feature-status` never imports `feature-user`:
 
 ```ts
+/** The owner→viewer relationship, as far as status visibility is concerned. */
+export interface SocialRelationship {
+  /** `viewer` is in `owner`'s contact list. */
+  isContact: boolean;
+  /** Either party has blocked the other. */
+  isBlocked: boolean;
+}
+
 export interface SocialGraphResolver {
-  /** Is `viewer` in `owner`'s contacts? Authorization → fails CLOSED. */
-  isContact(owner: string, viewer: string): Promise<boolean>;
   /**
-   * Has either party blocked the other? Checked in BOTH directions — an author who blocked a
-   * viewer must not be visible to them, and a viewer who blocked the author must not receive
-   * their statuses. Fails CLOSED (unknown ⇒ treated as blocked).
+   * Resolve how `viewer` relates to `owner`. Authorization → fails CLOSED: an unobtainable
+   * answer resolves to `{ isContact: false, isBlocked: true }`, never to permission.
    */
-  isBlocked(owner: string, other: string): Promise<boolean>;
+  relationship(owner: string, viewer: string): Promise<SocialRelationship>;
 }
 ```
+
+One method rather than two, because a single upstream call answers most of it. `GET /users/:owner/contacts`
+returns `Contact { contact_user_id, display_name, blocked }[]`, so the owner's list yields both
+whether the viewer is a contact and whether the *owner* blocked the viewer. Only the reverse
+direction needs a second call, `GET /users/:viewer/contacts/:owner/blocked` → `{ blocked }`. Both
+directions matter: an author who blocked a viewer must not be visible to them, and a viewer who
+blocked the author must not receive their statuses.
+
+Two integration details that are easy to get wrong:
+
+- **Responses are enveloped.** `ResponseInterceptor` wraps every JSON response as
+  `{ success, statusCode, message, data }`, so the resolver must read `body.data`, not the body.
+  (`HttpMembershipResolver` reads `body.members` with an array fallback and does not unwrap the
+  envelope — noted as a separate pre-existing concern, not changed here.)
+- **`listContacts` is the only available primitive** for a contact check; there is no
+  `GET /users/:owner/contacts/:viewer` existence endpoint. Phase 1 therefore fetches the owner's
+  list to answer one question. That is acceptable for correctness now and is exactly what Phase 2's
+  per-owner cache makes cheap; adding a narrow existence endpoint to `feature-user` is a Phase 2
+  option.
 
 `HttpSocialGraphResolver` copies `HttpMembershipResolver`'s hardening exactly: `http(s)`-only
 base-URL validation (so a mis-set env var cannot become an SSRF primitive), `x-velchat-internal`
@@ -136,23 +161,21 @@ shared secret, `redirect: 'error'`, an abort timeout, and in-flight request coal
 cache cannot fan one miss into hundreds of upstream calls. Base URL and secret come **from
 configuration only, never from a request**.
 
-The upstream block endpoint (`GET /users/:userId/contacts/:contactUserId/blocked`) is directional, so
-`isBlocked` issues both directions and denies if either reports a block. The two lookups share the
-in-flight coalescing described above.
-
-Both methods fail closed. This differs from `MembershipResolver.members()`, which fails *empty*
+`relationship` fails closed. This differs from `MembershipResolver.members()`, which fails *empty*
 because it drives best-effort live fan-out with a durable catch-up behind it. Here there is no
 backstop: an unobtainable answer must not read as permission.
 
 Audience becomes a **rule evaluated at read time** rather than a materialized snapshot:
 
-| Mode | Decision |
+| Mode | Decision (after the block check below) |
 |---|---|
-| `only` | `viewer ∈ audience.list` — no social-graph call |
-| `except` | `isContact(author, viewer) ∧ viewer ∉ audience.list` |
-| `contacts` | `isContact(author, viewer)` |
+| `only` | `viewer ∈ audience.list` |
+| `except` | `isContact ∧ viewer ∉ audience.list` |
+| `contacts` | `isContact` |
 
-`isBlocked(author, viewer)` is checked first on every path and denies regardless of mode.
+`isBlocked` is checked first on every path and denies regardless of mode — including `only`, so an
+explicitly listed viewer who has since been blocked loses access. The author is always allowed to
+read their own status.
 
 Three reasons to evaluate rather than snapshot: contact removals and new blocks take effect
 immediately instead of being frozen at post time; a 1024-contact author no longer writes a
@@ -226,9 +249,19 @@ cache needs it regardless. `libs/composition/src/groups.spec.ts` asserts per-gro
 declarations and is updated in the same change.
 
 - **Rate limiting** via the existing `RateLimiter.allow(key, limit, windowSec)`, keyed per account
-  per action, on create / view / react / delete / viewers. Limits are configuration, not literals.
-- **Idempotency** via the existing `IdempotencyStore.markIfNew`, on create, keyed by a
-  client-supplied `clientStatusId`, so a retried publish cannot produce a duplicate status.
+  per action, on create / view / react. Limits are configuration, not literals.
+
+Rate limiting fails **open**, which is the deliberate inverse of §3.3. It is an abuse control, not
+an authorization control: a Valkey outage must not stop people posting, whereas an unobtainable
+authorization answer must never read as permission.
+
+Idempotency on create is **deferred to Phase 2**, not because it does not matter but because doing
+it properly is its own change: it needs a `clientStatusId` on the DTO, a uniqueness constraint to
+make the guarantee real rather than advisory, and a decision about what a retry returns. Half-built
+idempotency reads as a guarantee while providing none, so Phase 1 leaves it out rather than
+gesturing at it. View and reaction writes are already idempotent at their primary keys, so the
+exposure is limited to a double-tapped publish creating two statuses — visible and self-correcting,
+unlike a silent authorization hole.
 
 ### 3.7 E2EE boundary
 
@@ -250,7 +283,7 @@ testable:
 | Dependency | Behaviour |
 |---|---|
 | `SocialGraphResolver` unreachable | **Deny.** Authorization with no answer is not permission. |
-| Valkey unreachable | Rate limiting and idempotency degrade; authorization and reads are unaffected because neither consults the cache. Correctness never depends on Valkey. |
+| Valkey unreachable | Rate limiting degrades open (§3.6); authorization and reads are unaffected because neither consults the cache. Correctness never depends on Valkey. |
 | Event bus unreachable | The status is already persisted; the publish failure is logged. Reads do not depend on the event. |
 | Expiry worker down | Expiry is still enforced at read time (§3.4). Only cleanup lags. |
 | Postgres unreachable | The endpoint fails. Postgres is the source of truth; there is no degraded mode that could invent an access decision. |
