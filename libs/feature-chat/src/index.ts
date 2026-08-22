@@ -11,7 +11,7 @@ export { ChatController } from './chat/chat.controller';
 export { ChatService } from './chat/chat.service';
 export { ChatRepository, isDuplicateKey } from './chat/chat.repository';
 export { ChatEvents } from './chat/chat.events';
-export { SeqService, type SeqFloor } from './chat/seq.service';
+export { SeqService } from './chat/seq.service';
 export { ReceiptsRepository } from './chat/receipts.repository';
 export { ReceiptsConsumer } from './chat/receipts.consumer';
 export * from './chat/message.types';

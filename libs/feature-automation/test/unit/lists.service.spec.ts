@@ -80,7 +80,7 @@ describe('ListsService (§A4.7)', () => {
     await svc.addItem(list.listId, 'do the thing');
     const full = await svc.getList(list.listId);
     expect(full.items).toHaveLength(1);
-    expect(full.items[0].text).toBe('do the thing');
+    expect(full.items[0]!.text).toBe('do the thing');
   });
 
   it('getList throws for a missing list', async () => {

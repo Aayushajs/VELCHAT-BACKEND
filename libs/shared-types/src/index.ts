@@ -40,6 +40,14 @@ export interface ContactAddedPayload {
   added_at: Iso8601;
 }
 
+/** A number that some users hold in their address book just joined VelChat (§contact-sync).
+ * Fan-out target = those owners, so their contact list flips "on VelChat" live (no re-scan). */
+export interface ContactRegisteredPayload {
+  account_id: AccountId; // the user who just became discoverable
+  owner_ids: AccountId[]; // users who have this account's number as a contact
+  registered_at: Iso8601;
+}
+
 /** A tenant scope (org/workspace/team). */
 export type ScopeType = 'org' | 'workspace' | 'team';
 export type TenantRole = 'owner' | 'admin' | 'member' | 'guest' | 'bot';
@@ -305,6 +313,7 @@ export interface EventPayloads {
   'org.created': OrgCreatedPayload;
   'member.added': MemberAddedPayload;
   'contact.added': ContactAddedPayload;
+  'contact.registered': ContactRegisteredPayload;
   'call.started': CallStartedPayload;
   'call.ended': CallEndedPayload;
   'call.participant.joined': CallParticipantPayload;

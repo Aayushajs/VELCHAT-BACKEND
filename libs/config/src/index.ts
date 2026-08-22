@@ -130,7 +130,9 @@ export const envSchema = z.object({
 
   // ── Provider selection (free-tier MVP defaults; switch to self-host at scale) ──
   // event bus: redis-streams (Upstash, ₹0) | kafka (self-host scale)
-  EVENT_BUS: z.enum(['redis-streams', 'kafka']).default('redis-streams'),
+  // event bus: redis-streams (Valkey/Upstash) | kafka (scale) | memory (in-process, zero
+  // dependency — the natural fit for the `mono` profile and for offline development)
+  EVENT_BUS: z.enum(['redis-streams', 'kafka', 'memory']).default('redis-streams'),
   // object storage: cloudinary (₹0) | s3 (MinIO / AWS S3 / Oracle Object Storage) |
   // azure-blob (Azure is the one target that is NOT S3-compatible — see deploy/PORTABILITY.md)
   STORAGE_PROVIDER: z.enum(['cloudinary', 's3', 'azure-blob']).default('cloudinary'),

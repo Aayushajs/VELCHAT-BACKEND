@@ -49,9 +49,9 @@ describe('NotificationService (§A19/§B10)', () => {
     await svc.onMessageSent(msg());
     expect(enqueued.map((e) => e.userId).sort()).toEqual(['bob', 'carol']); // not alice
     // privacy: payload has ids only, never content
-    expect(enqueued[0].payload).toEqual({ conversationId: 'c1', messageId: 'm1', seq: '5' });
-    expect(JSON.stringify(enqueued[0].payload)).not.toMatch(/content|text|body/i);
-    expect(enqueued[0].dedupeKey).toBe('msg:m1:bob');
+    expect(enqueued[0]!.payload).toEqual({ conversationId: 'c1', messageId: 'm1', seq: '5' });
+    expect(JSON.stringify(enqueued[0]!.payload)).not.toMatch(/content|text|body/i);
+    expect(enqueued[0]!.dedupeKey).toBe('msg:m1:bob');
   });
 
   it('skips push for online recipients (in-app delivery)', async () => {

@@ -227,6 +227,34 @@ export class AuthService {
     return this.repo.getAccountInfo(accountId);
   }
 
+  /**
+   * Attach a VERIFIED email to the account (§B2.1 profile). Only @gmail.com for now; globally
+   * unique (409 if another account already claimed it). Persisted server-side, so it survives
+   * logout/login (restored via getAccountInfo) — the client stops re-prompting for email on
+   * every sign-in. accountId comes from the verified token (no IDOR).
+   */
+  async setEmail(accountId: string, emailRaw: string): Promise<{ email: string }> {
+    const email = (emailRaw ?? '').trim().toLowerCase();
+    if (!/^[^\s@]+@gmail\.com$/.test(email)) {
+      throw new ValidationError('a valid @gmail.com address is required');
+    }
+    const existing = await this.repo.findVerifiedEmailAccount(email);
+    if (existing && existing !== accountId) {
+      throw new ConflictError('Email already in use by another account');
+    }
+    if (existing !== accountId) {
+      // Idempotent insert; the unique index makes a duplicate a no-op. Re-read to catch a
+      // concurrent claim by another account (the winner keeps it → 409 for the loser).
+      await this.repo.upsertVerifiedIdentifier(accountId, 'email', email);
+      const owner = await this.repo.findVerifiedEmailAccount(email);
+      if (owner && owner !== accountId) {
+        throw new ConflictError('Email already in use by another account');
+      }
+      await this.events.identifierChanged(accountId, 'email');
+    }
+    return { email };
+  }
+
   // ── 2Factor.in SMS OTP (additive auth method) ───────────────────────────
   /** Send an SMS OTP via 2Factor (AUTOGEN). 2Factor owns the code; we only track send/lock metadata. */
   async sendOtp(
@@ -310,6 +338,10 @@ export class AuthService {
       });
       const token = directToken(phoneNorm, key);
       await this.repo.registerOprfToken(token, accountId, keyRow.version);
+      // Live "contact joined": link every owner who already holds this number → notify them so
+      // their contact list flips "on VelChat" without a re-scan (§contact-sync fan-out).
+      const owners = await this.repo.linkContactEdges(token, accountId);
+      await this.events.contactRegistered(accountId, owners);
     } catch {
       // best-effort: discovery still works via the client's opt-in registration.
     }

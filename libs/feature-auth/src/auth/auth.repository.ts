@@ -207,6 +207,16 @@ export class AuthRepository implements RefreshStore {
     return row?.account_id ?? null;
   }
 
+  /** The account that owns a verified email (for the uniqueness check), or null if unclaimed. */
+  async findVerifiedEmailAccount(emailNorm: string): Promise<string | null> {
+    const res = await this.pg.pool.query(
+      "SELECT account_id FROM identifiers WHERE kind = 'email' AND value_norm = $1 AND verified_at IS NOT NULL",
+      [emailNorm],
+    );
+    const row = res.rows[0] as { account_id: string } | undefined;
+    return row?.account_id ?? null;
+  }
+
   // ── OPRF contact discovery (§G2) — server-side self-registration ─────────────
   /** The active OPRF secret key (shared DB with user-service). Null until first generated. */
   async getActiveOprfKey(): Promise<{
@@ -230,6 +240,18 @@ export class AuthRepository implements RefreshStore {
        ON CONFLICT (token) DO UPDATE SET account_id = $2, key_version = $3, updated_at = now()`,
       [token, accountId, keyVersion],
     );
+  }
+
+  /** Resolve every contact_edge that holds this token → set peer_id + return the owners, so the
+   * fan-out can tell exactly those users "your contact just joined VelChat" (§contact-sync). */
+  async linkContactEdges(peerToken: string, peerId: string): Promise<string[]> {
+    const res = await this.pg.pool.query(
+      `UPDATE contact_edges SET peer_id = $2, updated_at = now()
+        WHERE peer_token = $1 AND (peer_id IS DISTINCT FROM $2)
+      RETURNING owner_id`,
+      [peerToken, peerId],
+    );
+    return (res.rows as Array<{ owner_id: string }>).map((r) => r.owner_id);
   }
 
   /** Atomically re-point the account's phone identifier to a new number on the SAME account_id. */

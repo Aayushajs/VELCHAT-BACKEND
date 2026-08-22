@@ -78,7 +78,9 @@ async function main(): Promise<void> {
     // fabric ended up with no key — and, now that it fails closed rather than falling back to
     // `jwt.decode` (DEF-06), it rejected every socket while HTTP requests worked fine.
     jwtPublicKey: resolveAuthMode(config).publicKeyPem,
-    sink: bus ? new ReceiptPublisher(bus) : undefined,
+    // Projection passed deliberately: a second, independent membership check behind the fabric's
+    // gate, so neither layer is the only thing standing between a socket and someone else's chat.
+    sink: bus ? new ReceiptPublisher(bus, projection) : undefined,
     skdm,
     typing,
     membership,

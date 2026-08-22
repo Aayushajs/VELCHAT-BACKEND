@@ -18,15 +18,24 @@ export interface SigningKeyPair {
  * signed here could not be verified anywhere else, and every restart invalidated every outstanding
  * token. Sharing one on-disk pair makes local multi-service auth actually work.
  */
+/** Accept a PEM from an env var whether pasted multi-line OR single-line with `\n` escapes
+ * (dashboards vary) — normalize the escapes so RS256 verify/sign always gets a valid PEM. */
+function pemFromEnv(v: string | undefined): string | undefined {
+  const s = v?.replace(/\\n/g, '\n').trim();
+  return s || undefined;
+}
+
 export function loadOrGenerateKeyPair(env: {
   privatePem?: string;
   publicPem?: string;
 }): SigningKeyPair {
-  if (env.privatePem && env.publicPem) {
+  const priv = pemFromEnv(env.privatePem);
+  const pub = pemFromEnv(env.publicPem);
+  if (priv && pub) {
     return {
-      privateKeyPem: env.privatePem,
-      publicKeyPem: env.publicPem,
-      kid: kidFor(env.publicPem),
+      privateKeyPem: priv,
+      publicKeyPem: pub,
+      kid: kidFor(pub),
     };
   }
   const dev = loadOrCreateDevKeyPair();

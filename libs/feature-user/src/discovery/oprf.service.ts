@@ -12,8 +12,11 @@ import {
 import { OprfRepository } from './oprf.repository';
 
 const MAX_BATCH = 2000; // §G2: cap per-request batch size (full-resync throttle)
-const EVALUATE_LIMIT = 5; // evaluate batches per account per hour
-const MATCH_LIMIT = 10; // match batches per account per hour
+// Per-account hourly caps on discovery. The original 5/10 were far too tight for real use — a
+// couple of New-Chat opens / app restarts (each a batch) tripped a 429. Generous defaults so
+// normal use never 429s; env-tunable to clamp back down for production anti-enumeration.
+const EVALUATE_LIMIT = Number(process.env.OPRF_EVALUATE_LIMIT) || 500;
+const MATCH_LIMIT = Number(process.env.OPRF_MATCH_LIMIT) || 1000;
 const WINDOW_SEC = 3600;
 
 export interface PublicOprfKey {
@@ -98,6 +101,22 @@ export class OprfService {
   async unregister(accountId: string): Promise<{ message: string }> {
     await this.repo.removeAccountTokens(accountId);
     return { message: 'Removed from contact discovery.' };
+  }
+
+  /** Record the caller's contact tokens as edges (§contact-sync reverse index) so that when any
+   * of those numbers later joins VelChat, the owner is notified live. Tokens are opaque OPRF
+   * digests — never plaintext numbers. Idempotent; capped + validated like match. */
+  async registerEdges(accountId: string, tokens: string[]): Promise<{ message: string }> {
+    if (!accountId) throw new ValidationError('accountId is required');
+    const unique = [
+      ...new Set((tokens ?? []).filter((t) => typeof t === 'string' && /^[0-9a-f]{64}$/.test(t))),
+    ];
+    if (unique.length > MAX_BATCH) {
+      throw new ValidationError(`too many tokens in one request (max ${MAX_BATCH})`);
+    }
+    if (unique.length === 0) return { message: 'No edges to register.' };
+    await this.repo.upsertEdges(accountId, unique);
+    return { message: 'Contact edges registered.' };
   }
 
   /** Match client-derived tokens (address book, post-unblind) against the discoverable set. */

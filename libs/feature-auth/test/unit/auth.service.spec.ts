@@ -24,7 +24,7 @@ function makeAuth() {
     revokeDeviceTokens: jest.fn(async () => undefined),
     revokeAllAccountTokens: jest.fn(async () => undefined),
     revokeDevice: jest.fn(async () => undefined),
-    findVerifiedPhoneAccount: jest.fn(async () => null),
+    findVerifiedPhoneAccount: jest.fn(async (_phone?: string): Promise<string | null> => null),
     repointPhone: jest.fn(async () => undefined),
     consumeBackupCode: jest.fn(async () => true),
     storeBackupCodes: jest.fn(async () => undefined),

@@ -80,7 +80,7 @@ describe('OprfService (§G2)', () => {
     const selfNumber = '+15550001111';
     const selfBlind = blind(selfNumber, pub);
     const selfEval = await svc.evaluateBatch('acct-self', [bigIntToBase64Url(selfBlind.blinded)]);
-    const selfToken = unblind(base64UrlToBigInt(selfEval.evaluated[0]), selfBlind.r, pub);
+    const selfToken = unblind(base64UrlToBigInt(selfEval.evaluated[0]!), selfBlind.r, pub);
     await svc.register('acct-self', selfToken, selfEval.version);
 
     // "lookup" account uploads an address book containing selfNumber + an unrelated number.
@@ -91,8 +91,8 @@ describe('OprfService (§G2)', () => {
       bigIntToBase64Url(b1.blinded),
       bigIntToBase64Url(b2.blinded),
     ]);
-    const t1 = unblind(base64UrlToBigInt(evalRes.evaluated[0]), b1.r, pub);
-    const t2 = unblind(base64UrlToBigInt(evalRes.evaluated[1]), b2.r, pub);
+    const t1 = unblind(base64UrlToBigInt(evalRes.evaluated[0]!), b1.r, pub);
+    const t2 = unblind(base64UrlToBigInt(evalRes.evaluated[1]!), b2.r, pub);
 
     const { matches } = await svc.match('acct-lookup', [t1, t2]);
     expect(matches[t1]).toBe('acct-self');
@@ -140,16 +140,16 @@ describe('OprfService (§G2)', () => {
   it('cross-checks against the crypto lib’s directToken (server-known path) for consistency', async () => {
     const repo = makeRepo();
     const svc = new OprfService(repo as never, makeRateLimiter(), noopLogger());
-    const pubKey = await svc.getPublicKey();
+    await svc.getPublicKey();
     const row = await repo.getActiveKey();
     const key = deserializeOprfKey({ n: row!.n, e: row!.e, d: row!.d, version: row!.version });
     const number = '+15550009999';
     const pub = { n: key.n, e: key.e, nByteLength: key.nByteLength };
     const b = blind(number, pub);
     const evalRes = await svc.evaluateBatch('acct', [bigIntToBase64Url(b.blinded)]);
-    const token = unblind(base64UrlToBigInt(evalRes.evaluated[0]), b.r, pub);
+    const token = unblind(base64UrlToBigInt(evalRes.evaluated[0]!), b.r, pub);
     expect(token).toBe(directToken(number, key));
     // sanity: evaluate() called directly matches the service's batch result too
-    expect(cryptoEvaluate(b.blinded, key)).toBe(base64UrlToBigInt(evalRes.evaluated[0]));
+    expect(cryptoEvaluate(b.blinded, key)).toBe(base64UrlToBigInt(evalRes.evaluated[0]!));
   });
 });

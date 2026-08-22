@@ -37,6 +37,7 @@ export {
   AllowInternal,
   IS_PUBLIC_KEY,
   ALLOW_INTERNAL_KEY,
+  JWT_GUARD_OPTIONS_TOKEN,
   INTERNAL_HEADER,
   type VerifiedPrincipal,
   type JwtAuthGuardOptions,

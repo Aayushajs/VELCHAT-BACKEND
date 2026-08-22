@@ -20,9 +20,9 @@ export interface ChatModuleDeps {
 export class ChatModule {
   static forRoot(deps: ChatModuleDeps): DynamicModule {
     const repo = new ChatRepository(deps.mongo);
-    // The repository is the durable floor: Valkey is the fast path for `seq`, Mongo is the truth
-    // it re-seeds from when the counter is cold (DEF-01).
-    const seq = new SeqService(deps.valkey.redis, repo);
+    // Redis is the hot path, Mongo the durable source of truth — and the fallback when Redis is
+    // unreachable, so a Valkey outage degrades latency rather than failing sends (§B4.3).
+    const seq = new SeqService(deps.valkey.redis, deps.mongo);
     const events = new ChatEvents(deps.eventBus);
     const service = new ChatService(repo, seq, events);
 

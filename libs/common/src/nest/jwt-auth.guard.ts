@@ -1,4 +1,5 @@
 import {
+  Inject,
   Injectable,
   CanActivate,
   ExecutionContext,
@@ -20,6 +21,14 @@ export interface VerifiedPrincipal {
   role?: string;
   scope?: string;
 }
+
+/**
+ * Injection token for {@link JwtAuthGuardOptions}. A module that wants Nest to CONSTRUCT the guard
+ * (rather than receiving a pre-built instance) registers this in its providers. `GlobalAuthModule`
+ * builds the guard itself and does not need it, but the token stays exported so per-module wiring
+ * remains possible.
+ */
+export const JWT_GUARD_OPTIONS_TOKEN = Symbol('JWT_GUARD_OPTIONS');
 
 /** Metadata key for the @Public() decorator. */
 export const IS_PUBLIC_KEY = 'isPublic';
@@ -119,7 +128,7 @@ function verifyRS256(token: string, publicKeyPem: string, issuer: string): Recor
 export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly opts: JwtAuthGuardOptions,
+    @Inject(JWT_GUARD_OPTIONS_TOKEN) private readonly opts: JwtAuthGuardOptions,
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
