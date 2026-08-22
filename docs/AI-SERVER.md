@@ -4,7 +4,7 @@
 > (deploy free on **Hugging Face Spaces**, GPU tier) and point the VelChat backend at it. The backend
 > never bundles models — it calls this server over HTTP. **Free / self-hosted only — never a paid API.**
 
-The backend side is **already built and wired** (`apps/ai-service/src/ai-gateway/*` + the real-time
+The backend side is **already built and wired** (`apps/platform-service/src/ai-gateway/*` + the real-time
 caption pipeline). You only build + deploy the Python server described here, then set 4 env vars.
 
 ---
@@ -12,13 +12,13 @@ caption pipeline). You only build + deploy the Python server described here, the
 ## 1. How it plugs in
 
 ```
-Client (call) ──audio chunk──▶ ai-service  POST /ai/call/caption
+Client (call) ──audio chunk──▶ platform-service  POST /ai/call/caption
                                    │  STT → translate(per listener) → [TTS]
                                    ▼
                           HttpAiGateway ──HMAC-signed HTTP──▶  YOUR PYTHON SERVER (HF Spaces)
                                    │                              /stt /translate /tts /summarize /moderate /embed
                                    ▼
-                          emits call.caption ──▶ realtime-gateway ──WS──▶ each listener (their language)
+                          emits call.caption ──▶ realtime-service ──WS──▶ each listener (their language)
 ```
 
 Enable it by setting these on the backend (nothing else changes):
@@ -49,7 +49,7 @@ All are `POST`, JSON in/out. The backend sends `Content-Type: application/json`,
 | `/moderate` | `{ text }` | `{ flagged, categories, score }` |
 | `/embed` | `{ text }` | `{ vector: number[] }` |
 
-(These match `apps/ai-service/src/ai-gateway/ai.port.ts` — keep them in sync if you extend.)
+(These match `apps/platform-service/src/ai-gateway/ai.port.ts` — keep them in sync if you extend.)
 
 **Recommended free models:** Whisper (STT) · NLLB-200 / Marian / MADLAD (translate) · Piper or
 Coqui-TTS (TTS) · `sentence-transformers` (embed) · a small quantized LLM via `llama.cpp`/vLLM or a
@@ -135,8 +135,8 @@ async def stt(req: Request):
 
 1. Client joins a LiveKit call and captures the **local mic track** in short chunks (~300–500ms).
 2. Client `POST /ai/call/caption` with `{ callId, fromUserId, audioB64, srcLang?, isFinalHint, listeners:[{userId, lang, tts?}] }`.
-3. ai-service: `/stt` → per-listener `/translate` (parallel) → optional `/tts` → emits `call.caption` per listener.
-4. realtime-gateway pushes each `call.caption` to that listener's socket → the client renders the
+3. platform-service: `/stt` → per-listener `/translate` (parallel) → optional `/tts` → emits `call.caption` per listener.
+4. realtime-service pushes each `call.caption` to that listener's socket → the client renders the
    subtitle (and plays the TTS audio if `tts:true`). Each participant sees/hears the call in **their own language**.
 
 Personal E2EE calls do the same **on-device** (server relays only encrypted media) — this server is for
@@ -150,7 +150,7 @@ enterprise/server-readable calls.
 |-------|--------|
 | Backend AI gateway (HTTP, HMAC, timeout, no-op default) | ✅ built (`ai-gateway/`) |
 | Real-time caption pipeline (STT→translate→TTS→fan-out) | ✅ built (`realtime-translate/`) |
-| `call.caption` event + realtime-gateway delivery | ✅ built |
+| `call.caption` event + realtime-service delivery | ✅ built |
 | Env wiring + graceful degrade | ✅ built |
 | **The Python model server (this doc)** | ⬜ **you deploy on HF Spaces** |
 | Client: capture LiveKit track chunks + render captions/TTS | ⬜ client work |

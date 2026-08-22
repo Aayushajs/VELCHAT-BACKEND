@@ -47,8 +47,8 @@ pnpm --filter @velchat/scripts upload:logo ./assets/logo.png      # host logo �
 | `check-integrations.mjs` | Which integrations are configured vs falling back to a dev stub | (all) | Report printed; no send/connect |
 | `test-mail.mjs` | `@velchat/mail` builds the mailer from config and sends | `SMTP_URL`, `MAIL_FROM` | SMTP accepts + delivers (or LogMailer path runs if unset) |
 | `test-push.mjs` | `@velchat/push` router builds; **FCM service account can mint a Google OAuth token** | `VAPID_*`, `FCM_PROJECT_ID/CLIENT_EMAIL/PRIVATE_KEY` | Router built + (if FCM set) a real access token is minted |
-| `test-livekit.mjs` | Mints an HS256 join token like `call-service` and verifies it with the secret | `LIVEKIT_URL/API_KEY/API_SECRET` | Token round-trips with the `video` grant intact |
-| `test-otp.mjs` | End-to-end Reverse-OTP (§B2.2) + device-key login (§B2.5) against a running auth-service | (uses the DID webhook, no real SMS) | `register → webhook → session → challenge → login` all succeed |
+| `test-livekit.mjs` | Mints an HS256 join token like `platform-service` and verifies it with the secret | `LIVEKIT_URL/API_KEY/API_SECRET` | Token round-trips with the `video` grant intact |
+| `test-otp.mjs` | End-to-end Reverse-OTP (§B2.2) + device-key login (§B2.5) against a running identity-service | (uses the DID webhook, no real SMS) | `register → webhook → session → challenge → login` all succeed |
 
 The OTP script targets `http://127.0.0.1:3002` by default (override `AUTH_BASE_URL`). It generates a
 random test number each run and an ephemeral Ed25519 device key, so it never touches real data. It
@@ -74,9 +74,9 @@ Per CLAUDE.md, cross-cutting infra is a **shared lib**; anything domain-specific
 | **Crypto** | `libs/crypto` (libsignal wrappers) | E2EE |
 | **Common** | `libs/common` — logger, tracing, guards, response envelope, tenant context | all services |
 | — | — | — |
-| **OTP / Reverse-OTP** | `apps/auth-service` (domain logic) | auth-only state machine, not shared |
-| **Calls / LiveKit token** | `apps/call-service` | call-only signaling |
-| **Notification policy** | `apps/notification-service` | consumes the shared `libs/push` |
+| **OTP / Reverse-OTP** | `apps/identity-service` (domain logic) | auth-only state machine, not shared |
+| **Calls / LiveKit token** | `apps/platform-service` | call-only signaling |
+| **Notification policy** | `apps/messaging-service` | consumes the shared `libs/push` |
 
 So: **mail, push (incl. FCM), storage, cache, db, event-bus, search, crypto = libs**; OTP, LiveKit
 token, notification routing = their owning service, but they **use** the libs.
@@ -128,7 +128,7 @@ Run on **2026-07-04**, env `development`, against the current `.env`:
 
 ### Calls (LiveKit)
 - `LIVEKIT_URL` (`wss://…`), `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` from your LiveKit server/cloud.
-  Without them, `call-service` returns `503 CALLS_NOT_CONFIGURED` by design.
+  Without them, `platform-service` returns `503 CALLS_NOT_CONFIGURED` by design.
 
 ### Reverse-OTP (₹0 verification, §B2.2)
 - `REVOTP_WEBHOOK_SECRET` (HMAC the SIP gateway signs with) + `REVOTP_DID` (owned inbound number).

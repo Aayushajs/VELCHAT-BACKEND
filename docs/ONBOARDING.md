@@ -18,19 +18,19 @@ container/Lambda-equivalent. They share code through small libraries under `libs
 
 ```
 apps/
-├── api-gateway          # edge: aggregation, authn passthrough, rate limit   (HTTP 3000)
-├── realtime-gateway     # WebSocket fabric, presence fan-out, reconnect        3001
-├── auth-service         # DAPT auth, Reverse-OTP, tokens, device/key dir       3002
-├── user-service         # orgs/workspaces/teams, roles, authorize API          3003
-├── chat-service         # messages, delivery, receipts, ordering (Mongo)       3004
-├── group-channel-service# conversations, channels, communities, epochs         3005
-├── presence-service     # presence, last-seen, status/stories                  3006
-├── notification-service # outbox, push routing (APNs/FCM/WebPush)              3007
-├── media-service        # uploads (Cloudinary/S3), AV scan, transcode          3008
-├── search-service       # indexes events → Atlas Search/OpenSearch             3009
-├── call-service         # WebRTC signaling, LiveKit tokens, meetings           3010
-├── automation-service   # bots, slash commands, workflows, webhooks            3011
-└── ai-service           # translation/STT/TTS/summary (privacy fork)           3012
+├── edge-gateway          # edge: aggregation, authn passthrough, rate limit   (HTTP 3000)
+├── realtime-service     # WebSocket fabric, presence fan-out, reconnect        3001
+├── identity-service         # DAPT auth, Reverse-OTP, tokens, device/key dir       3002
+├── identity-service         # orgs/workspaces/teams, roles, authorize API          3003
+├── messaging-service         # messages, delivery, receipts, ordering (Mongo)       3004
+├── identity-service# conversations, channels, communities, epochs         3005
+├── realtime-service     # presence, last-seen, status/stories                  3006
+├── messaging-service # outbox, push routing (APNs/FCM/WebPush)              3007
+├── content-service        # uploads (Cloudinary/S3), AV scan, transcode          3008
+├── messaging-service       # indexes events → Atlas Search/OpenSearch             3009
+├── platform-service         # WebRTC signaling, LiveKit tokens, meetings           3010
+├── platform-service   # bots, slash commands, workflows, webhooks            3011
+└── platform-service           # translation/STT/TTS/summary (privacy fork)           3012
 
 libs/
 ├── config        # @velchat/config       — zod env schema (fail-closed)
@@ -91,7 +91,7 @@ cp .env.example .env            # defaults point at local docker-compose
 pnpm build
 
 # 5. run a service (or all)
-pnpm --filter @velchat/auth-service dev      # one
+pnpm --filter @velchat/identity-service dev      # one
 pnpm dev                                      # all (turbo --parallel)
 ```
 
@@ -112,7 +112,7 @@ with a clear message.
 4. Render injects `PORT`; `@velchat/config` maps it to `HTTP_PORT` automatically.
 
 > Free-tier reality: Render free services sleep when idle and you can't run all 13 at once. Start
-> with the MVP set (api-gateway, auth, user, chat, realtime, presence, notification) and enable the
+> with the MVP set (edge-gateway, auth, user, chat, realtime, presence, notification) and enable the
 > rest as you grow. To self-host at scale instead, use `deploy/` (Helm + ArgoCD) and flip the
 > selectors to `kafka` / `opensearch` / `s3`.
 
