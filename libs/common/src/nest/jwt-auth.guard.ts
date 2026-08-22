@@ -1,20 +1,14 @@
 import {
+  Inject,
   Injectable,
   CanActivate,
   ExecutionContext,
   SetMetadata,
-  Inject,
   type CustomDecorator,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { createVerify, createPublicKey } from 'node:crypto';
+import { createVerify, createPublicKey, timingSafeEqual } from 'node:crypto';
 import { UnauthorizedError } from '../errors/errors';
-
-/**
- * Injection token for {@link JwtAuthGuardOptions}.
- * Register this in each module's providers so NestJS DI can construct the guard.
- */
-export const JWT_GUARD_OPTIONS_TOKEN = Symbol('JWT_GUARD_OPTIONS');
 
 /**
  * Verified principal attached to `request.user` after JWT validation.
@@ -28,8 +22,22 @@ export interface VerifiedPrincipal {
   scope?: string;
 }
 
+/**
+ * Injection token for {@link JwtAuthGuardOptions}. A module that wants Nest to CONSTRUCT the guard
+ * (rather than receiving a pre-built instance) registers this in its providers. `GlobalAuthModule`
+ * builds the guard itself and does not need it, but the token stays exported so per-module wiring
+ * remains possible.
+ */
+export const JWT_GUARD_OPTIONS_TOKEN = Symbol('JWT_GUARD_OPTIONS');
+
 /** Metadata key for the @Public() decorator. */
 export const IS_PUBLIC_KEY = 'isPublic';
+
+/** Metadata key for the @AllowInternal() decorator. */
+export const ALLOW_INTERNAL_KEY = 'allowInternal';
+
+/** Header another VelChat service presents instead of a user token. */
+export const INTERNAL_HEADER = 'x-velchat-internal';
 
 /**
  * Mark an endpoint as public — the {@link JwtAuthGuard} will skip JWT verification.
@@ -37,11 +45,37 @@ export const IS_PUBLIC_KEY = 'isPublic';
  */
 export const Public = (): CustomDecorator<string> => SetMetadata(IS_PUBLIC_KEY, true);
 
+/**
+ * Mark an endpoint as callable by ANOTHER VELCHAT SERVICE as well as by a user.
+ *
+ * Needed because some endpoints have two legitimate callers: `GET /conversations/:id/members` is
+ * read by the mobile app AND by the WebSocket fabric, which has no user token to present. Before
+ * this the fabric sent no credential, got 401, read `[]`, and silently failed to deliver messages
+ * whenever the Valkey membership projection was cold (DEF-14).
+ *
+ * Deliberately opt-in per endpoint: the shared secret unlocks only the routes that declare it, so a
+ * leaked secret is not a master key. A user token still works on the same route.
+ */
+export const AllowInternal = (): CustomDecorator<string> => SetMetadata(ALLOW_INTERNAL_KEY, true);
+
 export interface JwtAuthGuardOptions {
   /** PEM-encoded RSA public key (or certificate) used to verify RS256 access JWTs. */
   publicKeyPem: string;
   /** Expected `iss` claim value (must match the auth-service issuer). */
   issuer: string;
+  /**
+   * Shared secret for service-to-service calls. When unset, the internal path is DISABLED — an
+   * unconfigured secret must never mean "any internal header is acceptable".
+   */
+  internalSecret?: string;
+}
+
+/** Constant-time compare that also rejects on length, so a prefix cannot pass. */
+function secretMatches(presented: string, expected: string): boolean {
+  const a = Buffer.from(presented);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }
 
 /**
@@ -104,6 +138,26 @@ export class JwtAuthGuard implements CanActivate {
       context.getClass(),
     ]);
     if (isPublic) return true;
+
+    const request0 = context.switchToHttp().getRequest<{
+      headers: Record<string, string | undefined>;
+      user?: VerifiedPrincipal;
+    }>();
+
+    // Service-to-service: only on endpoints that opted in, and only with a configured secret.
+    const allowsInternal = this.reflector.getAllAndOverride<boolean>(ALLOW_INTERNAL_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    const presented = request0.headers[INTERNAL_HEADER];
+    if (allowsInternal && this.opts.internalSecret && presented) {
+      if (secretMatches(presented, this.opts.internalSecret)) {
+        // A system principal, explicitly not a user, so nothing downstream mistakes it for one.
+        request0.user = { accountId: 'system', deviceId: 'internal', scope: 'internal' };
+        return true;
+      }
+      // A wrong secret is not fatal on its own — the caller may still hold a valid user token.
+    }
 
     const request = context.switchToHttp().getRequest<{
       headers: Record<string, string | undefined>;

@@ -1,93 +1,76 @@
 [
   {
-    "name": "api-gateway",
-    "http": 3000,
+    "name": "edge-gateway",
+    "http": 3001,
     "grpc": 50051,
     "ws": false,
     "routes": []
   },
   {
-    "name": "realtime-gateway",
-    "http": 3001,
+    "name": "identity-service",
+    "http": 3002,
     "grpc": 50052,
-    "ws": true,
-    "routes": ["/ws", "/realtime"]
+    "ws": false,
+    "routes": [
+      "/auth",
+      "/users",
+      "/orgs",
+      "/workspaces",
+      "/teams",
+      "/memberships",
+      "/authorize",
+      "/admin",
+      "/discovery",
+      "/channels",
+      "/groups",
+      "/communities",
+      "/broadcasts"
+    ]
   },
   {
-    "name": "auth-service",
-    "http": 3002,
+    "name": "messaging-service",
+    "http": 3004,
     "grpc": 50053,
     "ws": false,
-    "routes": ["/auth"]
+    "routes": [
+      "/chat",
+      "/messages",
+      "/conversations",
+      "/polls",
+      "/notifications",
+      "/mail",
+      "/search"
+    ]
   },
   {
-    "name": "user-service",
-    "http": 3003,
+    "name": "realtime-service",
+    "http": 3006,
     "grpc": 50054,
-    "ws": false,
-    "routes": ["/users", "/orgs", "/workspaces", "/teams", "/contacts"]
+    "ws": true,
+    "routes": ["/ws", "/realtime", "/presence"]
   },
   {
-    "name": "chat-service",
-    "http": 3004,
+    "name": "content-service",
+    "http": 3008,
     "grpc": 50055,
     "ws": false,
-    "routes": ["/chat", "/messages", "/polls"]
+    "routes": ["/media", "/files", "/backups", "/status"]
   },
   {
-    "name": "group-channel-service",
-    "http": 3005,
+    "name": "platform-service",
+    "http": 3010,
     "grpc": 50056,
     "ws": false,
-    "routes": ["/conversations", "/channels", "/groups", "/communities"]
-  },
-  {
-    "name": "presence-service",
-    "http": 3006,
-    "grpc": 50057,
-    "ws": false,
-    "routes": ["/presence", "/status"]
-  },
-  {
-    "name": "notification-service",
-    "http": 3007,
-    "grpc": 50058,
-    "ws": false,
-    "routes": ["/notifications"]
-  },
-  {
-    "name": "media-service",
-    "http": 3008,
-    "grpc": 50059,
-    "ws": false,
-    "routes": ["/media", "/files"]
-  },
-  {
-    "name": "search-service",
-    "http": 3009,
-    "grpc": 50060,
-    "ws": false,
-    "routes": ["/search"]
-  },
-  {
-    "name": "call-service",
-    "http": 3010,
-    "grpc": 50061,
-    "ws": false,
-    "routes": ["/calls", "/meetings"]
-  },
-  {
-    "name": "automation-service",
-    "http": 3011,
-    "grpc": 50062,
-    "ws": false,
-    "routes": ["/automation", "/bots", "/workflows", "/commands"]
-  },
-  {
-    "name": "ai-service",
-    "http": 3012,
-    "grpc": 50063,
-    "ws": false,
-    "routes": ["/ai", "/translate"]
+    "routes": [
+      "/calls",
+      "/meetings",
+      "/automation",
+      "/lists",
+      "/clips",
+      "/canvas",
+      "/feature-flags",
+      "/ai",
+      "/translate"
+    ]
   }
 ]

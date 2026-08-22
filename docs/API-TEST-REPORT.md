@@ -1,5 +1,7 @@
 # VelChat — API Test Report (auth-service)
 
+> **Historical record.** Written before the 13 → 6 service consolidation, so the service names and ports below are the ones in use at the time. The current topology is in [PART H of the architecture doc](./VelChat-Architecture.md#part-h--runtime-topology-amendment-v26-13--6-services). Kept unedited on purpose — an audit that is quietly rewritten stops being evidence.
+
 **Date:** 2026-07-03 · **Method:** every endpoint hit live against the running auth-service (`http://localhost:3050`, built dist). **16/22 → 2xx** (rest are negative tests returning the correct 4xx + message). Long tokens/keys truncated for readability.
 
 ## Response envelope

@@ -12,7 +12,7 @@ Responses use the standard envelope `{ success, statusCode, message, data }` (er
 
 Last updated: **2026-07-05**.
 
-## auth-service — `/auth` (§B2, DAPT)
+## identity-service — `/auth` (§B2, DAPT)
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/auth/register` | Cold-start: enter phone → Reverse-OTP session |
@@ -29,7 +29,7 @@ Last updated: **2026-07-05**.
 | POST | `/auth/backup-codes/issue` | Issue recovery codes |
 | GET | `/.well-known/jwks.json` | Public JWKS (raw) |
 
-## user-service — `/users`, `/discovery`, tenancy, `/admin` (§B3/§A13/§G2)
+## identity-service — `/users`, `/discovery`, tenancy, `/admin` (§B3/§A13/§G2)
 | Method | Path | Purpose |
 |---|---|---|
 | GET/PUT | `/users/:userId/profile` | Profile + privacy |
@@ -45,7 +45,7 @@ Last updated: **2026-07-05**.
 | GET | `/memberships` · `/authorize` | RBAC |
 | GET/PUT/POST | `/admin/orgs/:orgId/{audit,retention,exports}` | Compliance |
 
-## chat-service — `/chat`, `/polls`, `/messages`, `/conversations`, `/users` (§B4/§B15/§B16/§G1)
+## messaging-service — `/chat`, `/polls`, `/messages`, `/conversations`, `/users` (§B4/§B15/§B16/§G1)
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/chat/messages` | Send message (E2EE ciphertext or plaintext) |
@@ -59,13 +59,13 @@ Last updated: **2026-07-05**.
 | POST | `/messages/:messageId/resend-request` · `/resend-fulfill` | **E2EE resend (§G1-1)** |
 | GET | `/messages/resend/pending` | Sender flush-on-connect |
 
-## group-channel-service (§B7)
+## identity-service (§B7)
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/conversations/dm` · `/groups` · `/channels` | Create DM / group / channel |
 | POST/DELETE/GET | `/conversations/:id/members[/:userId]` | Membership |
 
-## presence-service — `/presence`, `/status` (§B8)
+## realtime-service — `/presence`, `/status` (§B8)
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/presence/{online,offline,heartbeat,subscribe}` | Presence lifecycle + fan-out |
@@ -75,7 +75,7 @@ Last updated: **2026-07-05**.
 | GET | `/status/:id/viewers` · `/status/feed/:authorId` | Viewers + audience feed |
 | DELETE | `/status/:id` | Delete a status |
 
-## notification-service — `/notifications`, `/mail/campaigns` (§B10/§A19)
+## messaging-service — `/notifications`, `/mail/campaigns` (§B10/§A19)
 | Method | Path | Purpose |
 |---|---|---|
 | PUT/GET | `/notifications/prefs` | Per-scope prefs (level, mute, DND) |
@@ -84,19 +84,19 @@ Last updated: **2026-07-05**.
 | GET | `/mail/campaigns[/:id]` | List / detail |
 | POST | `/mail/campaigns/:id/{pause,resume,send-now}` · DELETE | **Control a campaign** |
 
-## media-service — `/media`, `/backups` (§B11)
+## content-service — `/media`, `/backups` (§B11)
 | Method | Path | Purpose |
 |---|---|---|
 | POST/PUT | `/media/uploads[/:id]` | Resumable upload init / complete |
 | GET | `/media/:id` · `/media/:id/url` | Metadata / signed URL |
 | POST/GET | `/backups/:accountId[/latest]` | E2EE chat backup blob |
 
-## search-service — `/search` (§B13)
+## messaging-service — `/search` (§B13)
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/search?q=…` | ACL-filtered full-text (`from:`,`in:`,`has:`) |
 
-## call-service — `/calls`, `/meetings`, screen control (§B12/§A17/§A4.4)
+## platform-service — `/calls`, `/meetings`, screen control (§B12/§A17/§A4.4)
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/calls` · `/calls/:id/{join,admit,leave,end}` | Call lifecycle + LiveKit token |
@@ -106,7 +106,7 @@ Last updated: **2026-07-05**.
 | GET | `/calls/:callId/screen-control` | **Current control session** |
 | POST | `/calls/:callId/screen-control/:id/{grant,deny,release,revoke}` | **Grant/deny/release/revoke** |
 
-## automation-service — `/automation`, `/lists` (§B17/§A4.7)
+## platform-service — `/automation`, `/lists` (§B17/§A4.7)
 | Method | Path | Purpose |
 |---|---|---|
 | POST/GET | `/automation/bots` | Register / list bots |
@@ -118,12 +118,12 @@ Last updated: **2026-07-05**.
 | POST/GET/DELETE | `/lists[/:listId]` | **Lists (§A4.7)** |
 | POST/PATCH/DELETE | `/lists/:listId/items` · `/lists/items/:itemId` | **List items** |
 
-## ai-service — `/ai` (§A26/§B20)
+## platform-service — `/ai` (§A26/§B20)
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/ai/translate` · `/ai/detect` | Translate / detect (enterprise; personal is on-device) |
 | GET/PUT | `/ai/language` | User language prefs |
 | GET/PUT | `/ai/translate/pref` | Per-chat translate mode |
 
-> Realtime (WebSocket) via **realtime-gateway** (`/rt`) — not REST; see §B9. Events (`message.*`,
+> Realtime (WebSocket) via **realtime-service** (`/rt`) — not REST; see §B9. Events (`message.*`,
 > `presence.*`, `call.control.*`, `poll.updated`, `message.resend.*`, …) flow over Kafka/redis-streams.

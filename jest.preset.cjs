@@ -11,6 +11,11 @@ module.exports = {
   testMatch: ['**/*.spec.ts'],
   testPathIgnorePatterns: ['/node_modules/', '/dist/', '/test/integration/'],
   moduleFileExtensions: ['ts', 'js', 'json'],
+  // Per-package transform cache. Jest's default is one shared directory under the OS temp dir, and
+  // with ~40 workspaces running under Turbo concurrently the writes collide — on Windows that
+  // surfaces as "failed to cache transform results" and the suite fails for a reason that has
+  // nothing to do with the code. Scoping the cache to each package removes the contention.
+  cacheDirectory: '<rootDir>/.jest-cache',
   clearMocks: true,
   collectCoverageFrom: ['src/**/*.ts', '!src/**/*.d.ts', '!src/**/index.ts'],
   coverageDirectory: 'coverage',

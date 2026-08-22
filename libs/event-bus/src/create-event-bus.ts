@@ -6,13 +6,13 @@ import { KafkaEventBus } from './adapters/kafka.bus';
 import { InMemoryEventBus } from './adapters/in-memory.bus';
 
 /**
- * Selects the event-bus adapter from config.
- * - `redis-streams`: Upstash / Valkey free tier
- * - `kafka`: self-hosted scale profile
- * - `memory`: in-process zero-dependency execution for dev / monolith / offline testing
+ * Selects the event-bus adapter from config. Default `redis-streams` (Upstash free tier);
+ * `kafka` for the self-hosted scale profile. Adding a provider is a new adapter + a case here.
  */
 export function createEventBus(config: AppConfig, logger: Logger): EventBus {
   if (config.EVENT_BUS === 'memory') {
+    // In-process, zero dependency. The right choice for the single-process `mono` profile and for
+    // offline development, where standing up Redis buys nothing.
     return new InMemoryEventBus(logger);
   }
   if (config.EVENT_BUS === 'kafka') {

@@ -1,0 +1,11 @@
+# @velchat/messaging-service — Kubernetes values (AWS EKS / Azure AKS / OKE).
+# Same image the compose deployment runs; only the orchestrator differs.
+name: messaging-service
+image:
+  repository: ghcr.io/aayushajs/velchat-messaging-service
+  tag: latest
+service:
+  port: 3004
+env:
+  SERVICE_NAME: messaging-service
+  HTTP_PORT: '3004'

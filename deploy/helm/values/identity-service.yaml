@@ -1,0 +1,11 @@
+# @velchat/identity-service — Kubernetes values (AWS EKS / Azure AKS / OKE).
+# Same image the compose deployment runs; only the orchestrator differs.
+name: identity-service
+image:
+  repository: ghcr.io/aayushajs/velchat-identity-service
+  tag: latest
+service:
+  port: 3002
+env:
+  SERVICE_NAME: identity-service
+  HTTP_PORT: '3002'

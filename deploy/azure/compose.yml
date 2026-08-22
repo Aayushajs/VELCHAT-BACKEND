@@ -1,0 +1,76 @@
+# VelChat on Azure free allowance — B1S (1 vCPU / 1 GB), 750 h/month.
+#
+# 1 GB is the binding constraint, and it is why this file looks different from Oracle's. Six Node
+# processes are ~900 MB before the OS gets a byte, so this profile runs ONE process
+# (`velchat-mono`) with every feature group mounted, plus Valkey locally because it is tiny and the
+# event bus must not be metered. Postgres and Mongo are external — see .env.example.
+#
+# It is the same code as the six-service topology, mounted through the same assembler; only the
+# process count differs. Moving to six later is a profile change, not a rewrite.
+#
+# Bring up:  docker compose -f deploy/azure/compose.yml --env-file deploy/azure/.env up -d
+name: velchat
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports: ['80:80', '443:443']
+    volumes:
+      - ../shared/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    environment:
+      # The shared Caddyfile routes by these, so one file serves every target: in mono both the
+      # API and the WebSocket upgrade land on the same process.
+      UPSTREAM_API: velchat-mono:3000
+      UPSTREAM_WS: velchat-mono:3000
+    depends_on: [velchat-mono]
+    deploy: { resources: { limits: { memory: 64M } } }
+
+  velchat-mono:
+    image: ghcr.io/aayushajs/velchat-velchat-mono:${TAG:-latest}
+    restart: always
+    env_file: [./.env]
+    environment:
+      SERVICE_NAME: velchat-mono
+      HTTP_PORT: 3000
+      # 320 MB of heap on a 1 GB box: enough for every feature group, with room for the OS,
+      # Valkey and Caddy. Raise it only after checking `docker stats`.
+      NODE_OPTIONS: --max-old-space-size=320
+    depends_on:
+      valkey: { condition: service_healthy }
+    logging:
+      driver: json-file
+      options: { max-size: '10m', max-file: '3' }
+    deploy: { resources: { limits: { memory: 480M }, reservations: { cpus: '0.40' } } }
+
+  # Local, not managed: Azure Cache for Redis has no free tier, and a metered Redis is the worst
+  # possible home for the event bus (Redis Streams consumers poll continuously). Valkey is ~60 MB.
+  # `noeviction` is load-bearing — evicting a `seq:*` key reissues sequence numbers, which the
+  # mobile client skips as already-held: message loss with no error.
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: always
+    command:
+      - valkey-server
+      - --appendonly
+      - 'yes'
+      - --appendfsync
+      - everysec
+      - --maxmemory
+      - 96mb
+      - --maxmemory-policy
+      - noeviction
+    volumes: [valkeydata:/data]
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    deploy: { resources: { limits: { memory: 160M }, reservations: { cpus: '0.10' } } }
+
+volumes:
+  valkeydata:
+  caddydata:
+  caddyconfig:

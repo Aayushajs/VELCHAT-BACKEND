@@ -2,7 +2,7 @@
 
 > **Scope:** this is a **client-side** architecture spec (React Native mobile + React web, which live in
 > a separate repo). It exists here so the frontend has **zero missing pieces** when it's built. The
-> **backend pieces these features need are already implemented** in `media-service` (see §8). Everything
+> **backend pieces these features need are already implemented** in `content-service` (see §8). Everything
 > below runs on-device; the server only stores blobs + metadata and answers usage/availability queries.
 
 Covers: **cache size limit · LRU eviction · Manage Storage · filesystem folder strategy · background
@@ -142,7 +142,7 @@ Settings → Storage and Data
 second calls the backend `DELETE /media/:id` (owner-only) and removes it for everyone (tombstone). The UI
 must make the difference obvious.
 
-### Backend APIs powering this (already implemented in media-service)
+### Backend APIs powering this (already implemented in content-service)
 | Need | Endpoint |
 |------|----------|
 | Manage Storage overview (total + by type + by chat) | `GET /media/usage?ownerId=…` → `{ totalBytes, totalCount, byType[], byConversation[] }` |

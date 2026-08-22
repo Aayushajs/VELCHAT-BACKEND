@@ -1,5 +1,7 @@
 # VelChat — Production Readiness Report
 
+> **Historical record.** Written before the 13 → 6 service consolidation, so the service names and ports below are the ones in use at the time. The current topology is in [PART H of the architecture doc](./VelChat-Architecture.md#part-h--runtime-topology-amendment-v26-13--6-services). Kept unedited on purpose — an audit that is quietly rewritten stops being evidence.
+
 _System-wide audit against the architecture's Part G hardening criteria. Conducted with full-codebase context; every status is evidence-backed._
 
 > **Scope note (read this first):** VelChat is at **Phase 5 of an 11-phase roadmap** (Part F). The

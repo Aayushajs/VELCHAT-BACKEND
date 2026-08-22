@@ -128,10 +128,14 @@ export const envSchema = z.object({
   // Valkey (cache / presence / seq)
   VALKEY_URL: z.string().min(1).optional(),
 
-  // event bus: redis-streams (Upstash, ₹0) | kafka (self-host scale) | memory (in-process zero-dependency)
+  // ── Provider selection (free-tier MVP defaults; switch to self-host at scale) ──
+  // event bus: redis-streams (Upstash, ₹0) | kafka (self-host scale)
+  // event bus: redis-streams (Valkey/Upstash) | kafka (scale) | memory (in-process, zero
+  // dependency — the natural fit for the `mono` profile and for offline development)
   EVENT_BUS: z.enum(['redis-streams', 'kafka', 'memory']).default('redis-streams'),
-  // object storage: cloudinary (₹0) | s3 (MinIO/AWS self-host)
-  STORAGE_PROVIDER: z.enum(['cloudinary', 's3']).default('cloudinary'),
+  // object storage: cloudinary (₹0) | s3 (MinIO / AWS S3 / Oracle Object Storage) |
+  // azure-blob (Azure is the one target that is NOT S3-compatible — see deploy/PORTABILITY.md)
+  STORAGE_PROVIDER: z.enum(['cloudinary', 's3', 'azure-blob']).default('cloudinary'),
   // search: atlas (MongoDB Atlas Search, ₹0) | opensearch (self-host)
   SEARCH_PROVIDER: z.enum(['atlas', 'opensearch']).default('atlas'),
 
@@ -151,6 +155,12 @@ export const envSchema = z.object({
   S3_ACCESS_KEY: z.string().optional(),
   S3_SECRET_KEY: z.string().optional(),
   S3_BUCKET: z.string().optional(),
+
+  // Azure Blob (only when STORAGE_PROVIDER=azure-blob). The account key is a SECRET.
+  AZURE_STORAGE_ACCOUNT: z.string().optional(),
+  AZURE_STORAGE_KEY: z.string().optional(),
+  AZURE_STORAGE_CONTAINER: z.string().default('velchat-media'),
+  AZURE_BLOB_ENDPOINT: z.string().url().optional(), // override for Azurite / a private endpoint
 
   // Cloudinary (only when STORAGE_PROVIDER=cloudinary). cloudinary://key:secret@cloud
   CLOUDINARY_URL: z.string().optional(),
@@ -178,6 +188,32 @@ export const envSchema = z.object({
   // Auth
   JWT_ISSUER: z.string().optional(),
   JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+  // RS256 signing keypair. The PUBLIC half is needed by EVERY service so each can verify access
+  // tokens itself (§B2.3) — it is a public key, safe to distribute. Absent in production ⇒ the
+  // service refuses to boot rather than serving unauthenticated traffic (DEF-02).
+  // Absent in auth-service ⇒ an EPHEMERAL keypair is generated, so every restart invalidates all
+  // outstanding tokens and no other service can verify them (DEF-13). Always set both in prod.
+  JWT_PRIVATE_PEM: z.string().optional(),
+  JWT_PUBLIC_PEM: z.string().optional(),
+  // Explicit, greppable dev escape hatch: run without JWT verification. Refused in production.
+  // Shared secret for service-to-service calls, sent as `x-velchat-internal`. Required by the
+  // membership lookup the WebSocket fabric depends on: that endpoint is user-guarded, so an
+  // internal caller needs its own credential rather than borrowing a user's token (DEF-14).
+  INTERNAL_API_SECRET: z.string().optional(),
+
+  // WebSocket abuse limits (§B9.4). Conservative on purpose: `ws` itself defaults to a 100 MB
+  // frame, which is a memory-exhaustion lever.
+  WS_MAX_PAYLOAD_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(64 * 1024),
+  WS_INBOUND_PER_SECOND: z.coerce.number().int().positive().default(40),
+
+  AUTH_DEV_INSECURE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
 
   // Mail (self-hosted Postfix SMTP). Unset → mail is logged only (dev).
   SMTP_URL: z.string().optional(),

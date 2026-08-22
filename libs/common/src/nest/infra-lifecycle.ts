@@ -32,6 +32,15 @@ export class InfraLifecycle implements OnApplicationBootstrap, OnApplicationShut
   ) {}
 
   /**
+   * Names of the dependencies this process actually opened. Exposed because "which stores does this
+   * service connect to" is an architectural invariant worth asserting in a test rather than
+   * describing in a comment — realtime-service, for instance, must never open Postgres.
+   */
+  get resourceNames(): readonly string[] {
+    return this.resources.map((r) => r.name);
+  }
+
+  /**
    * Connect every dependency in PARALLEL, each bounded by a hard timeout, so an unreachable
    * datastore can't stall boot: total wait is max(one timeout), not the sum. A failure is logged,
    * not fatal — the service still serves `/health` and flips `/ready` green once pings pass (§B9).

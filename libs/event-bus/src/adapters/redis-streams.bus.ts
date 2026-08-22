@@ -11,49 +11,72 @@ import type { EventBus, EventHandler } from '../event-bus.port';
 interface Subscription {
   topic: string;
   groupId: string;
-  consumer: string;
   handler: EventHandler;
+}
+
+/** One reader per consumer GROUP, multiplexed across every topic that group subscribes to. */
+interface ConsumerGroup {
+  groupId: string;
+  consumer: string;
+  topics: string[];
+  handlers: Map<string, EventHandler>;
+  reader: Redis;
+  loop?: Promise<void>;
 }
 
 type StreamReadResult = Array<[string, Array<[string, string[]]>]> | null;
 
+/** Attempts per entry before it is treated as poison and moved to the DLQ. */
+const MAX_HANDLER_ATTEMPTS = 3;
+/** An entry pending longer than this is considered abandoned and is reclaimed. */
+const RECLAIM_MIN_IDLE_MS = 60_000;
+/** How often to sweep for abandoned entries. */
+const RECLAIM_INTERVAL_MS = 30_000;
+
 /**
- * Redis Streams event bus (Upstash free tier optimized).
- * Features:
- * - Single multiplexed XREADGROUP consumer loop per groupId (batching all subscribed topics)
- * - 30-second block timeout (drastically reducing Upstash request count by >95%)
- * - Resilient error handling with exponential backoff on rate limits or connection drops
- * - Fallback / graceful degradation so publisher and start() do not crash the service
+ * Redis Streams event bus. XADD to publish; per-group XREADGROUP consumers with XACK, dedupe,
+ * bounded retry, an XAUTOCLAIM reclaim sweep, and a `<topic>.dlq` for poison entries. Works against
+ * any Redis-compatible endpoint (local Valkey, or a managed one).
+ *
+ * Four properties here are load-bearing, and each replaces a defect the audit found:
+ *
+ * 1. **Idempotency is marked AFTER the handler succeeds.** Marking first meant a process killed
+ *    mid-handling recorded the event as processed, so the redelivery skipped it — silent event loss.
+ * 2. **A failing handler is retried before the DLQ.** Diverting on the first error meant one
+ *    transient Mongo blip permanently dropped a message fan-out.
+ * 3. **Abandoned entries are reclaimed.** Without XAUTOCLAIM, an entry delivered but never
+ *    acknowledged (the crash-before-XACK case) sat in the pending list forever and nobody processed
+ *    it again.
+ * 4. **One reader per consumer group, not per subscription.** 23 subscriptions each with their own
+ *    connection and blocking read cost ~397,000 commands/day at idle. Multiplexing the topics of a
+ *    group into a single XREADGROUP makes the idle cost negligible and cuts 23 connections to 4.
  */
 export class RedisStreamsEventBus implements EventBus {
   readonly name = 'event-bus:redis-streams';
   private readonly pub: Redis;
   private readonly idempotency: IdempotencyStore;
   private readonly subscriptions: Subscription[] = [];
-  private readonly readers: Redis[] = [];
+  private readonly groups: ConsumerGroup[] = [];
   private readonly maxLen: number;
+  private readonly blockMs: number;
+  private reclaimTimer?: ReturnType<typeof setInterval>;
   private running = false;
 
   constructor(
     url: string,
     private readonly logger: Logger,
-    opts?: { maxLenApprox?: number },
+    opts?: { maxLenApprox?: number; blockMs?: number },
   ) {
-    this.pub = new Redis(url, {
-      lazyConnect: true,
-      maxRetriesPerRequest: 2,
-      retryStrategy: (times) => (times > 10 ? null : Math.min(times * 300, 3000)),
-    });
+    this.pub = new Redis(url, { lazyConnect: true, maxRetriesPerRequest: null });
     this.idempotency = new IdempotencyStore(this.pub, 'evt-idem');
     this.maxLen = opts?.maxLenApprox ?? 100_000;
+    // A long block means a near-zero idle command rate. Configurable because a proxied endpoint may
+    // close a connection that blocks too long.
+    this.blockMs = opts?.blockMs ?? Number(process.env.EVENT_BUS_BLOCK_MS ?? 30_000);
   }
 
   async connect(): Promise<void> {
-    try {
-      await this.pub.connect();
-    } catch (err) {
-      this.logger.warn({ err: String(err) }, 'redis-streams publisher failed to connect at boot');
-    }
+    await this.pub.connect();
   }
 
   async ping(): Promise<boolean> {
@@ -66,12 +89,12 @@ export class RedisStreamsEventBus implements EventBus {
 
   async close(): Promise<void> {
     this.running = false;
-    for (const reader of this.readers) {
-      try {
-        reader.disconnect();
-      } catch {
-        // ignore
-      }
+    if (this.reclaimTimer) clearInterval(this.reclaimTimer);
+    // Wait for the loops to notice. Detaching without waiting leaves a handler mid-flight and, in
+    // tests, an open handle that stops the process from exiting.
+    for (const g of this.groups) {
+      g.reader.disconnect();
+      await g.loop?.catch(() => undefined);
     }
     try {
       await this.pub.quit();
@@ -81,130 +104,116 @@ export class RedisStreamsEventBus implements EventBus {
   }
 
   async publish<T>(topic: string, envelope: EventEnvelope<T>): Promise<void> {
-    try {
-      await this.pub.xadd(topic, 'MAXLEN', '~', this.maxLen, '*', 'e', JSON.stringify(envelope));
-    } catch (err) {
-      this.logger.error(
-        { topic, event_id: envelope.event_id, err: String(err) },
-        'failed to publish event to redis-streams',
-      );
-    }
+    await this.pub.xadd(topic, 'MAXLEN', '~', this.maxLen, '*', 'e', JSON.stringify(envelope));
   }
 
   subscribe<T>(topic: string, groupId: string, handler: EventHandler<T>): void {
-    this.subscriptions.push({
-      topic,
-      groupId,
-      consumer: `${groupId}-${this.subscriptions.length}`,
-      handler: handler as EventHandler,
-    });
+    this.subscriptions.push({ topic, groupId, handler: handler as EventHandler });
   }
 
   async start(): Promise<void> {
     if (this.running) return;
     this.running = true;
 
-    // Group subscriptions by groupId so one consumer reader handles multiple topics with a single XREADGROUP call
-    const groupMap = new Map<string, Subscription[]>();
+    // Group the subscriptions so each consumer group reads all of its topics in ONE call.
+    const byGroup = new Map<string, Subscription[]>();
     for (const sub of this.subscriptions) {
-      const list = groupMap.get(sub.groupId) ?? [];
+      const list = byGroup.get(sub.groupId) ?? [];
       list.push(sub);
-      groupMap.set(sub.groupId, list);
+      byGroup.set(sub.groupId, list);
     }
 
-    for (const [groupId, subs] of groupMap.entries()) {
-      // Ensure stream consumer groups exist
-      for (const sub of subs) {
+    for (const [groupId, subs] of byGroup) {
+      const topics = [...new Set(subs.map((s) => s.topic))];
+      for (const topic of topics) {
         try {
-          await this.pub.xgroup('CREATE', sub.topic, sub.groupId, '$', 'MKSTREAM');
+          await this.pub.xgroup('CREATE', topic, groupId, '$', 'MKSTREAM');
         } catch (err) {
-          const errMsg = String(err);
-          if (!errMsg.includes('BUSYGROUP')) {
-            this.logger.warn(
-              { topic: sub.topic, groupId, err: errMsg },
-              'xgroup CREATE failed (will retry or proceed)',
-            );
-          }
+          if (!String(err).includes('BUSYGROUP')) throw err; // already exists → fine
         }
       }
-
       const reader = this.pub.duplicate();
+      await reader.connect();
+      const group: ConsumerGroup = {
+        groupId,
+        // Stable per process, so a restart's abandoned entries are visibly someone else's and get
+        // reclaimed rather than silently re-owned.
+        consumer: `${groupId}-${process.pid}`,
+        topics,
+        handlers: new Map(subs.map((s) => [s.topic, s.handler])),
+        reader,
+      };
+      this.groups.push(group);
+      group.loop = this.consumeLoop(group);
+    }
+
+    this.reclaimTimer = setInterval(() => void this.reclaimAbandoned(), RECLAIM_INTERVAL_MS);
+    // Sweep once shortly after start so a previous process's stranded entries are not left waiting
+    // a full interval.
+    setTimeout(() => void this.reclaimAbandoned(), 1_000).unref?.();
+  }
+
+  private async consumeLoop(group: ConsumerGroup): Promise<void> {
+    while (this.running) {
       try {
-        await reader.connect();
-        this.readers.push(reader);
-        void this.consumeGroupLoop(reader, groupId, subs);
+        const res = (await group.reader.xreadgroup(
+          'GROUP',
+          group.groupId,
+          group.consumer,
+          'COUNT',
+          10,
+          'BLOCK',
+          this.blockMs,
+          'STREAMS',
+          ...group.topics,
+          ...group.topics.map(() => '>'),
+        )) as StreamReadResult;
+        if (!res) continue;
+        for (const [topic, entries] of res) {
+          for (const [id, fields] of entries) {
+            await this.handleEntry(group, topic, id, fields);
+          }
+        }
       } catch (err) {
-        this.logger.error(
-          { groupId, err: String(err) },
-          'failed to connect consumer reader for group',
-        );
+        if (!this.running) break;
+        this.logger.error({ group: group.groupId, err: String(err) }, 'redis-streams read error');
+        await delay(1000);
       }
     }
   }
 
   /**
-   * Consumes all topics for a specific consumer group using a single multiplexed XREADGROUP call.
-   * Uses a 30-second BLOCK timeout to keep idle command rate ultra-low.
+   * Hand any entry that has been pending too long to this consumer. This is the crash-recovery path:
+   * an entry read but never acknowledged is otherwise stranded in the pending list permanently.
    */
-  private async consumeGroupLoop(
-    reader: Redis,
-    groupId: string,
-    subs: Subscription[],
-  ): Promise<void> {
-    const consumerName = subs[0]?.consumer ?? groupId;
-    const handlerMap = new Map<string, EventHandler>();
-    for (const sub of subs) {
-      handlerMap.set(sub.topic, sub.handler);
-    }
-
-    const topics = subs.map((s) => s.topic);
-    const ids = subs.map(() => '>');
-    let consecutiveErrors = 0;
-
-    while (this.running) {
-      try {
-        const res = (await reader.xreadgroup(
-          'GROUP',
-          groupId,
-          consumerName,
-          'COUNT',
-          20,
-          'BLOCK',
-          30000,
-          'STREAMS',
-          ...topics,
-          ...ids,
-        )) as StreamReadResult;
-
-        consecutiveErrors = 0;
-        if (!res) continue;
-
-        for (const [topic, entries] of res) {
-          const handler = handlerMap.get(topic);
-          if (!handler) continue;
-
-          for (const [id, fields] of entries) {
-            await this.handleEntry(reader, topic, groupId, handler, id, fields);
+  private async reclaimAbandoned(): Promise<void> {
+    if (!this.running) return;
+    for (const group of this.groups) {
+      for (const topic of group.topics) {
+        try {
+          const res = (await group.reader.xautoclaim(
+            topic,
+            group.groupId,
+            group.consumer,
+            RECLAIM_MIN_IDLE_MS,
+            '0-0',
+            'COUNT',
+            10,
+          )) as [string, Array<[string, string[]]>] | null;
+          for (const [id, fields] of res?.[1] ?? []) {
+            this.logger.warn({ topic, id }, 'reclaimed abandoned event');
+            await this.handleEntry(group, topic, id, fields);
           }
+        } catch (err) {
+          this.logger.debug({ topic, err: String(err) }, 'reclaim sweep skipped');
         }
-      } catch (err) {
-        if (!this.running) break;
-        consecutiveErrors++;
-        const backoffMs = Math.min(consecutiveErrors * 5000, 30000);
-        this.logger.error(
-          { groupId, err: String(err), backoffMs },
-          'redis-streams multiplex read error (backing off)',
-        );
-        await delay(backoffMs);
       }
     }
   }
 
   private async handleEntry(
-    reader: Redis,
+    group: ConsumerGroup,
     topic: string,
-    groupId: string,
-    handler: EventHandler,
     id: string,
     fields: string[],
   ): Promise<void> {
@@ -213,41 +222,58 @@ export class RedisStreamsEventBus implements EventBus {
     try {
       envelope = parseEnvelope(raw);
     } catch (err) {
+      // Retrying a malformed payload can never succeed, so it goes straight out.
       await this.toDlq(topic, raw, 'unparseable', err);
-      try {
-        await reader.xack(topic, groupId, id);
-      } catch {
-        // ignore ack failure
-      }
+      await this.ack(group, topic, id);
       return;
     }
 
-    try {
-      if (!(await this.idempotency.markIfNew(envelope.event_id))) {
-        await reader.xack(topic, groupId, id); // duplicate — already processed
-        return;
-      }
-    } catch {
-      // If idempotency store has rate limit or fails, continue processing to avoid dropping message
+    if (await this.idempotency.wasProcessed(envelope.event_id)) {
+      await this.ack(group, topic, id);
+      return;
     }
 
-    try {
-      await runWithTenant(
-        { tenantId: envelope.tenant_id ?? '', traceId: envelope.trace_id, scope: 'tenant' },
-        () => handler(envelope),
-      );
-      await reader.xack(topic, groupId, id);
-    } catch (err) {
-      this.logger.error(
-        { topic, event_id: envelope.event_id, err: String(err) },
-        'handler failed → DLQ',
-      );
-      await this.toDlq(topic, raw, 'handler-error', err);
+    const handler = group.handlers.get(topic);
+    if (!handler) {
+      await this.ack(group, topic, id);
+      return;
+    }
+
+    for (let attempt = 1; attempt <= MAX_HANDLER_ATTEMPTS; attempt += 1) {
       try {
-        await reader.xack(topic, groupId, id);
-      } catch {
-        // ignore ack failure
+        await runWithTenant(
+          { tenantId: envelope.tenant_id ?? '', traceId: envelope.trace_id, scope: 'tenant' },
+          () => handler(envelope),
+        );
+        // AFTER success, never before: marking first turns a crash mid-handling into a lost event.
+        await this.idempotency.markIfNew(envelope.event_id);
+        await this.ack(group, topic, id);
+        return;
+      } catch (err) {
+        if (attempt < MAX_HANDLER_ATTEMPTS) {
+          this.logger.warn(
+            { topic, event_id: envelope.event_id, attempt, err: String(err) },
+            'handler failed, retrying',
+          );
+          await delay(50 * attempt); // brief, increasing backoff
+          continue;
+        }
+        this.logger.error(
+          { topic, event_id: envelope.event_id, attempts: attempt, err: String(err) },
+          'handler failed after retries → DLQ',
+        );
+        await this.toDlq(topic, raw, 'handler-error', err);
+        await this.ack(group, topic, id);
       }
+    }
+  }
+
+  /** Acknowledge, tolerating failure: an unacknowledged entry is reclaimed later, not lost. */
+  private async ack(group: ConsumerGroup, topic: string, id: string): Promise<void> {
+    try {
+      await group.reader.xack(topic, group.groupId, id);
+    } catch (err) {
+      this.logger.warn({ topic, id, err: String(err) }, 'xack failed — entry will be reclaimed');
     }
   }
 
@@ -260,9 +286,6 @@ export class RedisStreamsEventBus implements EventBus {
     try {
       await this.pub.xadd(
         `${topic}.dlq`,
-        'MAXLEN',
-        '~',
-        1000,
         '*',
         'reason',
         reason,
@@ -272,7 +295,7 @@ export class RedisStreamsEventBus implements EventBus {
         raw ?? '',
       );
     } catch (dlqErr) {
-      this.logger.warn({ topic, err: String(dlqErr) }, 'failed to write redis-streams DLQ');
+      this.logger.fatal({ err: String(dlqErr) }, 'failed to write redis-streams DLQ');
     }
   }
 }

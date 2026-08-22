@@ -1,0 +1,36 @@
+{
+  "name": "@velchat/composition",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Composition layer — feature groups as data, and the assembler that turns them into a runtime service. The only place cross-feature wiring lives.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "jest",
+    "clean": "rimraf dist .turbo coverage"
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.4.15",
+    "@velchat/common": "workspace:*",
+    "@velchat/config": "workspace:*",
+    "@velchat/feature-ai": "workspace:*",
+    "@velchat/feature-auth": "workspace:*",
+    "@velchat/feature-automation": "workspace:*",
+    "@velchat/feature-call": "workspace:*",
+    "@velchat/feature-chat": "workspace:*",
+    "@velchat/feature-group-channel": "workspace:*",
+    "@velchat/feature-media": "workspace:*",
+    "@velchat/feature-notification": "workspace:*",
+    "@velchat/feature-presence": "workspace:*",
+    "@velchat/feature-search": "workspace:*",
+    "@velchat/feature-status": "workspace:*",
+    "@velchat/feature-user": "workspace:*",
+    "@velchat/infra-context": "workspace:*",
+    "@velchat/mail": "workspace:*",
+    "@velchat/push": "workspace:*",
+    "pino": "^9.6.0"
+  }
+}

@@ -1,0 +1,11 @@
+# @velchat/content-service — Kubernetes values (AWS EKS / Azure AKS / OKE).
+# Same image the compose deployment runs; only the orchestrator differs.
+name: content-service
+image:
+  repository: ghcr.io/aayushajs/velchat-content-service
+  tag: latest
+service:
+  port: 3008
+env:
+  SERVICE_NAME: content-service
+  HTTP_PORT: '3008'

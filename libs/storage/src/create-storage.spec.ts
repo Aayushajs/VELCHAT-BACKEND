@@ -22,3 +22,25 @@ describe('createStorage (provider selection)', () => {
     expect(createStorage(cfg)).toBeInstanceOf(S3Storage);
   });
 });
+
+describe('createStorage — azure-blob (deploy/PORTABILITY.md)', () => {
+  const base = { SERVICE_NAME: 't', STORAGE_PROVIDER: 'azure-blob' };
+
+  it('selects the Azure adapter when the account and key are present', () => {
+    const storage = createStorage(
+      loadConfig({
+        ...base,
+        AZURE_STORAGE_ACCOUNT: 'acct',
+        AZURE_STORAGE_KEY: Buffer.from('k').toString('base64'),
+      } as NodeJS.ProcessEnv),
+    );
+    expect(storage.name).toBe('storage:azure-blob');
+  });
+
+  it('refuses to boot when the credentials are half-configured', () => {
+    // A missing key must stop the service, not surface later as every upload failing.
+    expect(() =>
+      createStorage(loadConfig({ ...base, AZURE_STORAGE_ACCOUNT: 'acct' } as NodeJS.ProcessEnv)),
+    ).toThrow(/AZURE_STORAGE_KEY/);
+  });
+});

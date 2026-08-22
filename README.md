@@ -59,29 +59,38 @@ flowchart TB
   subgraph Clients
     W[Web / Electron] & M[Mobile RN] & A[Admin Portal]
   end
-  W & M & A -->|HTTPS / gRPC-web| GW[api-gateway<br/>authN · rate-limit · route]
-  W & M & A -->|WSS| RT[realtime-gateway<br/>WebSocket fabric]
+  W & M & A -->|HTTPS| GW[edge-gateway<br/>rate-limit · route]
+  W & M & A -->|WSS /ws| RT
 
-  GW -->|gRPC / mTLS| SVC
-  RT --> SVC
+  GW --> ID & MSG & CON & PLT
+  GW --> RT
 
-  subgraph SVC[Services]
-    AUTH[auth] & USER[user] & CHAT[chat] & GC[group-channel]
-    PRES[presence] & NOTIF[notification] & MEDIA[media] & SEARCH[search]
-    CALL[call] & AUTO[automation] & AI[ai]
+  subgraph SVC[Six runtime services]
+    ID[identity-service<br/>auth · user · group-channel]
+    MSG[messaging-service<br/>chat · notification · search]
+    RT[realtime-service<br/>WebSocket fabric · presence]
+    CON[content-service<br/>media · status]
+    PLT[platform-service<br/>call · automation · ai]
   end
 
-  SVC <-->|produce / consume| BUS[(Kafka / Redis Streams<br/>event backbone)]
+  SVC <-->|produce / consume| BUS[(Redis Streams / Kafka<br/>event backbone)]
 
-  SVC --> PG[(PostgreSQL)]
-  SVC --> MG[(MongoDB)]
-  SVC --> VK[(Valkey)]
-  BUS --> OS[(OpenSearch)]
-  MEDIA --> S3[(MinIO / Cloudinary)]
+  ID & PLT & CON --> PG[(PostgreSQL)]
+  MSG & PLT --> MG[(MongoDB)]
+  ID & MSG & RT & PLT --> VK[(Valkey)]
+  CON --> S3[(S3 / Azure Blob / Cloudinary)]
 
-  CALL -. signaling .-> LK[LiveKit SFU + coturn]
+  PLT -. signaling .-> LK[LiveKit SFU + coturn]
 ```
 
+Each service owns one scaling axis and one datastore. `realtime-service` is deliberately
+**Valkey-only** — the process holding every WebSocket must not depend on a database, or a media or
+status deploy would drop live connections.
+
+The domains live in `libs/feature-*`; the services are thin composition roots over them, so the
+process layout is a configuration choice (`SPLIT_PROFILE`) rather than a structural one.
+
+**Two physical planes:**
 **Two physical planes:** the **data/control plane** (request/response + events, everything above the broker) and the **media plane** (WebRTC audio/video, peer→TURN→SFU — never touches the broker; only signaling flows through services).
 
 ---
@@ -89,59 +98,60 @@ flowchart TB
 ## Monorepo layout
 
 ```text
-apps/                         # 13 deployable services (NestJS)
-  api-gateway/                #  TLS, authN, rate-limit, reverse-proxy routing, CORS
-  realtime-gateway/           #  WebSocket fabric: presence, typing, delivery, receipts
-  auth-service/               #  DAPT, Reverse-OTP, passkeys, tokens, E2EE key directory
-  user-service/               #  profiles, contacts, orgs/workspaces/teams, RBAC, discovery
-  chat-service/               #  messages, receipts, reactions, edits, pins, polls, resend
-  group-channel-service/      #  conversations, membership, channels, communities
-  presence-service/           #  online/last-seen (+ privacy), rich status, stories
-  notification-service/       #  push (APNs/FCM/WebPush), prefs, DND, outbox+DLQ, digests
-  media-service/              #  upload, dedup, gallery, view-once, transcode write-back, backup
-  search-service/             #  OpenSearch indexing + ACL-scoped query (messages/files/people)
-  call-service/               #  LiveKit signaling, meetings, lobby, screen-control
-  automation-service/         #  bots, slash commands, workflows, reminders, lists/clips/canvas
-  ai-service/                 #  translation (NLLB), language prefs (self-hosted models)
-libs/                         # shared building blocks (no per-service copies)
-  common/                     #  logging, tracing, bootstrap, tenant context, errors, event envelope
-  config/                     #  env schema (zod) + typed AppConfig
-  crypto/                     #  libsignal wrappers, OPRF contact discovery
-  database/                   #  Postgres (RLS) + Mongo clients (Drizzle schema)
-  cache/                      #  Valkey client + rate limiter
-  event-bus/                  #  Kafka / Redis-Streams abstraction
-  storage/                    #  MinIO / Cloudinary object storage port
-  mail/  push/  search/       #  SMTP templates · push transports · search adapters
-  proto/  shared-types/       #  gRPC contracts (buf) + generated TS types
-migrations/                   # @velchat/migrations — versioned SQL + forward-only runner (expand/contract)
-docker/                       # per-service Dockerfiles + compose.yml (local data tier)
-deploy/                       # helm/ · argocd/ · k8s/  (GitOps self-host path; no secrets)
+apps/                         # 6 runtime services — thin composition roots (~18 lines each)
+  edge-gateway/               #  TLS-terminated HTTP edge: rate-limit, request id, routing
+  identity-service/           #  auth + user/tenancy + group-channel        Postgres · Valkey
+  messaging-service/          #  chat + notification + search               Mongo · Postgres · Valkey
+  realtime-service/           #  WebSocket fabric + presence                Valkey ONLY
+  content-service/            #  media + status/stories                     Postgres · object storage
+  platform-service/           #  call + automation + ai                     Postgres · Valkey · Mongo
+  velchat-mono/               #  every group in ONE process (for a 1 GB box; SPLIT_PROFILE=mono)
+libs/
+  feature-*/                  # 13 domain libraries — where the actual features live.
+                              #   auth user group-channel chat notification search
+                              #   realtime presence status media call automation ai
+                              #   A feature lib NEVER imports another (enforced by eslint):
+                              #   cross-feature talk is the event bus or a feature-contracts port.
+  composition/                # feature groups as data + the assembler that builds a service
+  infra-context/              # need-declared infra: a process opens only what it asks for
+  feature-contracts/          # cross-feature ports (MembershipResolver), interfaces only
+  common/                     # logging, tracing, bootstrap, tenant context, auth guard, errors
+  config/                     # env schema (zod) + typed AppConfig — validated at boot, fail-closed
+  crypto/                     # libsignal wrappers, OPRF contact discovery
+  database/                   # Postgres (RLS) + Mongo clients
+  cache/                      # Valkey client + rate limiter
+  event-bus/                  # Redis Streams / Kafka abstraction
+  storage/                    # object storage ports: s3 (AWS/Oracle/MinIO) · azure-blob · cloudinary
+  mail/  push/  search/       # SMTP templates · push transports · search adapters
+  proto/  shared-types/       # gRPC contracts (buf) + generated TS types
+migrations/                   # versioned SQL + forward-only runner (expand/contract)
+docker/                       # 6 multi-arch Dockerfiles + compose.yml (local data tier)
+deploy/                       # one directory per target — see deploy/README.md
+  oracle/ aws/ azure/ render/ #   compose.yml + .env.example + README.md each
+  shared/Caddyfile            #   ONE edge config; upstreams come from env
+  helm/ k8s/ argocd/          #   Kubernetes path (EKS / AKS / OKE)
 infra/                        # terraform/ · observability/
-tools/                        # service scaffold generator + local dev gateway (start-all)
-postman/                      # API collection
-docs/                         # architecture (source of truth), codebase guide, API reference
-render.yaml                   # Render Blueprint (free-tier deploy)
+tools/                        # scaffold generator + local dev gateway (start:all)
+docs/                         # architecture (source of truth), API reference, guides
+render.yaml                   # Render Blueprint (must live at the repo root)
 ```
 
 ---
 
 ## Services
 
-| Service                   | Port | Responsibility                                             | Primary store               |
-| ------------------------- | :--: | ---------------------------------------------------------- | --------------------------- |
-| **api-gateway**           | 3000 | TLS, verify JWT, rate-limit, reverse-proxy routing, CORS   | —                           |
-| **realtime-gateway**      | 3001 | WebSocket connections, event delivery, typing, receipts    | Valkey                      |
-| **auth-service**          | 3002 | DAPT, Reverse-OTP, passkeys, tokens, E2EE prekeys          | Postgres + Valkey           |
-| **user-service**          | 3003 | Profiles, contacts, orgs/workspaces/teams, RBAC, discovery | Postgres                    |
-| **chat-service**          | 3004 | Messages, receipts, reactions, edits, pins, polls          | MongoDB + Valkey            |
-| **group-channel-service** | 3005 | Conversations, membership, channels, communities           | Postgres                    |
-| **presence-service**      | 3006 | Online/last-seen (+ privacy), rich status, stories         | Valkey + Postgres           |
-| **notification-service**  | 3007 | Push routing, prefs, DND, outbox + DLQ                     | Postgres + Valkey           |
-| **media-service**         | 3008 | Upload, dedup, gallery, view-once, backup                  | MinIO/Cloudinary + Postgres |
-| **search-service**        | 3009 | Index + ACL-scoped query (messages/files/people/channels)  | OpenSearch                  |
-| **call-service**          | 3010 | LiveKit signaling, meetings, lobby, screen-control         | Postgres + Valkey           |
-| **automation-service**    | 3011 | Bots, slash commands, workflows, reminders, collab         | Postgres + Valkey           |
-| **ai-service**            | 3012 | Translation, language prefs (self-hosted models)           | Postgres                    |
+| Service               | Port | Absorbs                      | Scaling axis                     | Primary store             |
+| --------------------- | :--: | ---------------------------- | -------------------------------- | ------------------------- |
+| **edge-gateway**      | 3001 | api-gateway                  | HTTP RPS                         | —                         |
+| **identity-service**  | 3002 | auth · user · group-channel  | auth RPS                         | Postgres + Valkey         |
+| **messaging-service** | 3004 | chat · notification · search | message write throughput         | Mongo + Postgres + Valkey |
+| **realtime-service**  | 3006 | realtime-gateway · presence  | concurrent sockets               | **Valkey only**           |
+| **content-service**   | 3008 | media · status/stories       | upload bandwidth / transcode CPU | Postgres + object storage |
+| **platform-service**  | 3010 | call · automation · ai       | rooms / jobs                     | Postgres + Valkey + Mongo |
+
+Consolidated from 13 services: ~20,000 LOC of domain code moved into `libs/feature-*`, leaving under
+200 LOC in `apps/`. The **public API did not change** — `routes.ts` keeps its path patterns and only
+the destination is resolved differently, from `SPLIT_PROFILE`.
 
 Every service exposes `GET /health`, `GET /ready`, `GET /metrics` (Prometheus), and Swagger at `GET /docs`. A unified dev gateway aggregates all services (and their docs) at **http://localhost:8080**.
 
@@ -185,24 +195,37 @@ pnpm build
 ### 2. Configure
 
 ```bash
-cp .env.example .env          # root defaults; each service also has apps/<svc>/.env.example
-# edit .env — connection strings / secrets (never commit real secrets)
+cp .env.example .env          # connection strings / secrets — never commit real secrets
 ```
+
+You do **not** need to configure JWT keys for local work. Outside production, a missing
+`JWT_PUBLIC_PEM` falls back to a shared keypair generated once into `.velchat-dev-keys/` (gitignored)
+that every service loads, so tokens minted by one verify in another. Verification is real — it is
+just a local key. In production a missing key makes the service **refuse to boot** rather than serve
+unauthenticated traffic.
 
 ### 3. Bring up the data tier
 
 ```bash
-pnpm infra:up                 # postgres, mongo, valkey, kafka (KRaft), opensearch, minio
-pnpm db:migrate               # run versioned SQL migrations (forward-only)
+pnpm db:up                    # postgres, mongo, valkey  (the three the services actually need)
+pnpm db:migrate               # versioned SQL migrations, forward-only
 ```
+
+Kafka, OpenSearch and MinIO are no longer part of the default tier: the event bus runs on Redis
+Streams over the local Valkey, search uses a Mongo text index, and object storage is an adapter
+(`s3` · `azure-blob` · `cloudinary`). That removed ~3.9 GB of RAM from the footprint, which is what
+lets the whole stack fit an Oracle Always Free box.
 
 ### 4. Run
 
 ```bash
-pnpm dev                      # all services in parallel (Turborepo)
-# — or a single service —
-pnpm dev:chat                 # dev:auth, dev:user, dev:media, ... one per service
+pnpm start:all                # all six services + a unified dev gateway on http://localhost:8080
+# — or one service at a time —
+pnpm dev:messaging            # dev:edge · dev:identity · dev:realtime · dev:content · dev:platform
 ```
+
+`start:all` prints a health line per service and the single base URL your client should use. Every
+service also exposes `GET /health`, `GET /ready`, `GET /metrics` and Swagger at `GET /docs`.
 
 ### 5. Explore
 
@@ -243,11 +266,28 @@ Threat coverage: [Architecture §D4](docs/VelChat-Architecture.md#d4-threat-mode
 
 ## Deployment
 
-- **Local / small:** `docker/compose.yml` for the data tier + `pnpm dev` (or the per-service Dockerfiles in `docker/`).
-- **Free-tier cloud:** `render.yaml` — a Render Blueprint that provisions the services with env wiring.
-- **Production:** Kubernetes / k3s via Helm + ArgoCD (GitOps) — manifests in `deploy/`. Stateless services scale on HPA (RPS / connections / consumer lag); StatefulSets run via operators (CloudNativePG, Mongo, Valkey, Kafka/Strimzi, OpenSearch, MinIO). mTLS via Linkerd; secrets via Vault / Sealed Secrets; TLS via cert-manager + Let's Encrypt.
+One codebase, four targets, one environment contract — pick one and follow its runbook:
 
-Details: [Architecture §A21–A22](docs/VelChat-Architecture.md#a21-kubernetes-deployment-topology).
+| Target           | Free compute                            | For how long              | Profile                      |
+| ---------------- | --------------------------------------- | ------------------------- | ---------------------------- |
+| **Oracle Cloud** | A1 ARM, 2 OCPU / **12 GB**              | **forever** (Always Free) | `axis6` + local data tier    |
+| **AWS**          | `t4g.small`, 2 GB                       | until **31 Dec 2026**     | `axis6` + external data tier |
+| **Azure**        | `B1S`, 1 GB (+ $100/yr Students credit) | **12 months**             | **`mono`** — one process     |
+| **Render**       | free web services (sleep on idle)       | ongoing                   | `axis6` + managed free tiers |
+
+Start with Oracle: it is the only target whose compute is free indefinitely, and it has 6× the RAM
+of AWS free and 12× of Azure free. Verified limits, the portability contract and the scaling path are
+in **[deploy/PORTABILITY.md](deploy/PORTABILITY.md)**; per-target runbooks live in
+**[deploy/](deploy/README.md)**.
+
+```bash
+docker compose -f deploy/oracle/compose.yml --env-file deploy/oracle/.env up -d
+```
+
+Portability is the image plus the env contract, not the orchestrator: no cloud SDK in application
+code, every cloud-specific choice is an adapter behind an env var, and each Dockerfile builds
+`linux/arm64` (Oracle A1, AWS Graviton) alongside `linux/amd64` (Azure, x86). The same images run
+under Helm on EKS / AKS / OKE.
 
 ---
 

@@ -1,5 +1,7 @@
 # VelChat — Production Readiness Audit
 
+> **Historical record.** Written before the 13 → 6 service consolidation, so the service names and ports below are the ones in use at the time. The current topology is in [PART H of the architecture doc](./VelChat-Architecture.md#part-h--runtime-topology-amendment-v26-13--6-services). Kept unedited on purpose — an audit that is quietly rewritten stops being evidence.
+
 **Date:** 2026-06-28 · **Branch:** `dev` · **Phase:** ~P5 of 11 (P0 infra → P5 tenancy/admin)
 **Method:** read-only audit by the `security-e2ee-engineer` + `platform-devops-engineer` subagents, evidence-cited against `docs/VelChat-Architecture.md` Part G.
 

@@ -1,0 +1,11 @@
+# @velchat/realtime-service — Kubernetes values (AWS EKS / Azure AKS / OKE).
+# Same image the compose deployment runs; only the orchestrator differs.
+name: realtime-service
+image:
+  repository: ghcr.io/aayushajs/velchat-realtime-service
+  tag: latest
+service:
+  port: 3006
+env:
+  SERVICE_NAME: realtime-service
+  HTTP_PORT: '3006'

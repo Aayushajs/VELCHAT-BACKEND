@@ -1,0 +1,27 @@
+{
+  "name": "@velchat/feature-media",
+  "version": "0.1.0",
+  "private": true,
+  "description": "media feature library — runtime-agnostic; the composition root injects infra.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "jest",
+    "clean": "rimraf dist .turbo coverage"
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.4.15",
+    "@nestjs/platform-express": "^10.4.15",
+    "@nestjs/swagger": "^7.4.2",
+    "@velchat/common": "workspace:*",
+    "@velchat/database": "workspace:*",
+    "@velchat/event-bus": "workspace:*",
+    "@velchat/shared-types": "workspace:*",
+    "@velchat/storage": "workspace:*",
+    "class-validator": "^0.14.1",
+    "pino": "^9.6.0"
+  }
+}

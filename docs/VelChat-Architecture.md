@@ -70,7 +70,9 @@
 
 **PART F — Phased Delivery Roadmap** (backend/web/android/infra tracks, 11 phases)
 
-**PART G — Pre-Production Hardening Review** (E2EE multi-device, contact discovery, realtime scale, push, recovery, multi-tenant isolation, Kafka schema evolution)
+**PART G — Pre-Production Hardening Review**
+
+**PART H — Runtime Topology Amendment (v2.6)** — 13 → 6 services; amends §A8/§A21/§D3 (E2EE multi-device, contact discovery, realtime scale, push, recovery, multi-tenant isolation, Kafka schema evolution)
 
 ---
 
@@ -2460,4 +2462,104 @@ A critical, production-focused review (Principal/Staff+ lens) of the five highes
 
 ---
 
-*End of document — VelChat Architecture v2.5.*
+---
+
+# PART H — RUNTIME TOPOLOGY AMENDMENT (v2.6): 13 → 6 SERVICES
+
+> **Status:** implemented. This amends §A8 (microservice catalog), §A21 (deployment topology) and
+> §D3 (repo layout). Everything else in this document — the domain model, the E2EE boundary, the
+> event catalog, the flows in Part C, the threat model in §D4 — is unchanged and still binding.
+>
+> Full audit, alternatives considered, resource budget, migration plan and risk register:
+> `docs/superpowers/specs/2026-08-11-velchat-6-service-oracle-migration-design.md`.
+
+## H1. Why the catalog changed
+
+§A8 specified 13 services. The implementation reached ~20,000 LOC of application code, and the audit
+found three things that made 13 the wrong number *for this stage*:
+
+1. **No gRPC existed.** Despite §A9, services communicated only through the event bus and their own
+   stores, with the api-gateway as a plain reverse proxy. Merging processes therefore changed no
+   network contract.
+2. **The split cost more than it bought.** 13 processes carried ~106 pooled connections and 23
+   independent Redis Streams readers (~397,000 idle commands/day), and 13 cold starts on a free tier.
+3. **Security was per-service and therefore forgotten.** 11 of 13 services had no authentication
+   guard at all. A default-deny guard is auditable at 6 composition roots in a way it demonstrably
+   was not at 13.
+
+None of this invalidates the *bounded contexts* of §A5 — they are preserved exactly, as libraries.
+
+## H2. The topology
+
+| Runtime service | Feature libs | Scaling axis | Store owner |
+|---|---|---|---|
+| `edge-gateway` | gateway | HTTP RPS | — |
+| `identity-service` | auth, user, group-channel | auth RPS | PostgreSQL |
+| `messaging-service` | chat, notification, search | message write throughput | MongoDB |
+| `realtime-service` | realtime, presence | concurrent sockets | Valkey |
+| `content-service` | media, status | upload bandwidth / transcode CPU | object storage |
+| `platform-service` | call, automation, ai | rooms / jobs | PostgreSQL |
+
+Two groupings differ from the obvious reading of §A8, both on evidence:
+
+- **status/stories sits with media, not presence.** §A8 co-locates them, but `status` is
+  Postgres-backed while `presence` is pure Valkey. Pairing them would put a Postgres pool inside the
+  process holding every WebSocket, and make every status deploy drop live connections.
+- **search sits with chat, not media.** Its index is a `$text` index on the Mongo `messages`
+  collection that chat owns; hosting search elsewhere would be one service querying another's store,
+  which §A10.5 forbids.
+
+## H3. Structure
+
+```text
+apps/<service>/        composition root only: main.ts · telemetry-free bootstrap · app.module (~18 lines)
+libs/feature-*/         13 domain libraries — the bounded contexts of §A5, one per context
+libs/composition/       feature groups as data + the assembler that builds a runtime service
+libs/infra-context/     need-declared infrastructure construction
+libs/feature-contracts/ cross-feature ports (interfaces only)
+```
+
+Invariants, each enforced rather than documented:
+
+1. A `feature-*` library may not import another (eslint). Cross-feature communication is the event
+   bus or a `feature-contracts` port wired by the composition root. **This is what keeps §A8's
+   13-service topology reachable again** — see H4.
+2. A process constructs only the infrastructure its groups declare. Tested per service.
+3. One event bus per process; every consumer registers before `start()`, exactly once.
+4. Authentication is default-deny and fails closed at boot.
+
+## H4. Reaching 13 again, or 1
+
+`SPLIT_PROFILE` selects the process layout; the public API is unchanged in every case because
+`routes.ts` keeps its path patterns and only the *destination* is resolved differently.
+
+| Profile | Processes | Intended for |
+|---|---|---|
+| `mono` | 1 | a 1 GB box (Azure free); also the simplest local run |
+| `axis6` | 6 | the default — Oracle Always Free (12 GB), AWS t4g.small |
+| `full13` | 13 | the §A8 catalog; rollback, and the shape to grow into |
+
+Growing back out is adding a composition root and setting one `UPSTREAM_*` variable. No feature code
+moves, because features never referenced each other.
+
+## H5. Deployment (amends §A21)
+
+§A21 specifies Kubernetes with 13 Deployments. That remains the scale target and the Helm charts are
+maintained for it. The *current* target is a single always-on VM under Docker Compose, because §A21's
+footprint does not fit a free tier: Kafka, OpenSearch and MinIO alone are ~3.9 GB, and they are
+replaced by Redis Streams on Valkey, a Mongo text index, and an object-storage adapter.
+
+Per-target runbooks live in `deploy/{oracle,aws,azure,render}/`, over one shared edge config and one
+env contract. `deploy/PORTABILITY.md` carries the verified free-tier limits and the scaling path back
+to §A21.
+
+## H6. What did not change
+
+The E2EE boundary (§A14.3, §A18.2, §A26.1), identity as an immutable `account_id` (§A14.1), DAPT
+(§B2), per-conversation `seq` ordering (§B4.3), the event catalog (§A11), multi-tenant isolation
+(§G6), and every flow in Part C. Consolidation moved where code *runs*; it did not move a single
+trust boundary.
+
+---
+
+*End of document — VelChat Architecture v2.6 (Part H amends the runtime topology).*

@@ -1,7 +1,7 @@
 # VelChat — Feature Flag & Remote Configuration Platform
 
 > **Status:** Design (document-before-implement gate). **Datastore:** MongoDB only. **Host:** a new
-> `feature-flags` module inside **automation-service**. **Backward-compatible:** additive only — no
+> `feature-flags` module inside **platform-service**. **Backward-compatible:** additive only — no
 > existing API, event, schema, socket, or test changes.
 
 This document is the analysis + plan + ADR the implementation must follow. It reuses the existing
@@ -17,23 +17,23 @@ logging, DTO/response/error conventions, the durable interval-worker) — **no p
 | Service shape | `XModule.forRoot(deps): DynamicModule` wired in `app.module.ts`; `bootstrapService()` adds tenant interceptor, response envelope, error filter, CORS, Swagger, graceful drain |
 | HTTP responses | `ResponseInterceptor` → `{ success, statusCode, message, data }`; errors → `AllExceptionsFilter` mapping the `AppError` hierarchy (`ValidationError`, `ForbiddenError`, `NotFoundError`, `ConflictError`, `GoneError`, …) |
 | Validation | `class-validator` DTO classes + global `ValidationPipe` (whitelist + transform) |
-| AuthN | `Authorization: Bearer <JWT>` verified at the api-gateway; `account_id`/`tenant_id`/`role` in claims |
+| AuthN | `Authorization: Bearer <JWT>` verified at the edge-gateway; `account_id`/`tenant_id`/`role` in claims |
 | Tenancy / AuthZ | `TenantInterceptor` + `requireTenant()` / `currentTenantId()` (ALS, fail-closed §G6); RBAC via role claim |
 | MongoDB | `MongoClient` (`@velchat/database`) — `mongo.db.collection('…')` accessor; app-generated string ids |
 | Cache | `ValkeyClient` (`@velchat/cache`) — `redis` handle, TTL, bounded connect |
 | Events | `buildEnvelope({ eventType, key, producer, tenantId, payload })` + `EventBus.publish/subscribe` (Kafka or Redis-Streams); `EventPayloads` map in `@velchat/shared-types` |
-| Realtime push | services emit an event → **realtime-gateway `fanout-consumer`** subscribes → `event-router` fans to clients over WS |
-| Scheduling / background | automation-service **durable interval-worker** (`automation/job.worker.ts`) — same pattern reused for schedule + cleanup |
+| Realtime push | services emit an event → **realtime-service `fanout-consumer`** subscribes → `event-router` fans to clients over WS |
+| Scheduling / background | platform-service **durable interval-worker** (`automation/job.worker.ts`) — same pattern reused for schedule + cleanup |
 | Audit | append-only records (auth `auth_audit`, admin audit); flags keep their own Mongo `flag_audit` + emit `featureflag.changed` |
 | Config | `zod` env schema in `@velchat/config` (`MONGO_URL`, `VALKEY_URL` already present) |
 | Observability | OTel traces + Prometheus RED via `ObservabilityModule`; structured logs (no PII) |
 
 **Integration deltas (all additive):**
-1. New module `apps/automation-service/src/feature-flags/**` (Mongo-only).
-2. automation-service `app.module.ts`: add a `MongoClient` + `ValkeyClient` (only when `MONGO_URL`/`VALKEY_URL` set) and wire the module + its schedule/cleanup worker into the existing `managed` lifecycle.
+1. New module `apps/platform-service/src/feature-flags/**` (Mongo-only).
+2. platform-service `app.module.ts`: add a `MongoClient` + `ValkeyClient` (only when `MONGO_URL`/`VALKEY_URL` set) and wire the module + its schedule/cleanup worker into the existing `managed` lifecycle.
 3. `@velchat/shared-types`: add `FeatureFlagChangedPayload` + register `featureflag.changed` (additive, FULL_TRANSITIVE-safe).
-4. realtime-gateway `fanout-consumer`: subscribe `featureflag.changed` → broadcast a small "flags changed" frame to connected clients (they refetch). New `broadcast` path on the fabric — additive.
-5. api-gateway routing table: route `/feature-flags` → automation-service (one ordered rule).
+4. realtime-service `fanout-consumer`: subscribe `featureflag.changed` → broadcast a small "flags changed" frame to connected clients (they refetch). New `broadcast` path on the fabric — additive.
+5. edge-gateway routing table: route `/feature-flags` → platform-service (one ordered rule).
 
 No existing collection, table, event, endpoint, socket message, or test is modified.
 
@@ -41,8 +41,8 @@ No existing collection, table, event, endpoint, socket message, or test is modif
 
 ## 2. ADR — key decisions
 
-**ADR-1 — Host in automation-service (not a new service, not user-service).**
-Feature management is config + automation. automation-service already owns workflows, reminders, and a **durable interval-worker** — exactly what scheduled enable/disable, auto-rollback, and cleanup need. A new service adds ops (deploy, mesh, dashboards) for no benefit; user-service is identity/tenancy and would blur its bounded context. *Trade-off:* automation-service gains a Mongo + Valkey dependency (both already used elsewhere, so no new tech). Reversible: the module is self-contained and could be lifted into a `config-service` later without API changes.
+**ADR-1 — Host in platform-service (not a new service, not identity-service).**
+Feature management is config + automation. platform-service already owns workflows, reminders, and a **durable interval-worker** — exactly what scheduled enable/disable, auto-rollback, and cleanup need. A new service adds ops (deploy, mesh, dashboards) for no benefit; identity-service is identity/tenancy and would blur its bounded context. *Trade-off:* platform-service gains a Mongo + Valkey dependency (both already used elsewhere, so no new tech). Reversible: the module is self-contained and could be lifted into a `config-service` later without API changes.
 
 **ADR-2 — MongoDB only (per requirement).** Flags are schema-flexible (rollout rules, variants, config payloads, version snapshots) and read-hot. Mongo fits document evaluation + versioned snapshots; no relational joins are needed. PostgreSQL is deliberately untouched.
 
@@ -52,7 +52,7 @@ Feature management is config + automation. automation-service already owns workf
 
 **ADR-5 — Config versioning + rollback via immutable snapshots.** Every mutation writes a `flag_config_versions` snapshot and bumps `version`. Rollback = copy a prior snapshot forward as a new version (never rewrites history) → clean audit + instant emergency rollback.
 
-**ADR-6 — Real-time via the existing event → fan-out path.** Mutations emit `featureflag.changed`; realtime-gateway broadcasts a lightweight "refetch" signal. Clients pull the new evaluated set (cheap, cached). No flag *values* travel over the socket → no new leak surface and no per-client fan-out cost.
+**ADR-6 — Real-time via the existing event → fan-out path.** Mutations emit `featureflag.changed`; realtime-service broadcasts a lightweight "refetch" signal. Clients pull the new evaluated set (cheap, cached). No flag *values* travel over the socket → no new leak surface and no per-client fan-out cost.
 
 ---
 
@@ -176,8 +176,8 @@ export interface FeatureFlagChangedPayload {
 }
 // EventPayloads: 'featureflag.changed': FeatureFlagChangedPayload
 ```
-- automation-service emits it after each committed mutation / worker action.
-- realtime-gateway `fanout-consumer` subscribes and broadcasts a compact `{ type:'featureflag.changed', tenant_id, flag_key }` frame to connected clients (per-pod broadcast). Clients re-call `/feature-flags/evaluate`. **No flag values on the wire.**
+- platform-service emits it after each committed mutation / worker action.
+- realtime-service `fanout-consumer` subscribes and broadcasts a compact `{ type:'featureflag.changed', tenant_id, flag_key }` frame to connected clients (per-pod broadcast). Clients re-call `/feature-flags/evaluate`. **No flag values on the wire.**
 
 ---
 
@@ -220,7 +220,7 @@ Every automated action goes through the same audit + cache-invalidation + event 
 - Admin endpoints: tenant context required (fail-closed) + admin role check; evaluation endpoints: authenticated JWT.
 - **Every** mutating action writes a `flag_audit` record (actor, before/after) — non-negotiable.
 - Input validated by DTOs; no magic strings (enums for `op`/`action`/`type`).
-- Rate limiting is inherited from the api-gateway; the evaluation endpoint is cache-served.
+- Rate limiting is inherited from the edge-gateway; the evaluation endpoint is cache-served.
 - No internal config is exposed on evaluation responses (only `{on,value,variant,reason}` per flag).
 
 ---
@@ -241,7 +241,7 @@ Every automated action goes through the same audit + cache-invalidation + event 
 | Flags service down → clients can't evaluate | Clients cache last-known flags locally + fall back to `defaultValue`; evaluation is best-effort, never blocks the app |
 | Stale cache after change | Event-driven invalidation + short TTL; worst case = one TTL window |
 | Bad rollout locks users out | Kill switch (`/disable`) + emergency `/rollback` (instant, versioned); global maintenance allowlist |
-| Adding Mongo/Valkey to automation-service | Both already used elsewhere; wired only when the URL is set; boot stays non-fatal (§infra-lifecycle) |
+| Adding Mongo/Valkey to platform-service | Both already used elsewhere; wired only when the URL is set; boot stays non-fatal (§infra-lifecycle) |
 | Broadcast storm on mass change | Broadcast carries only a "refetch" signal (no values); clients debounce refetch |
 | Multi-tenant leakage | Tenant scoping on every collection + query; global vs tenant precedence explicit; admin routes tenant-guarded |
 
@@ -251,9 +251,9 @@ Every automated action goes through the same audit + cache-invalidation + event 
 
 Additive only — no data migration. Sequence:
 1. Land `@velchat/shared-types` event (additive) → build.
-2. Land the `feature-flags` module + worker in automation-service (guarded by `MONGO_URL`/`VALKEY_URL`; absent ⇒ module simply not wired, service unaffected).
-3. Add the realtime-gateway `featureflag.changed` broadcast.
-4. Add the api-gateway route rule.
+2. Land the `feature-flags` module + worker in platform-service (guarded by `MONGO_URL`/`VALKEY_URL`; absent ⇒ module simply not wired, service unaffected).
+3. Add the realtime-service `featureflag.changed` broadcast.
+4. Add the edge-gateway route rule.
 5. Indexes are created idempotently on module boot (`createIndex`), no separate migration.
 
 Rollback: remove the module wiring — nothing else references it; no schema/contract is broken.

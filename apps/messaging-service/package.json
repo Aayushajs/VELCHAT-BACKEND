@@ -1,0 +1,31 @@
+{
+  "name": "@velchat/messaging-service",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "jest",
+    "start": "cross-env SERVICE_NAME=messaging-service HTTP_PORT=3004 node dist/main.js",
+    "dev": "cross-env SERVICE_NAME=messaging-service HTTP_PORT=3004 TS_NODE_TRANSPILE_ONLY=true TS_NODE_PROJECT=../../tsconfig.base.json node --watch -r ts-node/register src/main.ts",
+    "clean": "rimraf dist .turbo coverage"
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.4.15",
+    "@nestjs/core": "^10.4.15",
+    "@nestjs/platform-express": "^10.4.15",
+    "@nestjs/swagger": "^7.4.2",
+    "@velchat/common": "workspace:*",
+    "@velchat/composition": "workspace:*",
+    "@velchat/config": "workspace:*",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "pino": "^9.6.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "buildStamp": "2026-08-01T08:27:39.759Z",
+  "description": "messaging-service — chat + notification + search. Owns the Mongo messages collection; one process, one event bus."
+}
