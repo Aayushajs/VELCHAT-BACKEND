@@ -1,4 +1,5 @@
 import type { AppConfig } from '@velchat/config';
+import { loadOrCreateDevKeyPair } from './dev-keys';
 
 const DEFAULT_ISSUER = 'https://auth.velchat.local';
 
@@ -14,9 +15,14 @@ export interface AuthMode {
  * cannot (DEF-02).
  *
  * The audit found 11 of 13 services serving every route unauthenticated, so the fix has to be
- * structural rather than a checklist: a service that lacks the public key does not come up. There
- * is exactly one escape hatch, `AUTH_DEV_INSECURE=true`, it is refused in production, and it is
- * named so it is obvious in a diff, a grep, and an env dump.
+ * structural rather than a checklist: a service that lacks the public key does not come up in
+ * production. There is exactly one escape hatch, `AUTH_DEV_INSECURE=true`, it is refused in
+ * production, and it is named so it is obvious in a diff, a grep, and an env dump.
+ *
+ * Outside production a missing key is not an error — it falls back to a shared, persisted dev
+ * keypair (see {@link loadOrCreateDevKeyPair}). That keeps `pnpm start:all` a zero-configuration
+ * command WITHOUT weakening it: verification is real, it is just using a locally generated key.
+ * Relaxing the check for convenience is what produced the original hole.
  */
 export function resolveAuthMode(config: AppConfig): AuthMode {
   const isProduction = config.NODE_ENV === 'production';
@@ -35,9 +41,20 @@ export function resolveAuthMode(config: AppConfig): AuthMode {
 
   if (config.AUTH_DEV_INSECURE) return { verify: false };
 
+  if (!isProduction) {
+    const dev = loadOrCreateDevKeyPair();
+    return {
+      verify: true,
+      publicKeyPem: dev.publicKeyPem,
+      issuer: config.JWT_ISSUER ?? DEFAULT_ISSUER,
+    };
+  }
+
   throw new Error(
     `${config.SERVICE_NAME}: JWT_PUBLIC_PEM is not set, so this service cannot verify access ` +
-      'tokens and refuses to start. Set JWT_PUBLIC_PEM (the RS256 public half — it is public, ' +
-      'safe to distribute to every service), or set AUTH_DEV_INSECURE=true for local development.',
+      'tokens and refuses to start in production. Set JWT_PUBLIC_PEM — the RS256 public half, ' +
+      'which is public and safe to give every service. Generate a pair with: openssl genpkey ' +
+      '-algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out jwt.key && openssl rsa -in jwt.key ' +
+      '-pubout -out jwt.pub',
   );
 }

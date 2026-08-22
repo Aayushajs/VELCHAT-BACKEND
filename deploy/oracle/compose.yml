@@ -8,12 +8,12 @@
 #     Silently evicting one reissues sequence numbers, and the mobile client SKIPS those as
 #     already-held: message loss with no error anywhere (DEF-01). Failing writes loudly is correct.
 #
-# Bring up:  docker compose -f docker/compose.oracle.yml --env-file .env.oracle up -d
+# Bring up:  docker compose -f deploy/oracle/compose.yml --env-file deploy/oracle/.env up -d
 name: velchat
 
 x-app: &app
   restart: always
-  env_file: [../.env.oracle]
+  env_file: [./.env]
   depends_on:
     postgres: { condition: service_healthy }
     valkey: { condition: service_healthy }
@@ -29,9 +29,13 @@ services:
     restart: always
     ports: ['80:80', '443:443']
     volumes:
-      - ../deploy/oracle/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../shared/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddydata:/data
       - caddyconfig:/config
+    environment:
+      # Consumed by the shared Caddyfile, which serves every target from one config.
+      UPSTREAM_API: edge-gateway:3001
+      UPSTREAM_WS: realtime-service:3006
     depends_on: [edge-gateway, realtime-service]
     deploy: { resources: { limits: { memory: 64M } } }
 
@@ -125,7 +129,7 @@ services:
       - -c
       - archive_timeout=300 # 5-minute WAL segments → the RPO floor (§4.4)
       - -c
-      - archive_command=/bin/true # replaced by the shipper in deploy/oracle/backup.sh
+      - archive_command=/bin/true # replaced by the shipper in deploy/oracle/scripts/backup.sh
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-velchat}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.oracle}

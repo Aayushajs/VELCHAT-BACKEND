@@ -1,0 +1,106 @@
+# VelChat on AWS — t4g.small (2 vCPU ARM / 2 GB), 750 h/month free through 31 Dec 2026.
+#
+# 2 GB fits the six services but NOT a local data tier, so Postgres, Mongo and Redis are external
+# (see .env.example). The images are identical to every other target — t4g is Graviton, and every
+# Dockerfile builds linux/arm64 alongside linux/amd64.
+#
+# Heads-up on the free window: the T4g trial ends 31 Dec 2026 and accounts created after
+# 15 Jul 2025 have no legacy 12-month tier — only $100-$200 of credits. Oracle Always Free is the
+# only target that stays free indefinitely (../PORTABILITY.md).
+#
+# Bring up:  docker compose -f deploy/aws/compose.yml --env-file deploy/aws/.env up -d
+name: velchat
+
+x-app: &app
+  restart: always
+  env_file: [./.env]
+  logging:
+    driver: json-file
+    options: { max-size: '10m', max-file: '3' }
+
+services:
+  # ── edge: TLS + routing. WebSockets go STRAIGHT to realtime-service (see Caddyfile): proxying
+  #    sockets through the Node gateway would double per-connection memory for no benefit.
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports: ['80:80', '443:443']
+    volumes:
+      - ../shared/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    environment:
+      # Consumed by the shared Caddyfile, which serves every target from one config.
+      UPSTREAM_API: edge-gateway:3001
+      UPSTREAM_WS: realtime-service:3006
+    depends_on: [edge-gateway, realtime-service]
+    deploy: { resources: { limits: { memory: 64M } } }
+
+  # ── the six services ───────────────────────────────────────────────────────────────────────
+  edge-gateway:
+    <<: *app
+    image: ghcr.io/aayushajs/velchat-edge-gateway:${TAG:-latest}
+    environment:
+      SERVICE_NAME: edge-gateway
+      HTTP_PORT: 3001
+      NODE_OPTIONS: --max-old-space-size=160
+      UPSTREAM_IDENTITY: http://identity-service:3002
+      UPSTREAM_MESSAGING: http://messaging-service:3004
+      UPSTREAM_REALTIME: http://realtime-service:3006
+      UPSTREAM_CONTENT: http://content-service:3008
+      UPSTREAM_PLATFORM: http://platform-service:3010
+    deploy: { resources: { limits: { memory: 224M, cpus: '0.5' }, reservations: { cpus: '0.10' } } }
+
+  identity-service:
+    <<: *app
+    image: ghcr.io/aayushajs/velchat-identity-service:${TAG:-latest}
+    environment:
+      SERVICE_NAME: identity-service
+      HTTP_PORT: 3002
+      NODE_OPTIONS: --max-old-space-size=224
+    deploy: { resources: { limits: { memory: 288M, cpus: '0.5' }, reservations: { cpus: '0.10' } } }
+
+  messaging-service:
+    <<: *app
+    image: ghcr.io/aayushajs/velchat-messaging-service:${TAG:-latest}
+    environment:
+      SERVICE_NAME: messaging-service
+      HTTP_PORT: 3004
+      NODE_OPTIONS: --max-old-space-size=288
+    # Reserved CPU, not just capped: this is the message hot path.
+    deploy: { resources: { limits: { memory: 288M, cpus: '1.0' }, reservations: { cpus: '0.30' } } }
+
+  # Highest-priority latency path and the leanest process — Valkey only, no Postgres pool.
+  realtime-service:
+    <<: *app
+    image: ghcr.io/aayushajs/velchat-realtime-service:${TAG:-latest}
+    environment:
+      SERVICE_NAME: realtime-service
+      HTTP_PORT: 3006
+      NODE_OPTIONS: --max-old-space-size=288
+      UPSTREAM_IDENTITY: http://identity-service:3002
+      POD_ID: realtime-1
+    deploy: { resources: { limits: { memory: 288M, cpus: '1.0' }, reservations: { cpus: '0.40' } } }
+
+  # ffmpeg lives here. The CPU cap is what stops a transcode from starving the socket process.
+  content-service:
+    <<: *app
+    image: ghcr.io/aayushajs/velchat-content-service:${TAG:-latest}
+    environment:
+      SERVICE_NAME: content-service
+      HTTP_PORT: 3008
+      NODE_OPTIONS: --max-old-space-size=192
+    deploy: { resources: { limits: { memory: 288M, cpus: '0.5' }, reservations: { cpus: '0.10' } } }
+
+  platform-service:
+    <<: *app
+    image: ghcr.io/aayushajs/velchat-platform-service:${TAG:-latest}
+    environment:
+      SERVICE_NAME: platform-service
+      HTTP_PORT: 3010
+      NODE_OPTIONS: --max-old-space-size=192
+    deploy: { resources: { limits: { memory: 288M, cpus: '0.5' }, reservations: { cpus: '0.10' } } }
+
+volumes:
+  caddydata:
+  caddyconfig:

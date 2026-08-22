@@ -47,7 +47,7 @@ describe('content-service composition root', () => {
   it('opens exactly the datastores it declared', () => {
     const { lifecycle } = build();
     expect([...(lifecycle?.resourceNames ?? [])].sort()).toEqual(
-      ['event-bus:redis-streams', 'postgres'].sort(),
+      ['event-bus:redis-streams', 'pipeline', 'postgres'].sort(),
     );
   });
 });

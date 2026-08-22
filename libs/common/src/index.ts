@@ -41,6 +41,7 @@ export {
 export { CurrentUser } from './nest/current-user.decorator';
 export { GlobalAuthModule } from './nest/global-auth.module';
 export { resolveAuthMode, type AuthMode } from './nest/auth-mode';
+export { loadOrCreateDevKeyPair, type DevKeyPair } from './nest/dev-keys';
 export { actingAccountId } from './nest/principal';
 export { AllExceptionsFilter } from './nest/all-exceptions.filter';
 export { requestIdMiddleware, requestIdOf, type RequestWithId } from './nest/request-id.middleware';

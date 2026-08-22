@@ -47,7 +47,7 @@ describe('identity-service composition root', () => {
   it('opens exactly the datastores it declared', () => {
     const { lifecycle } = build();
     expect([...(lifecycle?.resourceNames ?? [])].sort()).toEqual(
-      ['event-bus:redis-streams', 'postgres', 'valkey'].sort(),
+      ['event-bus:redis-streams', 'pipeline', 'postgres', 'valkey'].sort(),
     );
   });
 });

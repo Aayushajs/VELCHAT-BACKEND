@@ -7,12 +7,13 @@
  * here. `SPLIT_PROFILE` selects the mapping, which makes re-splitting (or merging further) a
  * configuration change rather than a refactor:
  *
+ *   SPLIT_PROFILE=mono    → everything resolves to UPSTREAM_MONO (one process; fits a 1 GB box)
  *   SPLIT_PROFILE=axis6   → AUTH, USER, GROUP_CHANNEL all resolve to UPSTREAM_IDENTITY   (default)
  *   SPLIT_PROFILE=full13  → each resolves to its own UPSTREAM_AUTH / _USER / _GROUP_CHANNEL
  *
  * `full13` is not decoration; it is the rollback path while both topologies are deployable.
  */
-export type SplitProfile = 'axis6' | 'full13';
+export type SplitProfile = 'mono' | 'axis6' | 'full13';
 
 /** Logical service → runtime service, under the 6-service topology. */
 const AXIS6: Record<string, string> = {
@@ -40,7 +41,9 @@ const DEV_PORTS: Record<string, number> = {
 };
 
 export function splitProfile(env: NodeJS.ProcessEnv = process.env): SplitProfile {
-  return env.SPLIT_PROFILE === 'full13' ? 'full13' : 'axis6';
+  if (env.SPLIT_PROFILE === 'full13') return 'full13';
+  if (env.SPLIT_PROFILE === 'mono') return 'mono';
+  return 'axis6';
 }
 
 /**
@@ -56,7 +59,11 @@ export function resolveUpstreamFor(
   const direct = env[`UPSTREAM_${logical}`];
   if (direct) return direct;
 
-  if (splitProfile(env) === 'axis6') {
+  const profile = splitProfile(env);
+  if (profile === 'mono') {
+    return env.UPSTREAM_MONO ?? 'http://localhost:3000';
+  }
+  if (profile === 'axis6') {
     const runtime = AXIS6[logical];
     if (runtime) {
       return env[`UPSTREAM_${runtime}`] ?? `http://localhost:${DEV_PORTS[runtime] ?? devPort}`;

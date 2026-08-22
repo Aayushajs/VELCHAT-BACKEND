@@ -50,7 +50,7 @@ describe('platform-service composition root', () => {
     // then starts the workers — it is a managed resource too, and its presence is the assertion
     // that the one-bus-start discipline is wired.
     expect([...(lifecycle?.resourceNames ?? [])].sort()).toEqual(
-      ['event-bus:redis-streams', 'mongo', 'platform-pipeline', 'postgres', 'valkey'].sort(),
+      ['event-bus:redis-streams', 'indexes', 'mongo', 'pipeline', 'postgres', 'valkey'].sort(),
     );
   });
 });

@@ -41,10 +41,13 @@ describe('realtime-service composition root', () => {
     expect(module.exports).toContain(INFRA);
   });
 
+  // 'pipeline' is the lifecycle step that registers consumers, starts the single event bus, then
+  // starts workers. Its presence is the assertion that ordering is wired; what matters here is that
+  // no DATASTORE beyond Valkey appears.
   it('stays Valkey-only — no Postgres pool in the socket process', () => {
     const { lifecycle, infra } = build();
     expect([...(lifecycle?.resourceNames ?? [])].sort()).toEqual(
-      ['event-bus:redis-streams', 'valkey'].sort(),
+      ['event-bus:redis-streams', 'pipeline', 'valkey'].sort(),
     );
     expect(infra?.postgres).toBeUndefined();
     expect(infra?.mongo).toBeUndefined();

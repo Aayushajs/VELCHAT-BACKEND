@@ -131,8 +131,9 @@ export const envSchema = z.object({
   // ── Provider selection (free-tier MVP defaults; switch to self-host at scale) ──
   // event bus: redis-streams (Upstash, ₹0) | kafka (self-host scale)
   EVENT_BUS: z.enum(['redis-streams', 'kafka']).default('redis-streams'),
-  // object storage: cloudinary (₹0) | s3 (MinIO/AWS self-host)
-  STORAGE_PROVIDER: z.enum(['cloudinary', 's3']).default('cloudinary'),
+  // object storage: cloudinary (₹0) | s3 (MinIO / AWS S3 / Oracle Object Storage) |
+  // azure-blob (Azure is the one target that is NOT S3-compatible — see deploy/PORTABILITY.md)
+  STORAGE_PROVIDER: z.enum(['cloudinary', 's3', 'azure-blob']).default('cloudinary'),
   // search: atlas (MongoDB Atlas Search, ₹0) | opensearch (self-host)
   SEARCH_PROVIDER: z.enum(['atlas', 'opensearch']).default('atlas'),
 
@@ -152,6 +153,12 @@ export const envSchema = z.object({
   S3_ACCESS_KEY: z.string().optional(),
   S3_SECRET_KEY: z.string().optional(),
   S3_BUCKET: z.string().optional(),
+
+  // Azure Blob (only when STORAGE_PROVIDER=azure-blob). The account key is a SECRET.
+  AZURE_STORAGE_ACCOUNT: z.string().optional(),
+  AZURE_STORAGE_KEY: z.string().optional(),
+  AZURE_STORAGE_CONTAINER: z.string().default('velchat-media'),
+  AZURE_BLOB_ENDPOINT: z.string().url().optional(), // override for Azurite / a private endpoint
 
   // Cloudinary (only when STORAGE_PROVIDER=cloudinary). cloudinary://key:secret@cloud
   CLOUDINARY_URL: z.string().optional(),

@@ -1,11 +1,17 @@
 # Deploy VelChat to Render (free tier)
 
-The repo ships a **Render Blueprint** (`render.yaml`) that deploys the built core services as Docker
+The repo ships a **Render Blueprint** (`render.yaml`) that deploys the six services as Docker
 web services. Datastores are **managed free tiers** (Neon / Atlas / Upstash / Cloudinary) — Render
 hosts only the stateless services. No paid SaaS, no secrets in git.
 
-> Render free web services **sleep after ~15 min idle** and cold-start on the next request. Fine for
-> a demo/MVP; upgrade the plan for always-on.
+> Render free web services **sleep after ~15 min idle** and cold-start on the next request, and the
+> managed free datastores are metered — Upstash allows 500k Redis commands/month, which the event bus
+> alone can exhaust in about a day. Useful for a demo; for something always-on and genuinely free,
+> use Oracle Always Free instead ([`../oracle/README.md`](../oracle/README.md)).
+
+Since the 13 → 6 consolidation the blueprint deploys six services: `edge-gateway`,
+`identity-service`, `messaging-service`, `realtime-service`, `content-service`, `platform-service`.
+`edge-gateway` carries the `UPSTREAM_*` variables that point at the other five.
 
 ---
 
