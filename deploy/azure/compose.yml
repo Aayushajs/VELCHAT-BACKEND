@@ -27,6 +27,12 @@ services:
       - caddydata:/data
       - caddyconfig:/config
     environment:
+      # The Caddyfile's site address is {$DOMAIN:localhost}. Without DOMAIN reaching THIS
+      # container it fell back to localhost, which turns on automatic HTTPS and 308-redirects
+      # every plain HTTP request to https://localhost — so the site answered nothing, on any
+      # host, whether or not a real domain was configured. ':80' serves plain HTTP; set a
+      # hostname to get a Let's Encrypt certificate instead.
+      DOMAIN: '${DOMAIN:-:80}'
       # The shared Caddyfile routes by these, so one file serves every target: in mono both the
       # API and the WebSocket upgrade land on the same process.
       UPSTREAM_API: velchat-mono:3000

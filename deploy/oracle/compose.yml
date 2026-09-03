@@ -33,6 +33,11 @@ services:
       - caddydata:/data
       - caddyconfig:/config
     environment:
+      # The Caddyfile's site address is {$DOMAIN:localhost}. Without DOMAIN reaching THIS
+      # container it falls back to localhost, which turns on automatic HTTPS and 308-redirects
+      # every plain HTTP request to https://localhost — the site then answers nothing on any
+      # host. ':80' serves plain HTTP; set a hostname for a Let's Encrypt certificate.
+      DOMAIN: '${DOMAIN:-:80}'
       # Consumed by the shared Caddyfile, which serves every target from one config.
       UPSTREAM_API: edge-gateway:3001
       UPSTREAM_WS: realtime-service:3006
