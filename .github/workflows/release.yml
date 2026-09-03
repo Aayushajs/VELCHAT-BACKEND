@@ -251,7 +251,10 @@ jobs:
     # Deployments sidebar link straight at the running box.
     environment:
       name: production
-      url: ${{ secrets.AZURE_PUBLIC_URL }}
+      # vars, not secrets: GitHub does not allow the secrets context in environment.url, and an
+      # invalid workflow file fails on every branch, not just this one. The URL is a public
+      # endpoint anyway.
+      url: ${{ vars.AZURE_PUBLIC_URL }}
     steps:
       - uses: actions/checkout@v4
 
@@ -317,4 +320,4 @@ jobs:
           echo "::error::${URL}/health did not come up. The previous containers may still be serving — check the VM."
           exit 1
         env:
-          URL: ${{ secrets.AZURE_PUBLIC_URL }}
+          URL: ${{ vars.AZURE_PUBLIC_URL }}
