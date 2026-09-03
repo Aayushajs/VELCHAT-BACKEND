@@ -59,22 +59,22 @@ unauthorized. Three findings dominated:
 
 **Phase 2, entirely.** None of it is security-critical; Phase 1 closed the exploitable holes.
 
-- The tray endpoint () and its Valkey cache. This is the hottest path in the
+- The tray endpoint (`GET /status/tray`) and its Valkey cache. This is the hottest path in the
   product and does not exist yet — a client building a tray today must call
-   once per author.
-- Realtime fan-out.  and  are published but **nothing consumes
-  them**, so there is no live ring or live removal.
+  `GET /status/feed/:authorId` once per author.
+- Realtime fan-out. `status.posted` and `status.expired` are published but **nothing consumes
+  them**, so there is no live ring and no live removal.
 - Media pipeline: upload authorization, thumbnails, transcode, view-once blob deletion, and the
-   /  lifecycle states (already allowed by the  CHECK constraint, so no
+  `processing` / `failed` lifecycle states (already allowed by the `0023` CHECK constraint, so no
   second migration is needed).
-- Mute/archive (,  from §B8 — neither table exists), reaction
+- Mute/archive (`status_mutes`, `status_archive` from §B8 — neither table exists), reaction
   aggregation and removal, per-status audience update.
 - Idempotent create, load tests, HLD/LLD documents.
 
-A per-viewer cost worth knowing before building the tray: 
+A per-viewer cost worth knowing before building the tray: `SocialGraphResolver.relationship()`
 makes **two** upstream calls, and its in-flight coalescing keys on the owner, so it dedupes the
 contacts lookup but not the reverse block probe. Resolving N viewers of one author therefore costs
- calls. The tray will want either a batch endpoint on the directory or a short-TTL cache.
+`1 + N` calls. The tray will want either a batch endpoint on the directory or a short-TTL cache.
 
 ### Decisions worth not re-litigating
 
