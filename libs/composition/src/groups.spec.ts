@@ -52,7 +52,7 @@ describe('feature groups', () => {
   });
 
   it('gives content object storage and no Mongo', () => {
-    const need = contentGroup(logger).need;
+    const need = contentGroup(config, logger).need;
     expect(need).toContain('storage');
     expect(need).not.toContain('mongo');
   });

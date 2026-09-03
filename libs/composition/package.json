@@ -21,6 +21,7 @@
     "@velchat/feature-automation": "workspace:*",
     "@velchat/feature-call": "workspace:*",
     "@velchat/feature-chat": "workspace:*",
+    "@velchat/feature-contracts": "workspace:*",
     "@velchat/feature-group-channel": "workspace:*",
     "@velchat/feature-media": "workspace:*",
     "@velchat/feature-notification": "workspace:*",

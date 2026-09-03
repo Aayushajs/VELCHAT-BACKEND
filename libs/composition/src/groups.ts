@@ -1,4 +1,5 @@
 import type { AppConfig } from '@velchat/config';
+import { resolveInternalSecret } from '@velchat/common';
 import type { Logger } from 'pino';
 import { createPushRouter } from '@velchat/push';
 import { createMailer } from '@velchat/mail';
@@ -27,6 +28,7 @@ import {
   FeatureFlagsModule,
 } from '@velchat/feature-automation';
 import { TranslateModule, CaptionModule, createAiGateway } from '@velchat/feature-ai';
+import { HttpSocialGraphResolver, type SocialGraphResolver } from '@velchat/feature-contracts';
 import { emptyMounted, type FeatureGroup, type Mounted } from './mounted';
 
 /**
@@ -163,8 +165,21 @@ export const realtimeGroup = (): FeatureGroup => ({
   },
 });
 
+/**
+ * Status authorization asks the directory whether a viewer is one of an author's contacts, and
+ * whether either party blocked the other. Without an internal secret we cannot ask, so we answer
+ * DENY rather than guessing — the same fail-closed stance realtime takes for receipts and typing.
+ */
+const denyAllSocialGraph = (logger: Logger): SocialGraphResolver => {
+  logger.warn(
+    'INTERNAL_API_SECRET is not set in production: status audience and block checks cannot be ' +
+      'verified, so every non-author status read will be DENIED. Posting and deletion still work.',
+  );
+  return { relationship: async () => ({ isContact: false, isBlocked: true }) };
+};
+
 /** media + status/stories + E2EE chat backup. The CPU-heavy group (ffmpeg lives here). */
-export const contentGroup = (logger: Logger): FeatureGroup => ({
+export const contentGroup = (config: AppConfig, logger: Logger): FeatureGroup => ({
   name: 'content',
   need: ['postgres', 'storage', 'eventBus'],
   mount(infra): Mounted {
@@ -179,7 +194,14 @@ export const contentGroup = (logger: Logger): FeatureGroup => ({
       m.imports.push(BackupModule.forRoot({ pg: postgres, storage }));
     }
     if (postgres && eventBus) {
-      m.imports.push(StatusModule.forRoot({ logger, pg: postgres, eventBus }));
+      const internalSecret = resolveInternalSecret(config);
+      const social = internalSecret
+        ? new HttpSocialGraphResolver({
+            baseUrl: process.env.UPSTREAM_IDENTITY || 'http://localhost:3002',
+            secret: internalSecret,
+          })
+        : denyAllSocialGraph(logger);
+      m.imports.push(StatusModule.forRoot({ logger, pg: postgres, eventBus, social }));
     }
     return m;
   },
@@ -254,6 +276,6 @@ export const allGroups = (config: AppConfig, logger: Logger): FeatureGroup[] => 
   identityGroup(config, logger),
   messagingGroup(config, logger),
   realtimeGroup(),
-  contentGroup(logger),
+  contentGroup(config, logger),
   platformGroup(config, logger),
 ];

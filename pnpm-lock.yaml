@@ -468,6 +468,9 @@ importers:
       '@velchat/feature-chat':
         specifier: workspace:*
         version: link:../feature-chat
+      '@velchat/feature-contracts':
+        specifier: workspace:*
+        version: link:../feature-contracts
       '@velchat/feature-group-channel':
         specifier: workspace:*
         version: link:../feature-group-channel
