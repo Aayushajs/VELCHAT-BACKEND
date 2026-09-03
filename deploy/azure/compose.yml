@@ -1,9 +1,15 @@
-# VelChat on Azure free allowance — B1S (1 vCPU / 1 GB), 750 h/month.
+# VelChat on an Azure VM. Runs ONE process (`velchat-mono`) with every feature group mounted, plus
+# Valkey locally because it is tiny and the event bus must not be metered. Postgres and Mongo are
+# external — see .env.example.
 #
-# 1 GB is the binding constraint, and it is why this file looks different from Oracle's. Six Node
-# processes are ~900 MB before the OS gets a byte, so this profile runs ONE process
-# (`velchat-mono`) with every feature group mounted, plus Valkey locally because it is tiny and the
-# event bus must not be metered. Postgres and Mongo are external — see .env.example.
+# Sizing is env-driven so one file serves both boxes people actually use here:
+#
+#   B1S      1 vCPU / 1 GB, free allowance   → MONO_MEM=480M  MONO_HEAP=320  VALKEY_MEM=160M
+#   B2as_v2  2 vCPU / 8 GB, from credit      → the defaults below
+#
+# The mono profile is not a lesser build: it mounts the same FeatureGroup values the six services
+# mount, through the same assembler, so only the process count differs. On an 8 GB box you could
+# also run SPLIT_PROFILE=axis6 for parity with Render — see deploy/PORTABILITY.md.
 #
 # It is the same code as the six-service topology, mounted through the same assembler; only the
 # process count differs. Moving to six later is a profile change, not a rewrite.
@@ -26,24 +32,28 @@ services:
       UPSTREAM_API: velchat-mono:3000
       UPSTREAM_WS: velchat-mono:3000
     depends_on: [velchat-mono]
-    deploy: { resources: { limits: { memory: 64M } } }
+    deploy: { resources: { limits: { memory: '${CADDY_MEM:-128M}' } } }
 
   velchat-mono:
-    image: ${IMAGE_REPO:-ghcr.io/velcart}/velchat-velchat-mono:${TAG:-latest}
+    image: '${IMAGE_REPO:-ghcr.io/velcart}/velchat-velchat-mono:${TAG:-latest}'
     restart: always
     env_file: [./.env]
     environment:
       SERVICE_NAME: velchat-mono
       HTTP_PORT: 3000
-      # 320 MB of heap on a 1 GB box: enough for every feature group, with room for the OS,
-      # Valkey and Caddy. Raise it only after checking `docker stats`.
-      NODE_OPTIONS: --max-old-space-size=320
+      # Node will not grow the heap past this no matter what the container limit says, so the two
+      # move together: keep the heap comfortably under MONO_MEM, which also has to cover the
+      # non-heap side (buffers, native modules, ffmpeg). Check `docker stats` before raising it.
+      NODE_OPTIONS: '--max-old-space-size=${MONO_HEAP:-2048}'
     depends_on:
       valkey: { condition: service_healthy }
     logging:
       driver: json-file
       options: { max-size: '10m', max-file: '3' }
-    deploy: { resources: { limits: { memory: 480M }, reservations: { cpus: '0.40' } } }
+    deploy:
+      resources:
+        limits: { memory: '${MONO_MEM:-3G}' }
+        reservations: { cpus: '${MONO_CPUS:-1.0}' }
 
   # Local, not managed: Azure Cache for Redis has no free tier, and a metered Redis is the worst
   # possible home for the event bus (Redis Streams consumers poll continuously). Valkey is ~60 MB.
@@ -59,7 +69,7 @@ services:
       - --appendfsync
       - everysec
       - --maxmemory
-      - 96mb
+      - '${VALKEY_MAXMEMORY:-768mb}'
       - --maxmemory-policy
       - noeviction
     volumes: [valkeydata:/data]
@@ -68,7 +78,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
-    deploy: { resources: { limits: { memory: 160M }, reservations: { cpus: '0.10' } } }
+    deploy:
+      resources:
+        limits: { memory: '${VALKEY_MEM:-1G}' }
+        reservations: { cpus: '${VALKEY_CPUS:-0.25}' }
 
 volumes:
   valkeydata:
