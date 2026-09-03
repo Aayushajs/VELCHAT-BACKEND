@@ -255,8 +255,43 @@ jobs:
       # invalid workflow file fails on every branch, not just this one. The URL is a public
       # endpoint anyway.
       url: ${{ vars.AZURE_PUBLIC_URL }}
+    env:
+      # `if:` cannot read the secrets context directly, so the presence check is lifted to env.
+      # Without the credential the deploy still runs; it just cannot start a stopped VM.
+      HAS_AZURE_CREDS: ${{ secrets.AZURE_CREDENTIALS != '' }}
     steps:
       - uses: actions/checkout@v4
+
+      # The box is deallocated outside working hours to conserve credit, so a deploy that assumes
+      # it is running fails on SSH timeout — which is exactly what happened on the v8.1.0 release.
+      # Start it first. `az vm start` on an already-running VM is a no-op, so this is safe to run
+      # every time. The service principal is scoped to the velchat resource group only.
+      - name: Start the VM if it is deallocated
+        if: ${{ env.HAS_AZURE_CREDS == 'true' }}
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Ensure the VM is running
+        if: ${{ env.HAS_AZURE_CREDS == 'true' }}
+        run: |
+          set -euo pipefail
+          state=$(az vm get-instance-view -g velchat -n velchat-vm             --query "instanceView.statuses[1].displayStatus" -o tsv)
+          echo "power state: $state"
+          if [ "$state" != "VM running" ]; then
+            echo "starting…"
+            az vm start -g velchat -n velchat-vm -o none
+            # SSH is not accepting connections the instant the VM reports running.
+            for i in $(seq 1 30); do
+              if nc -z -w 5 "$HOST" "${PORT:-22}" 2>/dev/null; then
+                echo "ssh reachable after ~$((i * 5))s"; break
+              fi
+              sleep 5
+            done
+          fi
+        env:
+          HOST: ${{ secrets.AZURE_HOST }}
+          PORT: ${{ secrets.AZURE_SSH_PORT }}
 
       - name: Deploy over SSH
         # Written out rather than delegated to a marketplace action: this step holds the key to the
