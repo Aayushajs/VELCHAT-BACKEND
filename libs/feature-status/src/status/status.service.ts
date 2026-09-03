@@ -1,16 +1,18 @@
 import { uuidv7, ValidationError, NotFoundError, ForbiddenError } from '@velchat/common';
-import { StatusRepository } from './status.repository';
+import type { SocialGraphResolver } from '@velchat/feature-contracts';
+import { StatusRepository, type ViewerPage } from './status.repository';
 import { StatusEvents } from './status.events';
 import {
-  audienceAllows,
+  canView,
   STATUS_TTL_MS,
   type Audience,
   type NewStatus,
   type StatusKind,
+  type StatusPost,
 } from './status.types';
 
+/** Everything about a new status EXCEPT who is posting it — that comes from the verified token. */
 export interface PostStatusInput {
-  userId: string;
   kind: StatusKind;
   mediaId?: string;
   /** Ciphertext for personal (e2ee) status — the server never sees plaintext. */
@@ -18,117 +20,172 @@ export interface PostStatusInput {
   bg?: string;
   caption?: string;
   audience?: Audience;
-  /** The author's contact account_ids — used to resolve the audience server-side. */
-  contacts?: string[];
   e2ee?: boolean;
   viewOnce?: boolean;
 }
 
+const MAX_VIEWER_PAGE = 100;
+const DEFAULT_VIEWER_PAGE = 50;
+const AUDIENCE_MODES = new Set(['contacts', 'except', 'only']);
+
 /**
- * Status / stories (§B8 / §C11). The audience rule + the author's contacts resolve to a concrete
- * set; the post stores that set and the realtime ring goes only to those members. Personal status
- * is E2EE (audience-encrypted by the client) — the server holds ciphertext + the audience set only.
+ * Status / stories (§B8 / §C11).
+ *
+ * Two rules hold this together. First, the acting account is always a parameter supplied by the
+ * controller from the verified token — never a field the caller can set; that is what closes the
+ * IDOR and impersonation bypasses. Second, visibility is decided live against the author's current
+ * social graph through the SocialGraphResolver port, which fails closed, so a contact removal or a
+ * new block takes effect immediately and an unreachable directory denies rather than allows.
+ *
+ * Personal status content is E2EE: `text`/`caption` are ciphertext the server stores and never
+ * parses, and no content field is ever put on the event bus or into a log.
  */
 export class StatusService {
   constructor(
     private readonly repo: StatusRepository,
     private readonly events: StatusEvents,
+    private readonly social: SocialGraphResolver,
   ) {}
 
   async post(
+    actingAccountId: string,
     input: PostStatusInput,
-  ): Promise<{ statusId: string; audience: string[]; expiresAt: string }> {
-    if (!input.userId) throw new ValidationError('userId is required');
-    const rule: Audience = input.audience ?? { mode: 'contacts' };
-    const contacts = new Set(input.contacts ?? []);
-    // Resolve the rule to a concrete audience (for 'only', the list itself; else filtered contacts).
-    const resolved =
-      rule.mode === 'only'
-        ? (rule.list ?? [])
-        : [...contacts].filter((c) => audienceAllows(rule, c, contacts));
+  ): Promise<{ statusId: string; expiresAt: string }> {
+    if (!actingAccountId) throw new ForbiddenError('authentication required');
+    if (!input.kind) throw new ValidationError('kind is required');
+    if (input.kind === 'text' && !input.text) {
+      throw new ValidationError('text status requires text');
+    }
+    if (input.kind !== 'text' && !input.mediaId) {
+      throw new ValidationError(`${input.kind} status requires mediaId`);
+    }
 
+    const rule = normaliseAudience(input.audience);
     const statusId = uuidv7();
+    // Server time only. A client-supplied expiry would let a caller pin a status forever.
     const expiresAt = new Date(Date.now() + STATUS_TTL_MS);
+
     const post: NewStatus = {
-      userId: input.userId,
+      userId: actingAccountId,
       kind: input.kind,
       mediaId: input.mediaId ?? null,
       text: input.text ?? null,
       bg: input.bg ?? null,
       caption: input.caption ?? null,
-      audience: { mode: rule.mode, list: resolved },
+      audience: rule,
       e2ee: input.e2ee ?? true,
       viewOnce: input.viewOnce ?? false,
     };
     await this.repo.create(statusId, post, expiresAt);
-    await this.events.statusPosted(
-      statusId,
-      input.userId,
-      input.kind,
-      resolved,
-      expiresAt.toISOString(),
-    );
-    return { statusId, audience: resolved, expiresAt: expiresAt.toISOString() };
+
+    // No content in the payload — the E2EE boundary (§3.7).
+    await this.events.statusPosted(statusId, actingAccountId, input.kind, expiresAt.toISOString());
+    return { statusId, expiresAt: expiresAt.toISOString() };
   }
 
-  /** Record a view — only if the viewer is in the audience (or is the author). */
-  async view(statusId: string, viewerId: string): Promise<void> {
-    const post = await this.repo.findActive(statusId);
-    if (!post) throw new NotFoundError('status not found or expired');
-    if (viewerId !== post.user_id && !inAudience(post.audience, viewerId)) {
-      throw new ForbiddenError('not in this status audience');
-    }
-    if (viewerId !== post.user_id) await this.repo.recordView(statusId, viewerId);
+  /** Record a view. Idempotent at the repository's primary key, so extra devices cannot inflate it. */
+  async view(statusId: string, actingAccountId: string): Promise<void> {
+    const post = await this.requireVisible(statusId, actingAccountId);
+    if (actingAccountId !== post.user_id) await this.repo.recordView(statusId, actingAccountId);
   }
 
-  async react(statusId: string, viewerId: string, emoji: string): Promise<void> {
+  async react(statusId: string, actingAccountId: string, emoji: string): Promise<void> {
     if (!emoji) throw new ValidationError('emoji is required');
-    const post = await this.repo.findActive(statusId);
-    if (!post) throw new NotFoundError('status not found or expired');
-    if (!inAudience(post.audience, viewerId))
-      throw new ForbiddenError('not in this status audience');
-    await this.repo.react(statusId, viewerId, emoji);
+    await this.requireVisible(statusId, actingAccountId);
+    await this.repo.react(statusId, actingAccountId, emoji);
   }
 
-  /** Viewer list — only the author may see who viewed (§B8). */
+  /** Viewer list — the author only (§B8), cursor-paginated. */
   async viewers(
     statusId: string,
-    requesterId: string,
-  ): Promise<Array<{ viewerId: string; viewedAt: string }>> {
+    actingAccountId: string,
+    limit = DEFAULT_VIEWER_PAGE,
+    after?: string,
+  ): Promise<{
+    viewers: Array<{ viewerId: string; viewedAt: string }>;
+    nextCursor: string | null;
+  }> {
     const post = await this.repo.findActive(statusId);
     if (!post) throw new NotFoundError('status not found or expired');
-    if (post.user_id !== requesterId) throw new ForbiddenError('only the author can see viewers');
-    return (await this.repo.viewers(statusId)).map((v) => ({
-      viewerId: v.viewer_id,
-      viewedAt: v.viewed_at,
-    }));
+    if (post.user_id !== actingAccountId) {
+      throw new ForbiddenError('only the author can see viewers');
+    }
+    const page: ViewerPage = await this.repo.viewersPage(statusId, clampLimit(limit), after);
+    return {
+      viewers: page.viewers.map((v) => ({ viewerId: v.viewer_id, viewedAt: v.viewed_at })),
+      nextCursor: page.nextCursor,
+    };
   }
 
-  /** A viewer's feed of an author's still-active statuses they're allowed to see. */
-  async feedOf(authorId: string, viewerId: string): Promise<Array<Record<string, unknown>>> {
-    const posts = await this.repo.listByUser(authorId);
+  /**
+   * An author's active statuses that the caller may see, oldest first for sequential playback.
+   * The relationship is resolved ONCE for the author, not per status — no N+1.
+   */
+  async feedOf(authorId: string, actingAccountId: string): Promise<Array<Record<string, unknown>>> {
+    const posts = await this.repo.listActiveByUser(authorId);
+    if (posts.length === 0) return [];
+
+    const rel =
+      authorId === actingAccountId
+        ? { isContact: true, isBlocked: false }
+        : await this.social.relationship(authorId, actingAccountId);
+
     return posts
-      .filter((p) => viewerId === p.user_id || inAudience(p.audience, viewerId))
-      .map((p) => ({
-        statusId: p.status_id,
-        kind: p.kind,
-        mediaId: p.media_id,
-        text: p.text, // ciphertext for personal
-        bg: p.bg,
-        caption: p.caption,
-        viewOnce: p.view_once,
-        createdAt: p.created_at,
-        expiresAt: p.expires_at,
-      }));
+      .filter((p) => canView({ audience: p.audience, authorId: p.user_id }, actingAccountId, rel))
+      .map(toWireStatus);
   }
 
-  async remove(statusId: string, userId: string): Promise<void> {
-    if (!(await this.repo.delete(statusId, userId))) {
+  async remove(statusId: string, actingAccountId: string): Promise<void> {
+    // Ownership lives in the UPDATE predicate, so "not yours" and "not there" are indistinguishable
+    // to the caller — deliberately, so this cannot be used to probe for others' status ids.
+    if (!(await this.repo.softDelete(statusId, actingAccountId))) {
       throw new NotFoundError('status not found or not yours');
     }
   }
+
+  /** Fetch + authorize in one place, so no read path can forget the check. */
+  private async requireVisible(statusId: string, viewerId: string): Promise<StatusPost> {
+    const post = await this.repo.findActive(statusId);
+    if (!post) throw new NotFoundError('status not found or expired');
+    if (post.user_id === viewerId) return post;
+
+    const rel = await this.social.relationship(post.user_id, viewerId);
+    if (!canView({ audience: post.audience, authorId: post.user_id }, viewerId, rel)) {
+      throw new ForbiddenError('not in this status audience');
+    }
+    return post;
+  }
 }
 
-function inAudience(audience: { list?: string[] }, viewer: string): boolean {
-  return (audience.list ?? []).includes(viewer);
+function clampLimit(limit: number): number {
+  if (!Number.isFinite(limit) || limit <= 0) return DEFAULT_VIEWER_PAGE;
+  return Math.min(Math.trunc(limit), MAX_VIEWER_PAGE);
+}
+
+/** Reject an unknown mode rather than silently falling back to a wider audience. */
+function normaliseAudience(audience: Audience | undefined): Audience {
+  if (!audience) return { mode: 'contacts' };
+  if (!AUDIENCE_MODES.has(audience.mode)) {
+    throw new ValidationError('audience.mode must be contacts, except or only');
+  }
+  const list = audience.list ?? [];
+  if (audience.mode === 'only' && list.length === 0) {
+    throw new ValidationError('audience.mode "only" requires a non-empty list');
+  }
+  return audience.mode === 'contacts' ? { mode: 'contacts' } : { mode: audience.mode, list };
+}
+
+function toWireStatus(p: StatusPost): Record<string, unknown> {
+  return {
+    statusId: p.status_id,
+    authorId: p.user_id,
+    kind: p.kind,
+    mediaId: p.media_id,
+    text: p.text, // ciphertext for personal — opaque to the server
+    bg: p.bg,
+    caption: p.caption,
+    viewOnce: p.view_once,
+    createdAt: p.created_at,
+    expiresAt: p.expires_at,
+  };
 }

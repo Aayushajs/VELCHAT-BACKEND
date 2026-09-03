@@ -930,6 +930,9 @@ importers:
       '@velchat/event-bus':
         specifier: workspace:*
         version: link:../event-bus
+      '@velchat/feature-contracts':
+        specifier: workspace:*
+        version: link:../feature-contracts
       '@velchat/shared-types':
         specifier: workspace:*
         version: link:../shared-types

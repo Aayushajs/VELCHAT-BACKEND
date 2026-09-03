@@ -18,6 +18,7 @@
     "@velchat/common": "workspace:*",
     "@velchat/database": "workspace:*",
     "@velchat/event-bus": "workspace:*",
+    "@velchat/feature-contracts": "workspace:*",
     "@velchat/shared-types": "workspace:*",
     "class-validator": "^0.14.1",
     "pino": "^9.6.0"

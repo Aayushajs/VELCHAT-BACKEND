@@ -3,7 +3,10 @@ import type { EventBus } from '@velchat/event-bus';
 import type { StatusPostedPayload } from '@velchat/shared-types';
 import type { StatusKind } from './status.types';
 
-/** Status events (§A11/§C11) → realtime rings only the audience members; notification follows. */
+/**
+ * Status events (§A11/§C11). The payload carries NO content and NO audience: personal status text
+ * and caption are ciphertext, and the audience is a rule consumers resolve from the directory.
+ */
 export class StatusEvents {
   constructor(private readonly bus: EventBus) {}
 
@@ -11,7 +14,6 @@ export class StatusEvents {
     statusId: string,
     userId: string,
     kind: StatusKind,
-    audience: string[],
     expiresAt: string,
   ): Promise<void> {
     await this.bus.publish<StatusPostedPayload>(
@@ -19,9 +21,11 @@ export class StatusEvents {
       buildEnvelope({
         eventType: 'status.posted',
         key: userId,
-        producer: 'presence-service',
+        producer: 'content-service', // was 'presence-service' — status is content-owned (Part H)
         tenantId: null,
-        payload: { status_id: statusId, user_id: userId, kind, audience, expires_at: expiresAt },
+        // No content fields: personal status text/caption are ciphertext and must not transit the
+        // bus. Consumers resolve the audience themselves via the directory.
+        payload: { status_id: statusId, user_id: userId, kind, expires_at: expiresAt },
       }),
     );
   }
