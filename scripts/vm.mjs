@@ -56,7 +56,7 @@ const CFG = {
   // Set AZ_HOST to skip the Azure CLI entirely for the SSH-based commands. Useful before the CLI
   // is installed, and mandatory-free once the public IP is static (it stops changing).
   host: env('AZ_HOST', ''),
-  composeRemote: env('AZ_COMPOSE_PATH', '~/velchat-compose.yml'),
+  composeRemote: env('AZ_COMPOSE_PATH', '~/velchat-deploy/azure/compose.yml'),
   envRemote: env('AZ_ENV_PATH', '~/velchat.env'),
 };
 
@@ -290,14 +290,22 @@ const commands = {
       process.exit(code);
     }
 
+    // The compose file mounts ../shared/Caddyfile, a path relative to ITS OWN directory. Dropping
+    // it in the home directory made that resolve to /home/shared, which does not exist, and Caddy
+    // failed to start. Mirror the repo layout instead so the relative path means what it means in
+    // the repo.
     ui.info('copying compose file + Caddyfile…');
+    ssh('mkdir -p ~/velchat-deploy/azure ~/velchat-deploy/shared');
     const scpArgs = ['-P', CFG.port, '-o', 'StrictHostKeyChecking=accept-new'];
     if (CFG.key) scpArgs.push('-i', CFG.key);
     const scp = (src, dest) =>
       spawnSync('scp', [...scpArgs, src, `${CFG.user}@${ip}:${dest}`], { stdio: 'inherit' })
         .status ?? 1;
-    if (scp('deploy/azure/compose.yml', '~/velchat-compose.yml') !== 0) process.exit(1);
-    if (scp('deploy/shared/Caddyfile', '~/Caddyfile') !== 0) process.exit(1);
+    if (scp('deploy/azure/compose.yml', '~/velchat-deploy/azure/compose.yml') !== 0)
+      process.exit(1);
+    if (scp('deploy/shared/Caddyfile', '~/velchat-deploy/shared/Caddyfile') !== 0) process.exit(1);
+    // compose.yml also declares env_file: [./.env], resolved next to itself.
+    ssh('ln -sf ~/velchat.env ~/velchat-deploy/azure/.env');
 
     // The env file holds database URLs and the internal secret, so it is created on the VM from
     // the template and filled in there. It never travels through this machine or through CI.

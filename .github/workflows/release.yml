@@ -271,16 +271,23 @@ jobs:
 
           # Ship only the compose file and the edge config. The .env stays on the VM and never
           # enters CI, so database URLs and the internal secret are never exposed to a workflow run.
-          scp -P "${PORT:-22}" deploy/azure/compose.yml "$SSH_USER@$HOST:~/velchat-compose.yml"
-          scp -P "${PORT:-22}" deploy/shared/Caddyfile "$SSH_USER@$HOST:~/Caddyfile"
+          #
+          # The repo's directory layout is mirrored on the box because compose.yml mounts
+          # ../shared/Caddyfile — a path relative to its own directory. Flattening both into the
+          # home directory makes that resolve to /home/shared, and Caddy refuses to start.
+          ssh -p "${PORT:-22}" "$SSH_USER@$HOST" 'mkdir -p ~/velchat-deploy/azure ~/velchat-deploy/shared'
+          scp -P "${PORT:-22}" deploy/azure/compose.yml "$SSH_USER@$HOST:~/velchat-deploy/azure/compose.yml"
+          scp -P "${PORT:-22}" deploy/shared/Caddyfile "$SSH_USER@$HOST:~/velchat-deploy/shared/Caddyfile"
 
           ssh -p "${PORT:-22}" "$SSH_USER@$HOST" \
             "GHCR_USER='$GHCR_USER' GHCR_TOKEN='$GHCR_TOKEN' TAG='$VERSION' bash -s" <<'REMOTE'
           set -euo pipefail
           echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+          # compose.yml also declares env_file: [./.env], resolved next to itself.
+          ln -sf ~/velchat.env ~/velchat-deploy/azure/.env
           export TAG
-          docker compose -f ~/velchat-compose.yml --env-file ~/velchat.env pull
-          docker compose -f ~/velchat-compose.yml --env-file ~/velchat.env up -d --remove-orphans
+          docker compose -f ~/velchat-deploy/azure/compose.yml --env-file ~/velchat.env pull
+          docker compose -f ~/velchat-deploy/azure/compose.yml --env-file ~/velchat.env up -d --remove-orphans
           docker image prune -f   # a 1 GB box fills up fast otherwise
           docker logout ghcr.io
           REMOTE
