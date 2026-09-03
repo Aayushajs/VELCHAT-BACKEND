@@ -149,10 +149,15 @@ consolidation. They redeploy on every push to `main`, building a topology the re
 `render.yaml` in this repo now describes six services and pins each to `branch: dev`, but Render
 does not re-read a blueprint on its own.
 
-1. Render dashboard → the existing Blueprint → **Sync / re-deploy blueprint** so it picks up the
-   current `render.yaml`.
-2. Delete the thirteen stale services from the old topology.
-3. Fill the `velchat-shared` env group with the same database URLs the VM uses.
+1. Render dashboard → the existing Blueprint → **Delete**.
+2. **Delete the thirteen stale services** — removing the blueprint does not remove them.
+3. **New → Blueprint** → connect the repo. It reads the current `render.yaml`: six services on `dev`.
+4. Fill the `velchat-shared` env group with the same database URLs the VM uses.
+5. Once the gateway answers, `gh variable set RENDER_BASE_URL --body https://velchat-edge-gateway.onrender.com`
+   so CI records a `development` deployment per push.
+
+Syncing the existing blueprint instead of recreating it tends to leave the old services orphaned,
+which is why this deletes first. Full detail in [`RUNBOOK.md`](RUNBOOK.md) §6.
 
 Two things worth knowing about how this shows up on GitHub:
 

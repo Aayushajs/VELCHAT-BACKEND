@@ -212,24 +212,50 @@ curl https://velchat.duckdns.org/health
 
 ## 6. Render — the dev environment
 
-**Still outstanding, and until it is done `dev` has no deployment.**
+**Outstanding. Until this is done, `dev` has no deployment.**
 
 Render is connected to the **old 13-service blueprint on `main`**. In the repo's Deployments
-sidebar that appears as thirteen `main - velchat-*` environments, named for services that stopped
-existing at the 6-service consolidation. They rebuild on every push to `main`.
+sidebar that shows as thirteen `main - velchat-*` environments, named for services that stopped
+existing at the 6-service consolidation — and they rebuild on every push to `main`, building a
+topology this repo no longer has.
 
-`render.yaml` here now describes six services pinned to `branch: dev`, but Render does not re-read
-a blueprint on its own:
+`render.yaml` here describes six services, each pinned to `branch: dev`. Render does not re-read a
+blueprint on its own, and syncing an existing one tends to leave the old services orphaned rather
+than removing them. Deleting and recreating is cleaner:
 
-1. Render dashboard → the Blueprint → **Sync / re-deploy blueprint**.
-2. Delete the thirteen stale services.
-3. Fill the `velchat-shared` env group with the same database URLs the VM uses.
+1. **Render dashboard → the existing Blueprint → Delete.**
+2. **Delete the thirteen stale services** (`velchat-api-gateway`, `velchat-ai-service`,
+   `velchat-auth-service`, and so on). Deleting the blueprint does not remove them.
+3. **New → Blueprint → connect `Aayushajs/VELCHAT-BACKEND`.** It reads the current `render.yaml`:
+   six services, each on `dev`.
+4. **Env Groups → `velchat-shared`** → fill in `POSTGRES_URL`, `MONGO_URL`, `VALKEY_URL`,
+   `CLOUDINARY_URL`. The same values the VM uses are in `~/velchat.env`.
+5. Once `https://velchat-edge-gateway.onrender.com/health` answers, activate the deployment record:
 
-Render names its own environments `<branch> - <service>`, so once it tracks `dev` you will see
-`dev - velchat-edge-gateway` and friends. It never writes to GitHub's `development` environment,
-which is why creating one by hand does nothing.
+   ```bash
+   gh variable set RENDER_BASE_URL --body "https://velchat-edge-gateway.onrender.com"
+   ```
 
----
+### Why that last step exists
+
+Render names its own environments `<branch> - <service>`, so after step 3 you get six
+`dev - velchat-*` entries. It never writes to GitHub's `development` environment, which is why
+creating one by hand does nothing on its own.
+
+The `development` job in `ci.yml` fills that gap: on a push to `dev` it polls the Render gateway's
+`/health` and records a `development` deployment once Render is actually serving. That gives one
+clean entry per branch — `production` for `main`, `development` for `dev` — instead of six per-service
+rows. It stays inert until `RENDER_BASE_URL` is set, so it produces no failures before Render works.
+
+It polls rather than assuming: a deployment record that turns green without checking anything would
+be worse than not having one.
+
+### One caveat on Render's free tier
+
+Services sleep after ~15 minutes idle and cold-start on the next request, and the free managed
+datastores are metered. Upstash in particular allows 500k Redis commands/month, which the event bus
+alone can exhaust in about a day — which is why the **Azure box runs Valkey locally** rather than
+pointing at Upstash. Keep that difference in mind when dev behaves differently from production.
 
 ## 7. Secrets and where they live
 

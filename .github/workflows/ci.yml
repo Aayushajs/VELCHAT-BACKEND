@@ -122,3 +122,39 @@ jobs:
           push: false
           cache-from: type=gha,scope=velchat-mono
           cache-to: type=gha,mode=max,scope=velchat-mono
+
+  development:
+    name: development deployment
+    # Render builds `dev` from source on its own runners; nothing here deploys. This job exists to
+    # record the result as a GitHub deployment, so the repo's Deployments sidebar shows
+    # development for `dev` the way it shows production for `main` — Render names its own
+    # environments `<branch> - <service>` and never writes to `development`.
+    #
+    # Gated on the variable so it stays inert until Render is actually serving `dev`. Activate with:
+    #   gh variable set RENDER_BASE_URL --body https://velchat-edge-gateway.onrender.com
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/dev' &&
+      vars.RENDER_BASE_URL != ''
+    needs: [verify]
+    runs-on: ubuntu-latest
+    environment:
+      name: development
+      url: ${{ vars.RENDER_BASE_URL }}
+    steps:
+      - name: Wait for Render to serve this build
+        # Polls rather than assuming: a deployment record that turns green without checking would
+        # be worse than none, and Render's free tier both sleeps and rebuilds slowly.
+        run: |
+          set -uo pipefail
+          for i in $(seq 1 40); do
+            if curl -fsS --max-time 15 "${URL}/health" > /dev/null 2>&1; then
+              echo "Render is serving ${URL} after ~$((i * 30))s"
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::error::${URL}/health did not answer within 20 minutes. Check the Render dashboard."
+          exit 1
+        env:
+          URL: ${{ vars.RENDER_BASE_URL }}
