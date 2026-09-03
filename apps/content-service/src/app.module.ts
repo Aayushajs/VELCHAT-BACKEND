@@ -13,6 +13,6 @@ export { INFRA } from '@velchat/composition';
 @Module({})
 export class AppModule {
   static forRoot(deps: AppDeps): DynamicModule {
-    return composeSingle(AppModule, deps, contentGroup(deps.logger));
+    return composeSingle(AppModule, deps, contentGroup(deps.config, deps.logger));
   }
 }

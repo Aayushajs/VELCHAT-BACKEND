@@ -41,7 +41,8 @@
     "changeset:tag": "changeset tag",
     "changeset:publish": "changeset publish",
     "changeset:status": "changeset status --since=main",
-    "prepare": "husky"
+    "prepare": "husky",
+    "vm": "node scripts/vm.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.11",

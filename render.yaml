@@ -1,4 +1,11 @@
 # VelChat backend on Render (FREE tier) — the SIX-service topology.
+#
+# ENVIRONMENT SPLIT: Render is DEV, Azure is PRODUCTION.
+#   dev  --> Render, from this blueprint (every service below pins branch: dev), auto-deployed by
+#            Render itself on push. CI still verifies the push first (.github/workflows/ci.yml).
+#   main --> Azure, via .github/workflows/release.yml, which versions, publishes signed images to
+#            GHCR and deploys them.
+# Nothing here builds production images; Render builds from source on its own runners.
 # Docs: https://render.com/docs/blueprint-spec   ·   deploy/RENDER.md
 #
 # Render is kept as a fallback target, not the primary one. Its free web services sleep when idle,
@@ -77,6 +84,7 @@ services:
   - type: web
     name: velchat-edge-gateway
     runtime: docker
+    branch: dev
     plan: free
     dockerfilePath: ./docker/edge-gateway.Dockerfile
     dockerContext: .
@@ -107,6 +115,7 @@ services:
   - type: web
     name: velchat-identity-service
     runtime: docker
+    branch: dev
     plan: free
     dockerfilePath: ./docker/identity-service.Dockerfile
     dockerContext: .
@@ -127,6 +136,7 @@ services:
   - type: web
     name: velchat-messaging-service
     runtime: docker
+    branch: dev
     plan: free
     dockerfilePath: ./docker/messaging-service.Dockerfile
     dockerContext: .
@@ -147,6 +157,7 @@ services:
   - type: web
     name: velchat-realtime-service
     runtime: docker
+    branch: dev
     plan: free
     dockerfilePath: ./docker/realtime-service.Dockerfile
     dockerContext: .
@@ -169,6 +180,7 @@ services:
   - type: web
     name: velchat-content-service
     runtime: docker
+    branch: dev
     plan: free
     dockerfilePath: ./docker/content-service.Dockerfile
     dockerContext: .
@@ -189,6 +201,7 @@ services:
   - type: web
     name: velchat-platform-service
     runtime: docker
+    branch: dev
     plan: free
     dockerfilePath: ./docker/platform-service.Dockerfile
     dockerContext: .

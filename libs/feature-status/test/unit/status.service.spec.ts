@@ -1,9 +1,9 @@
-import { StatusService } from '../../src/status/status.service';
-import { audienceAllows } from '../../src/status/status.types';
 import { ForbiddenError, NotFoundError } from '@velchat/common';
+import { StatusService } from '../../src/status/status.service';
 import type { StatusRepository } from '../../src/status/status.repository';
 import type { StatusEvents } from '../../src/status/status.events';
 import type { StatusPost } from '../../src/status/status.types';
+import type { SocialGraphResolver } from '@velchat/feature-contracts';
 
 function activePost(over: Partial<StatusPost> = {}): StatusPost {
   return {
@@ -11,92 +11,143 @@ function activePost(over: Partial<StatusPost> = {}): StatusPost {
     user_id: 'author',
     kind: 'text',
     media_id: null,
-    text: 'ct',
+    text: 'ciphertext',
     bg: null,
     caption: null,
-    audience: { mode: 'contacts', list: ['alice', 'bob'] },
+    audience: { mode: 'contacts' },
     e2ee: true,
     view_once: false,
-    created_at: '2026-06-22T00:00:00.000Z',
+    state: 'active',
+    deleted_at: null,
+    created_at: '2026-08-22T00:00:00.000Z',
     expires_at: '2099-01-01T00:00:00.000Z',
     ...over,
   };
 }
 
-function setup() {
-  const created: Array<{ statusId: string }> = [];
+function setup(
+  opts: { rel?: { isContact: boolean; isBlocked: boolean }; post?: StatusPost | null } = {},
+) {
+  const post = opts.post === undefined ? activePost() : opts.post;
   const repo = {
-    create: jest.fn(async (statusId: string) => {
-      created.push({ statusId });
-    }),
-    findActive: jest.fn(async () => activePost()),
+    create: jest.fn(async () => undefined),
+    findActive: jest.fn(async () => post),
+    listActiveByUser: jest.fn(async () => (post ? [post] : [])),
     recordView: jest.fn(async () => undefined),
-    viewers: jest.fn(async () => [{ viewer_id: 'alice', viewed_at: 't' }]),
+    viewersPage: jest.fn(async () => ({
+      viewers: [{ viewer_id: 'alice', viewed_at: '2026-08-22T01:00:00.000Z' }],
+      nextCursor: null,
+    })),
     react: jest.fn(async () => undefined),
-    delete: jest.fn(async () => true),
+    softDelete: jest.fn(async () => true),
   } as unknown as StatusRepository;
+
   const events = { statusPosted: jest.fn(async () => undefined) } as unknown as StatusEvents;
-  return { svc: new StatusService(repo, events), repo, events };
+  const social = {
+    relationship: jest.fn(async () => opts.rel ?? { isContact: true, isBlocked: false }),
+  } as unknown as SocialGraphResolver;
+
+  return { svc: new StatusService(repo, events, social), repo, events, social };
 }
 
-describe('audienceAllows (§B8)', () => {
-  const contacts = new Set(['alice', 'bob', 'carol']);
-  it('contacts → any contact', () => {
-    expect(audienceAllows({ mode: 'contacts' }, 'alice', contacts)).toBe(true);
-    expect(audienceAllows({ mode: 'contacts' }, 'stranger', contacts)).toBe(false);
+// Each case here is a bypass that WAS exploitable because the service trusted a caller-supplied id.
+describe('StatusService — security regressions', () => {
+  it('refuses to delete a status the caller does not own', async () => {
+    const { svc, repo } = setup();
+    (repo.softDelete as jest.Mock).mockResolvedValue(false); // author-scoped predicate matches nothing
+    await expect(svc.remove('s1', 'attacker')).rejects.toBeInstanceOf(NotFoundError);
+    expect(repo.softDelete).toHaveBeenCalledWith('s1', 'attacker');
   });
-  it('except → contacts minus the list', () => {
-    expect(audienceAllows({ mode: 'except', list: ['bob'] }, 'alice', contacts)).toBe(true);
-    expect(audienceAllows({ mode: 'except', list: ['bob'] }, 'bob', contacts)).toBe(false);
+
+  it('refuses the viewer list to anyone but the author', async () => {
+    const { svc } = setup();
+    await expect(svc.viewers('s1', 'attacker', 50)).rejects.toBeInstanceOf(ForbiddenError);
   });
-  it('only → exactly the list', () => {
-    expect(audienceAllows({ mode: 'only', list: ['carol'] }, 'carol', contacts)).toBe(true);
-    expect(audienceAllows({ mode: 'only', list: ['carol'] }, 'alice', contacts)).toBe(false);
+
+  it('gives the viewer list to the author', async () => {
+    const { svc } = setup();
+    await expect(svc.viewers('s1', 'author', 50)).resolves.toEqual({
+      viewers: [{ viewerId: 'alice', viewedAt: '2026-08-22T01:00:00.000Z' }],
+      nextCursor: null,
+    });
+  });
+
+  it('denies a non-contact reading an author feed', async () => {
+    const { svc } = setup({ rel: { isContact: false, isBlocked: false } });
+    await expect(svc.feedOf('author', 'stranger')).resolves.toEqual([]);
+  });
+
+  it('denies a blocked viewer on view, react and feed', async () => {
+    const blocked = { isContact: true, isBlocked: true };
+    const a = setup({ rel: blocked });
+    await expect(a.svc.view('s1', 'v')).rejects.toBeInstanceOf(ForbiddenError);
+    const b = setup({ rel: blocked });
+    await expect(b.svc.react('s1', 'v', '👍')).rejects.toBeInstanceOf(ForbiddenError);
+    const c = setup({ rel: blocked });
+    await expect(c.svc.feedOf('author', 'v')).resolves.toEqual([]);
+  });
+
+  it('denies when the social graph cannot be reached (fail closed)', async () => {
+    const { svc } = setup({ rel: { isContact: false, isBlocked: true } });
+    await expect(svc.view('s1', 'v')).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('404s on an expired or missing status rather than leaking existence', async () => {
+    const { svc } = setup({ post: null });
+    await expect(svc.view('gone', 'v')).rejects.toBeInstanceOf(NotFoundError);
+    await expect(svc.react('gone', 'v', '👍')).rejects.toBeInstanceOf(NotFoundError);
+    await expect(svc.viewers('gone', 'author', 50)).rejects.toBeInstanceOf(NotFoundError);
   });
 });
 
-describe('StatusService (§B8/§C11)', () => {
-  it('resolves the audience from contacts and emits status.posted', async () => {
+describe('StatusService — posting', () => {
+  it('attributes the status to the acting account, not to any supplied field', async () => {
     const { svc, events } = setup();
-    const res = await svc.post({
-      userId: 'author',
-      kind: 'text',
-      text: 'ciphertext',
-      audience: { mode: 'except', list: ['bob'] },
-      contacts: ['alice', 'bob', 'carol'],
-    });
-    expect(res.audience.sort()).toEqual(['alice', 'carol']); // bob excluded
+    const res = await svc.post('acting-author', { kind: 'text', text: 'ciphertext' });
+    expect(res.statusId).toBeDefined();
     expect(events.statusPosted).toHaveBeenCalledWith(
       res.statusId,
-      'author',
+      'acting-author',
       'text',
-      expect.arrayContaining(['alice', 'carol']),
       res.expiresAt,
     );
   });
 
-  it('blocks a view from outside the audience', async () => {
-    const { svc } = setup();
-    await expect(svc.view('s1', 'stranger')).rejects.toBeInstanceOf(ForbiddenError);
-  });
-
-  it('records a view for an audience member', async () => {
+  it('stores the audience RULE, not a materialised member list', async () => {
     const { svc, repo } = setup();
-    await svc.view('s1', 'alice');
-    expect(repo.recordView).toHaveBeenCalledWith('s1', 'alice');
+    await svc.post('author', {
+      kind: 'text',
+      text: 'ciphertext',
+      audience: { mode: 'except', list: ['bob'] },
+    });
+    const stored = (repo.create as jest.Mock).mock.calls[0][1];
+    expect(stored.audience).toEqual({ mode: 'except', list: ['bob'] });
   });
 
-  it('only the author can see the viewer list', async () => {
+  it('sets a 24h server-authoritative expiry', async () => {
     const { svc } = setup();
-    await expect(svc.viewers('s1', 'alice')).rejects.toBeInstanceOf(ForbiddenError);
-    await expect(svc.viewers('s1', 'author')).resolves.toEqual([
-      { viewerId: 'alice', viewedAt: 't' },
-    ]);
+    const before = Date.now();
+    const res = await svc.post('author', { kind: 'text', text: 'ciphertext' });
+    const ttl = new Date(res.expiresAt).getTime() - before;
+    expect(ttl).toBeGreaterThan(23 * 3600_000);
+    expect(ttl).toBeLessThanOrEqual(24 * 3600_000 + 5_000);
   });
 
-  it('404 on viewing an expired/missing status', async () => {
-    const { svc, repo } = setup();
-    (repo.findActive as jest.Mock).mockResolvedValueOnce(null);
-    await expect(svc.view('gone', 'alice')).rejects.toBeInstanceOf(NotFoundError);
+  // The E2EE boundary: content must not reach the event bus, its consumers, or a replay.
+  it('never puts status content in the emitted event', async () => {
+    const { svc, events } = setup();
+    await svc.post('author', { kind: 'text', text: 'SECRET', caption: 'ALSO SECRET' });
+    const serialised = JSON.stringify((events.statusPosted as jest.Mock).mock.calls[0]);
+    expect(serialised).not.toContain('SECRET');
+  });
+
+  it('records a view for an allowed viewer and skips it for the author', async () => {
+    const allowed = setup();
+    await allowed.svc.view('s1', 'viewer');
+    expect(allowed.repo.recordView).toHaveBeenCalledWith('s1', 'viewer');
+
+    const own = setup();
+    await own.svc.view('s1', 'author');
+    expect(own.repo.recordView).not.toHaveBeenCalled();
   });
 });

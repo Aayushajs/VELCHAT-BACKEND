@@ -2,7 +2,9 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    # dev is the Render environment and main is Azure, so both deploy from a push and both must be
+    # verified first. Pull requests are covered regardless of target branch.
+    branches: [main, dev]
   pull_request:
 
 permissions:
@@ -80,3 +82,43 @@ jobs:
           path: sbom.cdx.json
       # Image build (Buildah/Kaniko) + cosign signing run in the release workflow once a
       # registry is configured (P0); keyless signing uses the id-token permission above.
+
+  images:
+    name: docker build validation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # Cheap, and it covers all seven Dockerfiles. The real build below only exercises one of
+      # them, so this is what catches a typo in the six it does not build.
+      - name: Lint every Dockerfile
+        run: |
+          set -euo pipefail
+          status=0
+          for f in docker/*.Dockerfile; do
+            echo "::group::hadolint $f"
+            docker run --rm -i -v "$PWD:/w" -w /w hadolint/hadolint:latest-alpine \
+              hadolint --failure-threshold error "$f" || status=1
+            echo "::endgroup::"
+          done
+          exit $status
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Builds ONE image rather than all seven. The seven Dockerfiles differ only in WORKDIR,
+      # EXPOSE and CMD; the expensive, breakable part — `pnpm install` + `pnpm -r build` over the
+      # whole monorepo — is identical in each, and velchat-mono exercises it most completely
+      # because it mounts every feature group. Building all seven here would spend roughly seven
+      # times the Actions minutes to re-prove the same thing on every pull request. The release
+      # workflow does build and publish all seven on merge.
+      - name: Build velchat-mono (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/velchat-mono.Dockerfile
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha,scope=velchat-mono
+          cache-to: type=gha,mode=max,scope=velchat-mono

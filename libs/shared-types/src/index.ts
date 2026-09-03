@@ -233,9 +233,20 @@ export interface StatusPostedPayload {
   status_id: string;
   user_id: AccountId;
   kind: 'text' | 'image' | 'video' | 'voice';
-  /** Audience account_ids the post is visible to (resolved server-side from the audience rule). */
-  audience: AccountId[];
+  /**
+   * Legacy: the audience account_ids materialised at post time. No longer emitted — the audience is
+   * a RULE evaluated live against the social graph, and shipping a member list on the bus was
+   * metadata no consumer needed. Kept optional so the change stays additive for any consumer that
+   * still reads historical events.
+   */
+  audience?: AccountId[];
   expires_at: Iso8601;
+}
+
+/** A status reached its 24h TTL and is no longer readable (§B8). Carries no content. */
+export interface StatusExpiredPayload {
+  status_id: string;
+  user_id: AccountId;
 }
 
 export interface PresenceChangedPayload {
@@ -310,6 +321,7 @@ export interface EventPayloads {
   'file.uploaded': FileUploadedPayload;
   'file.deleted': FileDeletedPayload;
   'status.posted': StatusPostedPayload;
+  'status.expired': StatusExpiredPayload;
   'org.created': OrgCreatedPayload;
   'member.added': MemberAddedPayload;
   'contact.added': ContactAddedPayload;

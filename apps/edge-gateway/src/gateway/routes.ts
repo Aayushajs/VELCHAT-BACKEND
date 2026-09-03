@@ -37,7 +37,11 @@ export const ROUTES: Route[] = [
   R(/^\/conversations(\/|$)/, 'CHAT', 3004),
   R(/^\/(chat|polls|messages)(\/|$)/, 'CHAT', 3004),
   R(/^\/(groups|channels|communities|broadcasts)(\/|$)/, 'GROUP_CHANNEL', 3005),
-  R(/^\/(presence|status)(\/|$)/, 'PRESENCE', 3006),
+  R(/^\/presence(\/|$)/, 'PRESENCE', 3006),
+  // Stories are owned by feature-status, mounted in the CONTENT group — not realtime. The
+  // combined presence|status rule sent these to realtime, where no StatusController exists,
+  // so the whole API 404'd under axis6/full13 and only worked under mono.
+  R(/^\/status(\/|$)/, 'STATUS', 3008),
   R(/^\/(notifications|mail)(\/|$)/, 'NOTIFICATION', 3007),
   R(/^\/(media|backups)(\/|$)/, 'MEDIA', 3008),
   R(/^\/search(\/|$)/, 'SEARCH', 3009),

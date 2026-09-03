@@ -11,7 +11,8 @@
     "test:livekit": "node test-livekit.mjs",
     "test:otp": "node test-otp.mjs",
     "upload:logo": "node upload-logo.mjs",
-    "test:all": "node check-integrations.mjs && node test-mail.mjs && node test-push.mjs && node test-livekit.mjs"
+    "test:all": "node check-integrations.mjs && node test-mail.mjs && node test-push.mjs && node test-livekit.mjs",
+    "vm": "node vm.mjs"
   },
   "dependencies": {
     "@velchat/common": "workspace:*",

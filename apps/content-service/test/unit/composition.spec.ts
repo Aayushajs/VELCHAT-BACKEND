@@ -46,8 +46,12 @@ describe('content-service composition root', () => {
 
   it('opens exactly the datastores it declared', () => {
     const { lifecycle } = build();
+    // Valkey is here for status rate limiting, and object storage arrives through the pipeline.
+    // The constraint this guards runs the other way round: it is REALTIME that must never grow a
+    // Postgres pool, because that process holds every live WebSocket and would drop them on a
+    // content deploy. Adding Valkey to content costs a connection, not a blast radius.
     expect([...(lifecycle?.resourceNames ?? [])].sort()).toEqual(
-      ['event-bus:redis-streams', 'pipeline', 'postgres'].sort(),
+      ['event-bus:redis-streams', 'pipeline', 'postgres', 'valkey'].sort(),
     );
   });
 });

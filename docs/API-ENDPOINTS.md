@@ -65,15 +65,32 @@ Last updated: **2026-07-05**.
 | POST | `/conversations/dm` · `/groups` · `/channels` | Create DM / group / channel |
 | POST/DELETE/GET | `/conversations/:id/members[/:userId]` | Membership |
 
-## realtime-service — `/presence`, `/status` (§B8)
+## realtime-service — `/presence` (§B8)
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/presence/{online,offline,heartbeat,subscribe}` | Presence lifecycle + fan-out |
-| PUT | `/presence/status` | Rich status |
+| PUT | `/presence/status` | Rich status (Teams-style availability — NOT stories) |
 | GET | `/presence/:userId` | Resolve presence |
-| POST | `/status` · `/status/:id/{view,reactions}` | Stories: post / view / react |
-| GET | `/status/:id/viewers` · `/status/feed/:authorId` | Viewers + audience feed |
-| DELETE | `/status/:id` | Delete a status |
+
+## content-service — `/status` (§B8/§C11)
+Stories are Postgres-backed and owned by the content group, not realtime. (This table previously
+listed them under realtime-service, matching a routing defect that made the whole API 404 under the
+default profile.)
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/status` | Post a status. 24h server-set expiry |
+| POST | `/status/:id/view` | Record a view (idempotent, audience-checked) |
+| POST | `/status/:id/reactions` | React with an emoji |
+| GET | `/status/:id/viewers?limit=&after=` | Viewer list — author only, cursor-paginated |
+| GET | `/status/feed/:authorId` | An author'"'"'s active statuses visible to the caller |
+| DELETE | `/status/:id` | Soft-delete a status (author only) |
+
+> Every `/status` endpoint derives the acting account from the verified access token. The former
+> `userId` / `viewerId` / `requesterId` parameters are gone — they let any caller act as another
+> account. Paths are unchanged, and because the global ValidationPipe runs with
+> `forbidNonWhitelisted`, a client still sending them now gets a 400 rather than silent acceptance.
+> See [status/SECURITY.md](status/SECURITY.md).
 
 ## messaging-service — `/notifications`, `/mail/campaigns` (§B10/§A19)
 | Method | Path | Purpose |

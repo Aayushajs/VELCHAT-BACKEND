@@ -59,3 +59,12 @@ deploy/*/.env
 
 # Shared local dev JWT keypair (generated on first run; never used in production)
 .velchat-dev-keys/
+
+# SSH private keys have no extension, so *.pem / *.key above do not catch them.
+id_rsa
+id_ed25519
+id_ecdsa
+*_key
+!*_key.pub
+# Machine-specific VM control overrides (resource group, key path)
+deploy/*/.vmrc

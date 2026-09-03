@@ -1,53 +1,317 @@
 name: release
 
-# Automated versioning for the monorepo via Changesets — versions ONLY the packages that changed.
-# On push to main: if unreleased changesets exist, opens a "Version Packages" PR; when that PR
-# merges, creates git tags + GitHub Releases. No npm publish (packages are private). ci.yml is
-# untouched; this workflow only handles versioning/releases.
+# Merge to main → version → images → tag + GitHub Release → deploy.
+#
+# The version is derived from Conventional Commits, so a merge produces a release with no second
+# PR to approve. (This replaced a Changesets flow, which needed a "Version Packages" PR merged
+# before any tag appeared — correct for publishing many npm packages, but this repo publishes
+# container images from one repo-wide version, so the extra round trip bought nothing.)
+#
+# Ordering is deliberate: images are built and pushed BEFORE the tag exists. A build that fails
+# therefore leaves no tag and no release, so a tag in this repo always denotes something that
+# actually built.
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Image platforms (default amd64 only — see the note in the images job)'
+        required: false
+        default: 'linux/amd64'
 
-# changesets/action needs to open the version PR + create tags/releases.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: false
+  group: release-main
+  cancel-in-progress: false # never cancel a half-published release
+
+env:
+  # GHCR namespaces by repository OWNER, and the path must be lowercase.
+  REGISTRY: ghcr.io
 
 jobs:
-  release:
-    name: changesets
+  version:
+    name: next version
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.semver.outputs.version }}
+      tag: ${{ steps.semver.outputs.tag }}
+      bump: ${{ steps.semver.outputs.bump }}
+      owner: ${{ steps.owner.outputs.lc }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # full history + tags so Changesets computes bumps correctly
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Create Version PR / tag + release
-        if: ${{ secrets.CHANGESETS_GITHUB_TOKEN != '' }}
-        uses: changesets/action@v1
-        with:
-          version: pnpm changeset:version
-          # Private monorepo → no npm publish; tag packages so the action cuts GitHub Releases.
-          publish: pnpm changeset:tag
-          commit: 'chore(release): version packages'
-          title: 'chore(release): version packages'
-        env:
-          # This repository disallows PR creation with the default workflow token.
-          # Use a PAT in `CHANGESETS_GITHUB_TOKEN` (repo scope) for the Changesets action.
-          GITHUB_TOKEN: ${{ secrets.CHANGESETS_GITHUB_TOKEN }}
-      - name: Skip Changesets (missing PAT)
-        if: ${{ secrets.CHANGESETS_GITHUB_TOKEN == '' }}
+          fetch-depth: 0 # full history + tags, or the commit range below is wrong
+
+      - id: owner
+        run: echo "lc=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - id: semver
+        name: Derive the next version from Conventional Commits
         run: |
-          echo "::notice::Skipping changesets release: CHANGESETS_GITHUB_TOKEN is not set, and secrets.GITHUB_TOKEN cannot create PRs in this repository."
+          set -euo pipefail
+          git fetch --tags --force --quiet
+
+          LAST=$(git tag -l 'v*' --sort=-v:refname | head -n1 || true)
+          if [ -z "$LAST" ]; then
+            # No tag yet: seed from the root package.json so the first release cannot land BEHIND
+            # the version the repo already advertises.
+            BASE=$(node -p "require('./package.json').version")
+            RANGE=""
+            echo "No existing tag; seeding from package.json ($BASE)"
+          else
+            BASE="${LAST#v}"
+            RANGE="${LAST}..HEAD"
+            echo "Last tag $LAST; scanning $RANGE"
+          fi
+
+          SUBJECTS=$(git log --no-merges --format='%s' ${RANGE} || true)
+          BODIES=$(git log --no-merges --format='%B' ${RANGE} || true)
+
+          BUMP=none
+          if printf '%s\n' "$BODIES" | grep -qE '^BREAKING[ -]CHANGE:'; then
+            BUMP=major
+          elif printf '%s\n' "$SUBJECTS" | grep -qE '^[a-zA-Z]+(\([^)]*\))?!:'; then
+            BUMP=major
+          elif printf '%s\n' "$SUBJECTS" | grep -qE '^feat(\([^)]*\))?:'; then
+            BUMP=minor
+          elif printf '%s\n' "$SUBJECTS" | grep -qE '^(fix|perf|revert)(\([^)]*\))?:'; then
+            BUMP=patch
+          fi
+
+          MAJOR="${BASE%%.*}"; REST="${BASE#*.}"; MINOR="${REST%%.*}"; PATCH="${REST#*.}"
+          PATCH="${PATCH%%-*}"
+
+          # Pre-1.0 guard: while the major is 0 the API is not declared stable, so a breaking
+          # change bumps the MINOR (0.4.1 -> 0.5.0). Without this a stray "feat!:" would declare
+          # 1.0.0 by accident, which is not a decision a commit message should be able to make.
+          if [ "$BUMP" = "major" ] && [ "$MAJOR" -eq 0 ]; then
+            echo "::notice::pre-1.0: breaking change treated as a minor bump. Tag v1.0.0 by hand when ready."
+            BUMP=minor
+          fi
+
+          case "$BUMP" in
+            major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR+1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH+1)) ;;
+            none)  echo "::notice::No feat/fix/breaking commits since ${LAST:-repo start} — nothing to release." ;;
+          esac
+
+          VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          {
+            echo "bump=$BUMP"
+            echo "version=$VERSION"
+            echo "tag=v$VERSION"
+          } >> "$GITHUB_OUTPUT"
+          echo "### Release: $BUMP -> v$VERSION" >> "$GITHUB_STEP_SUMMARY"
+
+  images:
+    name: image ${{ matrix.service }}
+    needs: version
+    if: needs.version.outputs.bump != 'none'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write # cosign keyless (OIDC)
+      attestations: write
+    strategy:
+      fail-fast: false # one bad service should not hide the state of the other six
+      matrix:
+        service:
+          - edge-gateway
+          - identity-service
+          - messaging-service
+          - realtime-service
+          - content-service
+          - platform-service
+          - velchat-mono
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/${{ matrix.service }}.Dockerfile
+          # amd64 only by default. arm64 has to run under QEMU here, which roughly triples build
+          # time for a full pnpm monorepo across seven images — real Actions minutes for an
+          # architecture the current deploy target (Azure B1S) does not use. Re-run this workflow
+          # from the Actions tab with platforms=linux/amd64,linux/arm64 when publishing for
+          # Oracle A1 / AWS Graviton / Azure B2pts.
+          platforms: ${{ inputs.platforms || 'linux/amd64' }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ needs.version.outputs.owner }}/velchat-${{ matrix.service }}:${{ needs.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ needs.version.outputs.owner }}/velchat-${{ matrix.service }}:sha-${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ needs.version.outputs.owner }}/velchat-${{ matrix.service }}:latest
+          # BuildKit emits both and attaches them to the image in the registry, so provenance and
+          # the dependency list travel WITH the artifact instead of living in a CI log.
+          sbom: true
+          provenance: mode=max
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.version.outputs.version }}
+            org.opencontainers.image.licenses=AGPL-3.0-or-later
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Sign the image (keyless)
+        # Signs the DIGEST, not a tag: a tag can be repointed at different bytes later, a digest
+        # cannot, so the signature stays bound to exactly what was scanned here.
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ needs.version.outputs.owner }}/velchat-${{ matrix.service }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ needs.version.outputs.owner }}/velchat-${{ matrix.service }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+      - name: Trivy scan the built image
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ needs.version.outputs.owner }}/velchat-${{ matrix.service }}@${{ steps.build.outputs.digest }}
+          severity: CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+
+  publish:
+    name: tag + GitHub Release
+    needs: [version, images]
+    if: needs.version.outputs.bump != 'none'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the tag and the release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create the tag
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "${TAG}"
+          git push origin "${TAG}"
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: ${{ needs.version.outputs.tag }}
+          generate_release_notes: true
+          body: |
+            Container images for `${{ needs.version.outputs.version }}` — signed with cosign, each carrying an SBOM and build provenance.
+
+            Pull:
+
+            ```
+            ghcr.io/${{ needs.version.outputs.owner }}/velchat-velchat-mono:${{ needs.version.outputs.version }}
+            ghcr.io/${{ needs.version.outputs.owner }}/velchat-edge-gateway:${{ needs.version.outputs.version }}
+            ghcr.io/${{ needs.version.outputs.owner }}/velchat-identity-service:${{ needs.version.outputs.version }}
+            ghcr.io/${{ needs.version.outputs.owner }}/velchat-messaging-service:${{ needs.version.outputs.version }}
+            ghcr.io/${{ needs.version.outputs.owner }}/velchat-realtime-service:${{ needs.version.outputs.version }}
+            ghcr.io/${{ needs.version.outputs.owner }}/velchat-content-service:${{ needs.version.outputs.version }}
+            ghcr.io/${{ needs.version.outputs.owner }}/velchat-platform-service:${{ needs.version.outputs.version }}
+            ```
+
+            Verify a signature before trusting an image:
+
+            ```bash
+            cosign verify ghcr.io/${{ needs.version.outputs.owner }}/velchat-velchat-mono:${{ needs.version.outputs.version }} \
+              --certificate-identity-regexp "^https://github.com/${{ github.repository }}/" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com
+            ```
+
+  deploy:
+    name: deploy to Azure
+    needs: [version, images, publish]
+    if: needs.version.outputs.bump != 'none'
+    runs-on: ubuntu-latest
+    # Gives the deploy its own secret scope, and is the hook for manual approval: add a required
+    # reviewer to this environment in Settings -> Environments and every deploy waits for a human.
+    # Left ungated by default so a merge reaches the VM on its own.
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy over SSH
+        # Written out rather than delegated to a marketplace action: this step holds the key to the
+        # production host, and the repo already prefers auditable, pinned supply chains.
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          if [ -n "${SSH_HOST_KEY:-}" ]; then
+            printf '%s\n' "$SSH_HOST_KEY" > ~/.ssh/known_hosts
+          else
+            echo "::warning::AZURE_SSH_HOST_KEY is not set — trusting the host on first sight. Set it to pin the host and defeat MITM."
+            ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          fi
+
+          # Ship only the compose file and the edge config. The .env stays on the VM and never
+          # enters CI, so database URLs and the internal secret are never exposed to a workflow run.
+          #
+          # The repo's directory layout is mirrored on the box because compose.yml mounts
+          # ../shared/Caddyfile — a path relative to its own directory. Flattening both into the
+          # home directory makes that resolve to /home/shared, and Caddy refuses to start.
+          ssh -p "${PORT:-22}" "$SSH_USER@$HOST" 'mkdir -p ~/velchat-deploy/azure ~/velchat-deploy/shared'
+          scp -P "${PORT:-22}" deploy/azure/compose.yml "$SSH_USER@$HOST:~/velchat-deploy/azure/compose.yml"
+          scp -P "${PORT:-22}" deploy/shared/Caddyfile "$SSH_USER@$HOST:~/velchat-deploy/shared/Caddyfile"
+
+          ssh -p "${PORT:-22}" "$SSH_USER@$HOST" \
+            "GHCR_USER='$GHCR_USER' GHCR_TOKEN='$GHCR_TOKEN' TAG='$VERSION' bash -s" <<'REMOTE'
+          set -euo pipefail
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+          # compose.yml also declares env_file: [./.env], resolved next to itself.
+          ln -sf ~/velchat.env ~/velchat-deploy/azure/.env
+          export TAG
+          docker compose -f ~/velchat-deploy/azure/compose.yml --env-file ~/velchat.env pull
+          docker compose -f ~/velchat-deploy/azure/compose.yml --env-file ~/velchat.env up -d --remove-orphans
+          docker image prune -f   # a 1 GB box fills up fast otherwise
+          docker logout ghcr.io
+          REMOTE
+        env:
+          SSH_KEY: ${{ secrets.AZURE_SSH_KEY }}
+          SSH_HOST_KEY: ${{ secrets.AZURE_SSH_HOST_KEY }}
+          HOST: ${{ secrets.AZURE_HOST }}
+          SSH_USER: ${{ secrets.AZURE_USER }}
+          PORT: ${{ secrets.AZURE_SSH_PORT }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+
+      - name: Smoke check
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 10); do
+            if curl -fsS --max-time 10 "${URL}/health" > /dev/null; then
+              echo "healthy after ${i} attempt(s)"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::${URL}/health did not come up. The previous containers may still be serving — check the VM."
+          exit 1
+        env:
+          URL: ${{ secrets.AZURE_PUBLIC_URL }}
