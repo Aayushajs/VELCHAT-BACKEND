@@ -247,8 +247,11 @@ jobs:
     runs-on: ubuntu-latest
     # Gives the deploy its own secret scope, and is the hook for manual approval: add a required
     # reviewer to this environment in Settings -> Environments and every deploy waits for a human.
-    # Left ungated by default so a merge reaches the VM on its own.
-    environment: production
+    # Left ungated by default so a merge reaches the VM on its own. The url makes the repo's
+    # Deployments sidebar link straight at the running box.
+    environment:
+      name: production
+      url: ${{ secrets.AZURE_PUBLIC_URL }}
     steps:
       - uses: actions/checkout@v4
 
