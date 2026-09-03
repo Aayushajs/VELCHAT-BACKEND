@@ -2,7 +2,7 @@
 # Same image the compose deployment runs; only the orchestrator differs.
 name: edge-gateway
 image:
-  repository: ghcr.io/aayushajs/velchat-edge-gateway
+  repository: ghcr.io/velcart/velchat-edge-gateway
   tag: latest
 service:
   port: 3001

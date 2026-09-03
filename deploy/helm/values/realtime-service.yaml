@@ -2,7 +2,7 @@
 # Same image the compose deployment runs; only the orchestrator differs.
 name: realtime-service
 image:
-  repository: ghcr.io/aayushajs/velchat-realtime-service
+  repository: ghcr.io/velcart/velchat-realtime-service
   tag: latest
 service:
   port: 3006

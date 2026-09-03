@@ -2,7 +2,7 @@
 # Same image the compose deployment runs; only the orchestrator differs.
 name: content-service
 image:
-  repository: ghcr.io/aayushajs/velchat-content-service
+  repository: ghcr.io/velcart/velchat-content-service
   tag: latest
 service:
   port: 3008

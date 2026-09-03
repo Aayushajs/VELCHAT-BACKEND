@@ -29,7 +29,7 @@ services:
     deploy: { resources: { limits: { memory: 64M } } }
 
   velchat-mono:
-    image: ghcr.io/aayushajs/velchat-velchat-mono:${TAG:-latest}
+    image: ${IMAGE_REPO:-ghcr.io/velcart}/velchat-velchat-mono:${TAG:-latest}
     restart: always
     env_file: [./.env]
     environment:
