@@ -119,13 +119,28 @@ function ssh(remoteCmd, { interactive = false } = {}) {
     ui.fail('No public IP — the VM is probably deallocated. Run:  pnpm vm start');
     process.exit(1);
   }
-  const args = ['-p', CFG.port, '-o', 'StrictHostKeyChecking=accept-new'];
+  // ConnectTimeout so this fails fast instead of hanging for the default ~2 minutes. With
+  // auto-shutdown enabled the box is deallocated most evenings, and a two-minute stall is a bad
+  // way to find that out.
+  const args = [
+    '-p',
+    CFG.port,
+    '-o',
+    'StrictHostKeyChecking=accept-new',
+    '-o',
+    'ConnectTimeout=15',
+  ];
   if (CFG.key) args.push('-i', CFG.key);
   args.push(`${CFG.user}@${ip}`);
   if (remoteCmd) args.push(remoteCmd);
   const r = spawnSync('ssh', args, {
     stdio: interactive ? 'inherit' : ['ignore', 'inherit', 'inherit'],
   });
+  if (r.status === 255) {
+    ui.fail(`cannot reach ${ip}:${CFG.port}`);
+    ui.dim('Most likely the VM is deallocated (auto-shutdown). Start it:  pnpm vm start');
+    ui.dim('If it IS running, check the security group allows 22 from your address.');
+  }
   return r.status ?? 1;
 }
 
