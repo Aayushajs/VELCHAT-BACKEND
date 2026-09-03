@@ -15,7 +15,10 @@ COPY . .
 # than silently resolve different versions — we sign these images and publish an SBOM for them,
 # and both are meaningless if the dependency graph can drift at build time.
 RUN pnpm install --frozen-lockfile
-RUN pnpm -r build
+# turbo, not `pnpm -r build`: turbo.json declares dependsOn ^build, so libraries build before the
+# packages that import them. `pnpm -r` got the order wrong on a clean tree and failed on the first
+# cross-library import, which never showed up locally because dist/ was already populated.
+RUN pnpm build
 
 FROM node:22-alpine AS runtime
 RUN corepack enable

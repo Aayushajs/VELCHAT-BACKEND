@@ -15,7 +15,7 @@ Two threads are in flight. One is finished, one is partly done.
 | Thread | State |
 | --- | --- |
 | Status/Stories Phase 1 — security & reachability | **Complete.** All 12 planned tasks done. |
-| CI/CD + deployment | **Written, never executed.** Docker was unavailable locally, so the first CI run is the first real test. |
+| CI/CD + deployment | **Images verified locally; workflows not yet run.** The `velchat-mono` image builds, boots and passes its healthcheck. GHCR push, signing and the SSH deploy are still unproven. |
 
 Repo gates are green as of the last commit: `pnpm typecheck` 62/62, `pnpm build` 34/34,
 `pnpm test` 58/58, lint clean apart from two pre-existing `no-non-null-assertion` warnings in
@@ -99,9 +99,15 @@ See `docs/CI-CD.md` for the full runbook. In short: `dev` → Render (builds fro
 `main` → Azure (versioned, signed images from GHCR). Version is derived from Conventional Commits,
 so a merge cuts a release with no second PR.
 
-**Nothing here has run yet.** Docker was unavailable on the development machine, so the workflows
-and the new `docker/velchat-mono.Dockerfile` have never been executed. Expect the first run to need
-fixing, and treat a first-run failure as ordinary rather than as evidence of a deeper problem.
+**Partly proven.** Building `velchat-mono` locally exposed three defects that are now fixed: all
+seven Dockerfiles ran `pnpm -r build` instead of the repo's own `turbo run build`, which got the
+order wrong on a clean tree; `.dockerignore` let `tsconfig.tsbuildinfo` into the image while
+excluding `dist`, so `tsc` skipped emitting for `@velchat/crypto` and `@velchat/feature-contracts`
+and everything importing them failed; and `--frozen-lockfile` is now used everywhere, verified
+rather than assumed. The image builds, boots, serves `/health` and reports `healthy`.
+
+The workflows themselves have still never run. GHCR push, cosign signing and the SSH deploy are
+unproven, so treat a first-run failure there as ordinary.
 
 ### Before the first deploy can work
 
@@ -127,10 +133,6 @@ the work above.
 - **Spec files are type-checked by nothing.** Every package's `tsconfig.json` excludes
   `**/*.spec.ts` and ts-jest runs transpile-only, so a type error in a test only surfaces at
   runtime.
-- **Six Dockerfiles use `pnpm install --frozen-lockfile=false`,** which lets the dependency graph
-  drift at build time. We sign these images and publish an SBOM for them; both assume the opposite.
-  `docker/velchat-mono.Dockerfile` uses `--frozen-lockfile` — the other six should follow, ideally
-  once CI has proven the lockfile is clean.
 - **Each image rebuilds the whole monorepo.** One shared base image with seven thin images on top
   would cut release build time roughly sevenfold.
 - **`UPSTREAM_STATUS` is undocumented** in the env contract. Harmless under `axis6`; a `full13`

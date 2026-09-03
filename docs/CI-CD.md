@@ -184,12 +184,31 @@ newer schema. That is what makes a rollback safe without a database restore.
 
 ---
 
+## Verified locally
+
+`velchat-mono` was built and run before any of this shipped, which turned up three real defects
+that no amount of review would have caught:
+
+1. Every Dockerfile ran `pnpm -r build`, which got the build order wrong on a clean tree. The repo's
+   own root script is `turbo run build`, and `turbo.json` declares `dependsOn: ["^build"]`, so
+   turbo builds a library before whatever imports it. All seven now run `pnpm build`.
+2. `.dockerignore` excluded `**/dist` but **not** `tsconfig.tsbuildinfo`. Since
+   `tsconfig.base.json` sets `"incremental": true`, the stale build state told `tsc` everything was
+   already emitted while no output existed, so `@velchat/crypto` and `@velchat/feature-contracts`
+   silently produced nothing and every package importing them failed to resolve. Build state must
+   never enter an image; it is excluded now.
+3. `--frozen-lockfile` was proven safe rather than assumed — the install step succeeds, so all
+   seven Dockerfiles now use it and the images are reproducible.
+
+The result builds (exit 0), boots, serves `/health`, and the container's `HEALTHCHECK` reports
+`healthy`. What is still unproven is everything that needs GitHub: the workflows themselves, GHCR
+push, cosign signing, and the SSH deploy.
+
 ## Known gaps
 
-- **Image builds are not reproducible across the seven Dockerfiles.** Six of them run
-  `pnpm install --frozen-lockfile=false`, which allows the dependency graph to drift at build time.
-  Signing an image and publishing an SBOM for it both assume the opposite.
-  `docker/velchat-mono.Dockerfile` uses `--frozen-lockfile`; the other six should follow.
+- **Only `velchat-mono` has actually been built.** The other six Dockerfiles received the same
+  two fixes and are structurally identical, but have not been run. The release workflow builds all
+  seven, so the first release is where they get proven.
 - **Each image rebuilds the whole monorepo.** A shared base image carrying one `pnpm -r build`,
   with seven thin images on top, would cut release build time by roughly seven times. The matrix
   runs in parallel so wall-clock is acceptable today, but it is seven times the Actions minutes.

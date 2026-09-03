@@ -10,3 +10,10 @@
 deploy
 infra
 docs
+
+# Incremental-build state. tsconfig.base.json sets "incremental": true, so each package writes a
+# tsconfig.tsbuildinfo recording what it already emitted. Copying that into an image while **/dist
+# is excluded tells tsc everything is up to date when no output exists at all — it emits nothing,
+# dist is never created, and every package importing it fails to resolve. That is what broke the
+# image build for @velchat/crypto and @velchat/feature-contracts.
+**/*.tsbuildinfo
