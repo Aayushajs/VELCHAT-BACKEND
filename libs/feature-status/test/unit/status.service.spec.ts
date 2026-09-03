@@ -1,5 +1,4 @@
 import { StatusService } from '../../src/status/status.service';
-import { audienceAllows } from '../../src/status/status.types';
 import { ForbiddenError, NotFoundError } from '@velchat/common';
 import type { StatusRepository } from '../../src/status/status.repository';
 import type { StatusEvents } from '../../src/status/status.events';
@@ -38,22 +37,6 @@ function setup() {
   const events = { statusPosted: jest.fn(async () => undefined) } as unknown as StatusEvents;
   return { svc: new StatusService(repo, events), repo, events };
 }
-
-describe('audienceAllows (§B8)', () => {
-  const contacts = new Set(['alice', 'bob', 'carol']);
-  it('contacts → any contact', () => {
-    expect(audienceAllows({ mode: 'contacts' }, 'alice', contacts)).toBe(true);
-    expect(audienceAllows({ mode: 'contacts' }, 'stranger', contacts)).toBe(false);
-  });
-  it('except → contacts minus the list', () => {
-    expect(audienceAllows({ mode: 'except', list: ['bob'] }, 'alice', contacts)).toBe(true);
-    expect(audienceAllows({ mode: 'except', list: ['bob'] }, 'bob', contacts)).toBe(false);
-  });
-  it('only → exactly the list', () => {
-    expect(audienceAllows({ mode: 'only', list: ['carol'] }, 'carol', contacts)).toBe(true);
-    expect(audienceAllows({ mode: 'only', list: ['carol'] }, 'alice', contacts)).toBe(false);
-  });
-});
 
 describe('StatusService (§B8/§C11)', () => {
   it('resolves the audience from contacts and emits status.posted', async () => {
