@@ -1,6 +1,6 @@
 {
   "name": "velchat",
-  "version": "0.1.2",
+  "version": "8.0.0",
   "private": true,
   "description": "VelChat — free, OSS, self-hostable WhatsApp + Teams + Slack hybrid (backend monorepo)",
   "license": "AGPL-3.0-or-later",

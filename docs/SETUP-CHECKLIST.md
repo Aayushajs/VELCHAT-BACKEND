@@ -89,11 +89,16 @@ POSTGRES_URL=... pnpm --filter @velchat/migrations migrate
 
 ---
 
-## 4. DNS
+## 4. DNS — not done, and this is the one real gap
 
-Point an `A` record at the VM's public IP **before** the first deploy. Caddy requests the
-certificate on startup, and that request fails if the name does not yet resolve. Set the same name
-as `DOMAIN` in `~/velchat.env`.
+There is no DNS name yet, so `~/velchat.env` carries `DOMAIN=:80` and Caddy serves **plain HTTP**.
+The REST API works over `http://20.219.132.21`, but the mobile client needs `wss://` and will not
+connect until a hostname exists.
+
+Any free name works — DuckDNS gives you `something.duckdns.org` in about two minutes, and
+`20.219.132.21.nip.io` resolves with no signup at all. Point an `A` record at the VM, set `DOMAIN`
+to that name in `~/velchat.env`, and restart. Caddy requests the certificate itself on startup, so
+the name has to resolve **before** the restart or the request fails.
 
 ---
 
@@ -102,12 +107,15 @@ as `DOMAIN` in `~/velchat.env`.
 **Settings → Secrets and variables → Actions.** `GITHUB_TOKEN` is provided automatically and
 already covers pushing to GHCR; everything below is only for the deploy job.
 
+These are all set already, along with the `production` environment and `write` workflow
+permissions. The table is here so the setup can be reproduced, not because it is outstanding.
+
 | Secret | Required | Value |
 | --- | --- | --- |
 | `AZURE_HOST` | yes | the VM's public IP or DNS name |
 | `AZURE_USER` | yes | `azureuser` |
 | `AZURE_SSH_KEY` | yes | the **private** key, full PEM including the BEGIN/END lines |
-| `AZURE_PUBLIC_URL` | yes | `https://<your-domain>`, for the post-deploy health check |
+| `AZURE_PUBLIC_URL` | — | **A repository variable, not a secret.** GitHub rejects the `secrets` context in `environment.url`, and an invalid workflow file fails on every branch. Currently `http://20.219.132.21` |
 | `AZURE_SSH_HOST_KEY` | recommended | output of `ssh-keyscan -H <ip>`; pins the host against MITM |
 | `AZURE_SSH_PORT` | no | defaults to `22` |
 
@@ -131,11 +139,28 @@ on the box once.
 
 ## 7. Render — the dev environment
 
-**New → Blueprint → connect the repo.** It reads `render.yaml`, which pins every service to the
-`dev` branch. Then fill the `velchat-shared` env group with the same database URLs.
+**This still needs doing in the Render dashboard, and until it is done `dev` has no deployment.**
 
-Render free services sleep after ~15 minutes idle, so a cold start there is expected and is not a
-production signal.
+Render is currently connected to the **old 13-service blueprint on `main`**. That is visible in the
+repo's Deployments sidebar as thirteen environments named `main - velchat-api-gateway`,
+`main - velchat-ai-service` and so on — service names that stopped existing at the 6-service
+consolidation. They redeploy on every push to `main`, building a topology the repo no longer has.
+
+`render.yaml` in this repo now describes six services and pins each to `branch: dev`, but Render
+does not re-read a blueprint on its own.
+
+1. Render dashboard → the existing Blueprint → **Sync / re-deploy blueprint** so it picks up the
+   current `render.yaml`.
+2. Delete the thirteen stale services from the old topology.
+3. Fill the `velchat-shared` env group with the same database URLs the VM uses.
+
+Two things worth knowing about how this shows up on GitHub:
+
+- Render names its own environments `<branch> - <service>`, so once it tracks `dev` you will see
+  `dev - velchat-edge-gateway` and friends. It never writes to a `development` environment, so
+  creating one by hand does nothing.
+- Render free services sleep after ~15 minutes idle. A cold start there is expected and is not a
+  production signal.
 
 ---
 
