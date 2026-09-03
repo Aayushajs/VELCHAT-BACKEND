@@ -14,7 +14,7 @@ Two threads are in flight. One is finished, one is partly done.
 
 | Thread | State |
 | --- | --- |
-| Status/Stories Phase 1 — security & reachability | **Core complete.** The exploitable holes are closed. Three planned tasks remain, none security-critical. |
+| Status/Stories Phase 1 — security & reachability | **Complete.** All 12 planned tasks done. |
 | CI/CD + deployment | **Written, never executed.** Docker was unavailable locally, so the first CI run is the first real test. |
 
 Repo gates are green as of the last commit: `pnpm typecheck` 62/62, `pnpm build` 34/34,
@@ -53,21 +53,28 @@ unauthorized. Three findings dominated:
 | `f877b5d` | State-filtered reads, soft delete, cursor-paginated viewers, two-stage expiry queries |
 | `9a4307a` | Service takes the acting identity as a parameter and authorizes live |
 | `86094ad` | Controller uses `@CurrentUser`; composition wires the resolver |
+| `ce1062f` | Expiry worker, per-account rate limits, `docs/status/SECURITY.md`, API-doc correction |
 
 ### Not done
 
-- **Task 8 — expiry worker.** The repository queries exist (`markExpired`, `purgeAfterGrace`) but
-  nothing calls them. **This is not a correctness gap:** reads filter
-  `state = 'active' AND expires_at > now()`, so an expired status is already invisible. The worker
-  is for emitting `status.expired` and reclaiming rows.
-- **Task 10 — rate limiting.** Needs `valkey` added to `contentGroup.need`, which also means
-  updating the datastore assertion in `libs/composition/src/groups.spec.ts`. Do **not** weaken the
-  realtime-group assertion in that file — it is what keeps a Postgres pool out of the process
-  holding every WebSocket.
-- **Task 11 — docs.** `docs/status/SECURITY.md` and correcting the Status entry in
-  `docs/API-ENDPOINTS.md`, which still lists Status under realtime-service.
-- **Phase 2 entirely** — the tray endpoint and its cache, realtime fan-out, the media pipeline,
-  mute/archive, reaction aggregation, idempotent create, load tests.
+**Phase 2, entirely.** None of it is security-critical; Phase 1 closed the exploitable holes.
+
+- The tray endpoint () and its Valkey cache. This is the hottest path in the
+  product and does not exist yet — a client building a tray today must call
+   once per author.
+- Realtime fan-out.  and  are published but **nothing consumes
+  them**, so there is no live ring or live removal.
+- Media pipeline: upload authorization, thumbnails, transcode, view-once blob deletion, and the
+   /  lifecycle states (already allowed by the  CHECK constraint, so no
+  second migration is needed).
+- Mute/archive (,  from §B8 — neither table exists), reaction
+  aggregation and removal, per-status audience update.
+- Idempotent create, load tests, HLD/LLD documents.
+
+A per-viewer cost worth knowing before building the tray: 
+makes **two** upstream calls, and its in-flight coalescing keys on the owner, so it dedupes the
+contacts lookup but not the reverse block probe. Resolving N viewers of one author therefore costs
+ calls. The tray will want either a batch endpoint on the directory or a short-TTL cache.
 
 ### Decisions worth not re-litigating
 
