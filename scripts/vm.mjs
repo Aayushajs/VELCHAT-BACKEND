@@ -172,6 +172,9 @@ function ssh(remoteCmd, { interactive = false } = {}) {
 const compose = (rest) =>
   `docker compose -f ${CFG.composeRemote} --env-file ${CFG.envRemote} ${rest}`;
 
+/** Arguments that follow the command name; assigned once the command is resolved below. */
+let cmdArgs = [];
+
 const commands = {
   async status() {
     requireLogin();
@@ -234,14 +237,14 @@ const commands = {
 
   async logs() {
     if (!CFG.host) requireLogin();
-    const service = process.argv[4] ?? '';
+    const service = cmdArgs[0] ?? '';
     ui.title(`logs ${service || '(all services)'} — Ctrl-C to stop`);
     process.exit(ssh(compose(`logs -f --tail=100 ${service}`)));
   },
 
   async deploy() {
     if (!CFG.host) requireLogin();
-    const tag = process.argv[4];
+    const tag = cmdArgs[0];
     ui.title(`Deploying${tag ? ` tag ${tag}` : ' (tag from the env file)'}`);
     const prefix = tag ? `TAG=${tag} ` : '';
     const code = ssh(
@@ -348,7 +351,13 @@ ${paint(c.dim, 'Requires the Azure CLI and `az login`.')}
   },
 };
 
-const cmd = process.argv[3] ?? process.argv[2];
+// Pick the first argument that names a command, and treat everything after it as that command's
+// arguments. Indexing fixed positions broke `vm deploy 8.1.0`: the tag landed where the command
+// was expected and the script printed help instead of deploying.
+const argv = process.argv.slice(2);
+const cmdIndex = argv.findIndex((a) => Object.prototype.hasOwnProperty.call(commands, a));
+const cmd = cmdIndex === -1 ? 'help' : argv[cmdIndex];
+cmdArgs = cmdIndex === -1 ? [] : argv.slice(cmdIndex + 1);
 const fn = commands[cmd] ?? commands.help;
 fn().catch((err) => {
   ui.fail(String(err?.message ?? err));
