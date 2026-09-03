@@ -2,7 +2,7 @@
 # Same image the compose deployment runs; only the orchestrator differs.
 name: identity-service
 image:
-  repository: ghcr.io/velcart/velchat-identity-service
+  repository: ghcr.io/aayushajs/velchat-identity-service
   tag: latest
 service:
   port: 3002

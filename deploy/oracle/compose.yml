@@ -42,7 +42,7 @@ services:
   # ── the six services ───────────────────────────────────────────────────────────────────────
   edge-gateway:
     <<: *app
-    image: ${IMAGE_REPO:-ghcr.io/velcart}/velchat-edge-gateway:${TAG:-latest}
+    image: ${IMAGE_REPO:-ghcr.io/aayushajs}/velchat-edge-gateway:${TAG:-latest}
     environment:
       SERVICE_NAME: edge-gateway
       HTTP_PORT: 3001
@@ -56,7 +56,7 @@ services:
 
   identity-service:
     <<: *app
-    image: ${IMAGE_REPO:-ghcr.io/velcart}/velchat-identity-service:${TAG:-latest}
+    image: ${IMAGE_REPO:-ghcr.io/aayushajs}/velchat-identity-service:${TAG:-latest}
     environment:
       SERVICE_NAME: identity-service
       HTTP_PORT: 3002
@@ -65,7 +65,7 @@ services:
 
   messaging-service:
     <<: *app
-    image: ${IMAGE_REPO:-ghcr.io/velcart}/velchat-messaging-service:${TAG:-latest}
+    image: ${IMAGE_REPO:-ghcr.io/aayushajs}/velchat-messaging-service:${TAG:-latest}
     environment:
       SERVICE_NAME: messaging-service
       HTTP_PORT: 3004
@@ -80,7 +80,7 @@ services:
   # Highest-priority latency path and the leanest process — Valkey only, no Postgres pool.
   realtime-service:
     <<: *app
-    image: ${IMAGE_REPO:-ghcr.io/velcart}/velchat-realtime-service:${TAG:-latest}
+    image: ${IMAGE_REPO:-ghcr.io/aayushajs}/velchat-realtime-service:${TAG:-latest}
     environment:
       SERVICE_NAME: realtime-service
       HTTP_PORT: 3006
@@ -94,7 +94,7 @@ services:
   # ffmpeg lives here. The CPU cap is what stops a transcode from starving the socket process.
   content-service:
     <<: *app
-    image: ${IMAGE_REPO:-ghcr.io/velcart}/velchat-content-service:${TAG:-latest}
+    image: ${IMAGE_REPO:-ghcr.io/aayushajs}/velchat-content-service:${TAG:-latest}
     environment:
       SERVICE_NAME: content-service
       HTTP_PORT: 3008
@@ -103,7 +103,7 @@ services:
 
   platform-service:
     <<: *app
-    image: ${IMAGE_REPO:-ghcr.io/velcart}/velchat-platform-service:${TAG:-latest}
+    image: ${IMAGE_REPO:-ghcr.io/aayushajs}/velchat-platform-service:${TAG:-latest}
     environment:
       SERVICE_NAME: platform-service
       HTTP_PORT: 3010

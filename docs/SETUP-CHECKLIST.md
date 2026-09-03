@@ -122,7 +122,7 @@ that environment, so adding a reviewer gates every deploy with no workflow chang
 
 ## 6. GHCR — package visibility
 
-The first release creates seven packages under `ghcr.io/velcart/`. They inherit the repository's
+The first release creates seven packages under `ghcr.io/aayushajs/`. They inherit the repository's
 visibility. If the repo is private, the VM needs to authenticate to pull them — the deploy workflow
 does this with `GITHUB_TOKEN`, and `pnpm vm deploy` needs you to have run `docker login ghcr.io`
 on the box once.
@@ -160,8 +160,8 @@ pnpm vm status                       # containers up?
 pnpm vm health                       # /health from inside the box
 curl https://<your-domain>/health    # through Caddy, with TLS
 
-cosign verify ghcr.io/velcart/velchat-velchat-mono:<version> \
-  --certificate-identity-regexp "^https://github.com/VELCART/VELCHAT-BACKEND/" \
+cosign verify ghcr.io/aayushajs/velchat-velchat-mono:<version> \
+  --certificate-identity-regexp "^https://github.com/Aayushajs/VELCHAT-BACKEND/" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 

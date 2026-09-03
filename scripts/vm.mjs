@@ -60,16 +60,41 @@ const CFG = {
   envRemote: env('AZ_ENV_PATH', '~/velchat.env'),
 };
 
+/**
+ * Locate the Azure CLI. A pip --user install (the route that needs no administrator) puts `az`
+ * under the Python user scripts directory, which is not on PATH by default, so fall back to it
+ * rather than telling the user it is missing when it is right there.
+ */
+function azBin() {
+  if (process.env.AZ_BIN) return process.env.AZ_BIN;
+  const home = process.env.USERPROFILE ?? process.env.HOME ?? '';
+  const candidates = [];
+  if (home) {
+    for (const v of ['313', '312', '311', '310']) {
+      candidates.push(
+        resolve(home, 'AppData/Roaming/Python/Python' + v + '/Scripts', 'az.bat'),
+        resolve(home, '.local/bin/az'),
+      );
+    }
+  }
+  for (const c of candidates) if (existsSync(c)) return c;
+  return 'az'; // on PATH, or genuinely absent
+}
+
+const AZ = azBin();
+
 function az(args, { quiet = false } = {}) {
   try {
-    return execFileSync('az', args, {
+    return execFileSync(AZ, args, {
       encoding: 'utf8',
       stdio: quiet ? ['ignore', 'pipe', 'pipe'] : ['ignore', 'pipe', 'inherit'],
       shell: process.platform === 'win32', // az is a .cmd shim on Windows
     }).trim();
   } catch (err) {
     if (err.code === 'ENOENT') {
-      ui.fail('Azure CLI not found. Install it: https://aka.ms/installazurecli');
+      ui.fail('Azure CLI not found. Install it without admin rights:');
+      ui.dim('  python -m pip install --user azure-cli');
+      ui.dim('Or set AZ_BIN in deploy/azure/.vmrc to its full path.');
       process.exit(1);
     }
     throw err;

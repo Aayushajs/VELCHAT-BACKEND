@@ -35,7 +35,7 @@ services:
     deploy: { resources: { limits: { memory: '${CADDY_MEM:-128M}' } } }
 
   velchat-mono:
-    image: '${IMAGE_REPO:-ghcr.io/velcart}/velchat-velchat-mono:${TAG:-latest}'
+    image: '${IMAGE_REPO:-ghcr.io/aayushajs}/velchat-velchat-mono:${TAG:-latest}'
     restart: always
     env_file: [./.env]
     environment:

@@ -79,13 +79,13 @@ its "Version Packages" PR meant a release needed two merges instead of one.
 Published to GHCR, which namespaces by repository **owner**:
 
 ```text
-ghcr.io/velcart/velchat-velchat-mono         ← the 1 GB / Azure target
-ghcr.io/velcart/velchat-edge-gateway
-ghcr.io/velcart/velchat-identity-service
-ghcr.io/velcart/velchat-messaging-service
-ghcr.io/velcart/velchat-realtime-service
-ghcr.io/velcart/velchat-content-service
-ghcr.io/velcart/velchat-platform-service
+ghcr.io/aayushajs/velchat-velchat-mono         ← the 1 GB / Azure target
+ghcr.io/aayushajs/velchat-edge-gateway
+ghcr.io/aayushajs/velchat-identity-service
+ghcr.io/aayushajs/velchat-messaging-service
+ghcr.io/aayushajs/velchat-realtime-service
+ghcr.io/aayushajs/velchat-content-service
+ghcr.io/aayushajs/velchat-platform-service
 ```
 
 Each is pushed with three tags — `<version>`, `sha-<commit>`, and `latest` — and carries an SBOM,
@@ -109,8 +109,8 @@ The signature covers the **digest**, not a tag, so it stays bound to exactly the
 scanned:
 
 ```bash
-cosign verify ghcr.io/velcart/velchat-velchat-mono:0.2.0 \
-  --certificate-identity-regexp "^https://github.com/VELCART/VELCHAT-BACKEND/" \
+cosign verify ghcr.io/aayushajs/velchat-velchat-mono:0.2.0 \
+  --certificate-identity-regexp "^https://github.com/Aayushajs/VELCHAT-BACKEND/" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
@@ -149,7 +149,7 @@ sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2
 sudo usermod -aG docker "$USER" && newgrp docker
 
 # The env file the deploy expects at a fixed path. Fill in the REQUIRED values.
-curl -fsSL https://raw.githubusercontent.com/VELCART/VELCHAT-BACKEND/main/deploy/azure/.env.example \
+curl -fsSL https://raw.githubusercontent.com/Aayushajs/VELCHAT-BACKEND/main/deploy/azure/.env.example \
   -o ~/velchat.env
 nano ~/velchat.env
 ```

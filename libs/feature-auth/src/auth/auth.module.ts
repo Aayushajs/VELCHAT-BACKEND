@@ -34,9 +34,15 @@ export interface AuthModuleDeps {
 export class AuthModule {
   static forRoot(deps: AuthModuleDeps): DynamicModule {
     const repo = new AuthRepository(deps.pg);
+    // From the VALIDATED config, not process.env.JWT_PRIVATE_KEY/JWT_PUBLIC_KEY. Those names are
+    // not in the config schema and nothing sets them, so this always received undefined and fell
+    // through to the dev keypair — in production that meant refusing to boot was impossible (the
+    // guarantee in CLAUDE.md), tokens were re-signed with a fresh key on every restart, and in a
+    // container the fallback died on EACCES trying to mkdir .velchat-dev-keys. ChannelsModule had
+    // the same bug and was already fixed this way; see libs/composition/src/groups.ts.
     const keyPair = loadOrGenerateKeyPair({
-      privatePem: process.env.JWT_PRIVATE_KEY,
-      publicPem: process.env.JWT_PUBLIC_KEY,
+      privatePem: deps.config.JWT_PRIVATE_PEM,
+      publicPem: deps.config.JWT_PUBLIC_PEM,
     });
     const tokens = new TokenService(repo, {
       keyPair,
