@@ -55,9 +55,9 @@ approve.
 
 | Commit | Bump | Example |
 | --- | --- | --- |
-| `fix:` · `perf:` · `revert:` | patch | `0.1.2 → 0.1.3` |
-| `feat:` | minor | `0.1.2 → 0.2.0` |
-| `feat!:` or a `BREAKING CHANGE:` body | major | `1.4.0 → 2.0.0` |
+| `fix:` · `perf:` · `revert:` | patch | `8.0.0 → 8.0.1` |
+| `feat:` | minor | `8.0.0 → 8.1.0` |
+| `feat!:` or a `BREAKING CHANGE:` body | major | `8.0.0 → 9.0.0` |
 | `docs:` · `chore:` · `test:` · `refactor:` · `style:` | none | no release |
 
 **Pre-1.0 guard.** While the major is `0` the API is not declared stable, so a breaking change
@@ -65,8 +65,10 @@ bumps the *minor* (`0.4.1 → 0.5.0`) instead of declaring `1.0.0`. Whether a pr
 decision a human makes, not something a commit message should be able to trigger by accident. Tag
 `v1.0.0` by hand when you mean it, and normal major bumps take over from there.
 
-With no tag in the repository yet, the first version is seeded from the root `package.json` so the
-first release cannot land behind the version the repo already advertises.
+The last `v*` tag is the base. The repository already carried tags up to `v7.0.0` from earlier
+merges, so the first automated release landed on **`v8.0.0`** — not on `0.2.0`, which is what the
+then-stale `package.json` version would have suggested. `package.json` has been brought in line
+with the tag lineage. The `package.json` seed only applies when no `v*` tag exists at all.
 
 This replaced a Changesets flow. Changesets is the right tool for publishing many independently
 versioned npm packages; this repo publishes **container images from one repo-wide version**, and
@@ -184,10 +186,21 @@ newer schema. That is what makes a rollback safe without a database restore.
 
 ---
 
-## Verified locally
+## Verified end to end
 
-`velchat-mono` was built and run before any of this shipped, which turned up three real defects
-that no amount of review would have caught:
+The pipeline has run for real. Merging `dev` into `main` produced **`v8.0.0`**: seven images built
+and pushed to GHCR, signed, scanned, tagged, released, and deployed to the Azure VM, which then
+answered its health check from the public internet.
+
+```
+http://20.219.132.21/health  ->  200  {"status":"ok","service":"velchat-mono", ...}
+```
+
+The box runs `ghcr.io/aayushajs/velchat-velchat-mono:8.0.0`, pulled from the registry by the deploy
+job — not a locally built image.
+
+Getting there surfaced six defects, none of which review had caught, and four of which only appear
+when something actually runs:
 
 1. Every Dockerfile ran `pnpm -r build`, which got the build order wrong on a clean tree. The repo's
    own root script is `turbo run build`, and `turbo.json` declares `dependsOn: ["^build"]`, so
@@ -206,9 +219,9 @@ push, cosign signing, and the SSH deploy.
 
 ## Known gaps
 
-- **Only `velchat-mono` has actually been built.** The other six Dockerfiles received the same
-  two fixes and are structurally identical, but have not been run. The release workflow builds all
-  seven, so the first release is where they get proven.
+- **No TLS.** There is no DNS name yet, so `DOMAIN=:80` and Caddy serves plain HTTP. The REST API
+  works; the mobile client needs `wss://` and will not connect until a hostname exists. Setting
+  `DOMAIN` to a real name is the only change required — Caddy obtains the certificate itself.
 - **Each image rebuilds the whole monorepo.** A shared base image carrying one `pnpm -r build`,
   with seven thin images on top, would cut release build time by roughly seven times. The matrix
   runs in parallel so wall-clock is acceptable today, but it is seven times the Actions minutes.
