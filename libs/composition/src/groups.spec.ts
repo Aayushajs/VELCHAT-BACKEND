@@ -55,6 +55,9 @@ describe('feature groups', () => {
     const need = contentGroup(config, logger).need;
     expect(need).toContain('storage');
     expect(need).not.toContain('mongo');
+    // Valkey is here for status rate limiting. Note the asymmetry with the realtime assertion
+    // above: Valkey in the content process is fine, Postgres in the socket process is not.
+    expect(need).toContain('valkey');
   });
 
   it('gives platform the three stores its features span', () => {

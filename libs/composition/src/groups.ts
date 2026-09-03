@@ -1,5 +1,6 @@
 import type { AppConfig } from '@velchat/config';
 import { resolveInternalSecret } from '@velchat/common';
+import { RateLimiter } from '@velchat/cache';
 import type { Logger } from 'pino';
 import { createPushRouter } from '@velchat/push';
 import { createMailer } from '@velchat/mail';
@@ -181,10 +182,12 @@ const denyAllSocialGraph = (logger: Logger): SocialGraphResolver => {
 /** media + status/stories + E2EE chat backup. The CPU-heavy group (ffmpeg lives here). */
 export const contentGroup = (config: AppConfig, logger: Logger): FeatureGroup => ({
   name: 'content',
-  need: ['postgres', 'storage', 'eventBus'],
+  // valkey joins for status rate limiting. The binding architectural constraint runs the other way
+  // round — REALTIME must stay Valkey-only, so a content deploy can never drop live sockets.
+  need: ['postgres', 'storage', 'valkey', 'eventBus'],
   mount(infra): Mounted {
     const m = emptyMounted();
-    const { postgres, storage, eventBus } = infra;
+    const { postgres, storage, valkey, eventBus } = infra;
 
     if (postgres && storage && eventBus) {
       m.imports.push(MediaModule.forRoot({ logger, pg: postgres, storage, eventBus }));
@@ -201,7 +204,17 @@ export const contentGroup = (config: AppConfig, logger: Logger): FeatureGroup =>
             secret: internalSecret,
           })
         : denyAllSocialGraph(logger);
-      m.imports.push(StatusModule.forRoot({ logger, pg: postgres, eventBus, social }));
+      const status = StatusModule.forRoot({
+        logger,
+        pg: postgres,
+        eventBus,
+        social,
+        // Absent when the profile has no Valkey — status then runs unthrottled rather than refusing
+        // to start, because a quota is not a correctness requirement.
+        throttle: valkey ? { limiter: new RateLimiter(valkey.redis) } : undefined,
+      });
+      m.imports.push(status.module);
+      m.workers.push(status.wiring.worker);
     }
     return m;
   },

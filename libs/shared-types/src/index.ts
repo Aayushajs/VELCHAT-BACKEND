@@ -243,6 +243,12 @@ export interface StatusPostedPayload {
   expires_at: Iso8601;
 }
 
+/** A status reached its 24h TTL and is no longer readable (§B8). Carries no content. */
+export interface StatusExpiredPayload {
+  status_id: string;
+  user_id: AccountId;
+}
+
 export interface PresenceChangedPayload {
   account_id: AccountId;
   status: 'online' | 'offline' | 'away';
@@ -315,6 +321,7 @@ export interface EventPayloads {
   'file.uploaded': FileUploadedPayload;
   'file.deleted': FileDeletedPayload;
   'status.posted': StatusPostedPayload;
+  'status.expired': StatusExpiredPayload;
   'org.created': OrgCreatedPayload;
   'member.added': MemberAddedPayload;
   'contact.added': ContactAddedPayload;

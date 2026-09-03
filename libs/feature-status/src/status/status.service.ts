@@ -1,4 +1,10 @@
-import { uuidv7, ValidationError, NotFoundError, ForbiddenError } from '@velchat/common';
+import {
+  uuidv7,
+  ValidationError,
+  NotFoundError,
+  ForbiddenError,
+  RateLimitError,
+} from '@velchat/common';
 import type { SocialGraphResolver } from '@velchat/feature-contracts';
 import { StatusRepository, type ViewerPage } from './status.repository';
 import { StatusEvents } from './status.events';
@@ -28,6 +34,19 @@ const MAX_VIEWER_PAGE = 100;
 const DEFAULT_VIEWER_PAGE = 50;
 const AUDIENCE_MODES = new Set(['contacts', 'except', 'only']);
 
+/** Structural subset of RateLimiter — kept local so this lib need not depend on @velchat/cache. */
+export interface StatusRateLimiter {
+  allow(key: string, limit: number, windowSec: number): Promise<boolean>;
+}
+
+export interface StatusThrottle {
+  limiter: StatusRateLimiter;
+  limits?: { create?: number; view?: number; react?: number };
+}
+
+const THROTTLE_WINDOW_SEC = 60;
+const DEFAULT_LIMITS = { create: 30, view: 600, react: 120 } as const;
+
 /**
  * Status / stories (§B8 / §C11).
  *
@@ -45,13 +64,37 @@ export class StatusService {
     private readonly repo: StatusRepository,
     private readonly events: StatusEvents,
     private readonly social: SocialGraphResolver,
+    private readonly throttle?: StatusThrottle,
   ) {}
+
+  /**
+   * Abuse control, NOT authorization — so it fails OPEN. A Valkey outage must not stop people
+   * posting. requireVisible fails closed instead, and that asymmetry is the point: an unobtainable
+   * authorization answer must never read as permission, while an unobtainable quota reading should
+   * not take the feature down.
+   */
+  private async guard(action: 'create' | 'view' | 'react', accountId: string): Promise<void> {
+    if (!this.throttle) return;
+    const limit = this.throttle.limits?.[action] ?? DEFAULT_LIMITS[action];
+    let allowed = true;
+    try {
+      allowed = await this.throttle.limiter.allow(
+        `status:${action}:${accountId}`,
+        limit,
+        THROTTLE_WINDOW_SEC,
+      );
+    } catch {
+      return; // limiter unavailable → allow
+    }
+    if (!allowed) throw new RateLimitError(`status ${action} rate limit exceeded`);
+  }
 
   async post(
     actingAccountId: string,
     input: PostStatusInput,
   ): Promise<{ statusId: string; expiresAt: string }> {
     if (!actingAccountId) throw new ForbiddenError('authentication required');
+    await this.guard('create', actingAccountId);
     if (!input.kind) throw new ValidationError('kind is required');
     if (input.kind === 'text' && !input.text) {
       throw new ValidationError('text status requires text');
@@ -85,12 +128,14 @@ export class StatusService {
 
   /** Record a view. Idempotent at the repository's primary key, so extra devices cannot inflate it. */
   async view(statusId: string, actingAccountId: string): Promise<void> {
+    await this.guard('view', actingAccountId);
     const post = await this.requireVisible(statusId, actingAccountId);
     if (actingAccountId !== post.user_id) await this.repo.recordView(statusId, actingAccountId);
   }
 
   async react(statusId: string, actingAccountId: string, emoji: string): Promise<void> {
     if (!emoji) throw new ValidationError('emoji is required');
+    await this.guard('react', actingAccountId);
     await this.requireVisible(statusId, actingAccountId);
     await this.repo.react(statusId, actingAccountId, emoji);
   }
