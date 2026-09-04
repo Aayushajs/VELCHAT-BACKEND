@@ -51,15 +51,19 @@ describe('topology resolution', () => {
   });
 
   it('routes every logical service in the table to a known runtime owner', () => {
+    // Sentinels carry a scheme so this keeps testing the MAPPING. A bare value would now be
+    // normalised to https://… (Render can only inject a scheme-less host), and the assertion
+    // would be measuring that instead.
     const e = env({
-      UPSTREAM_IDENTITY: 'i',
-      UPSTREAM_MESSAGING: 'm',
-      UPSTREAM_REALTIME: 'r',
-      UPSTREAM_CONTENT: 'c',
-      UPSTREAM_PLATFORM: 'p',
+      UPSTREAM_IDENTITY: 'http://i',
+      UPSTREAM_MESSAGING: 'http://m',
+      UPSTREAM_REALTIME: 'http://r',
+      UPSTREAM_CONTENT: 'http://c',
+      UPSTREAM_PLATFORM: 'http://p',
     });
+    const expected = ['http://i', 'http://m', 'http://r', 'http://c', 'http://p'];
     const unmapped = [...new Set(ROUTES.map((r) => r.service))].filter(
-      (s) => !['i', 'm', 'r', 'c', 'p'].includes(resolveUpstreamFor(s, 1, e)),
+      (s) => !expected.includes(resolveUpstreamFor(s, 1, e)),
     );
     expect(unmapped).toEqual([]);
   });

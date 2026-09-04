@@ -15,7 +15,7 @@ Two threads are in flight. One is finished, one is partly done.
 | Thread | State |
 | --- | --- |
 | Status/Stories Phase 1 — security & reachability | **Complete.** All 12 planned tasks done. |
-| CI/CD + deployment | **Live.** `v8.0.0` released: seven signed images on GHCR, deployed to Azure, answering `/health` from the internet. |
+| CI/CD + deployment | **Live, both environments.** `main` → Azure (signed images from GHCR, VM started and stopped around the deploy); `dev` → Render (six services, built from source). |
 
 Repo gates are green as of the last commit: `pnpm typecheck` 62/62, `pnpm build` 34/34,
 `pnpm test` 58/58, lint clean apart from two pre-existing `no-non-null-assertion` warnings in
@@ -139,11 +139,14 @@ The first automated release landed on **`v8.0.0`**, not `0.2.0`. The repository 
 1. **No DNS name.** `DOMAIN=:80`, so Caddy serves plain HTTP. The mobile client needs `wss://` and
    cannot connect until a hostname exists. Any free name (DuckDNS, nip.io) plus a `DOMAIN` change
    and a restart is the whole fix.
-2. **Render still deploys the old 13-service blueprint from `main`.** `render.yaml` describes six
-   services pinned to `dev`, but Render does not re-read a blueprint on its own — it needs a sync
-   in its dashboard, and the thirteen stale services deleted. Until then `dev` has no deployment,
-   and Render keeps rebuilding a topology the repo no longer has.
+2. **Production is not always-on.** The deploy deallocates the VM when it was the one that started
+   it, so the site is down between deploys. Right for a demo box, wrong for one serving clients.
 3. **Migrations have not been run** against the Neon Postgres.
+
+Render is no longer outstanding: six services are live on `dev`, the blueprint resolves upstreams
+with `fromService` (Render appends a random suffix to taken names — `-2aje` here — so hardcoded
+onrender.com URLs pointed at hosts that did not exist), and CI records a `development` deployment
+once the gateway answers.
 
 Everything else is done: repository secrets, the `production` environment, `write` workflow
 permissions, Docker on the VM, generated JWT keypair and internal secret, and the provider

@@ -19,7 +19,7 @@ Production-grade · multi-tenant · real-time · end-to-end encrypted (personal)
 [![Images](https://img.shields.io/badge/images-GHCR%20%C2%B7%20signed-2088FF?logo=github&logoColor=white)](https://github.com/Aayushajs?tab=packages&repo_name=VELCHAT-BACKEND)
 [![Signed with cosign](https://img.shields.io/badge/cosign-keyless%20signed-1D4ED8?logo=sigstore&logoColor=white)](https://docs.sigstore.dev/cosign/overview/)
 
-[Architecture](docs/VelChat-Architecture.md) · [Codebase Guide](docs/VelChat-Codebase-Guide.md) · [API Reference](docs/API-ENDPOINTS.md) · [Onboarding](docs/ONBOARDING.md)
+[Architecture](docs/VelChat-Architecture.md) · [Codebase Guide](docs/Offical-Docs/VelChat-Codebase-Guide.md) · [API Reference](docs/API-ENDPOINTS.md) · [Onboarding](docs/ONBOARDING.md)
 
 </div>
 
@@ -393,14 +393,59 @@ Full runbook: **[docs/RUNBOOK.md](docs/RUNBOOK.md)** · pipeline design:
 
 ## Documentation
 
-| Doc                                                                   | What it covers                                                |
-| --------------------------------------------------------------------- | ------------------------------------------------------------- |
-| [VelChat-Architecture.md](docs/VelChat-Architecture.md)               | **Source of truth** — HLD + LLD, flows, threat model, roadmap |
-| [VelChat-Codebase-Guide.md](docs/VelChat-Codebase-Guide.md)           | Every service, folder, and file with graphs + rationale       |
-| [API-ENDPOINTS.md](docs/API-ENDPOINTS.md)                             | Full REST endpoint reference for all 13 services              |
-| [INTEGRATIONS.md](docs/INTEGRATIONS.md)                               | External integrations & env wiring                            |
-| [ONBOARDING.md](docs/ONBOARDING.md)                                   | New-contributor setup & workflow                              |
-| [PRODUCTION-READINESS-REPORT.md](docs/PRODUCTION-READINESS-REPORT.md) | Pre-production hardening review                               |
+**Start here**
+
+| Doc                                                                      | What it covers                                                                                                              |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| [VelChat-Architecture.md](docs/VelChat-Architecture.md)                  | **Source of truth** — HLD + LLD, flows, threat model, roadmap                                                               |
+| [VelChat-Codebase-Guide.md](docs/Offical-Docs/VelChat-Codebase-Guide.md) | Every service, folder and file, with graphs and rationale                                                                   |
+| [PROJECT-STATE.md](docs/PROJECT-STATE.md)                                | What is in flight, what was decided and why, what is known-broken. **Read this first if you are picking the work up cold.** |
+| [ONBOARDING.md](docs/ONBOARDING.md)                                      | New-contributor setup and workflow                                                                                          |
+
+**Running it**
+
+| Doc                                            | What it covers                                                                                                                                     |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [RUNBOOK.md](docs/RUNBOOK.md)                  | **Every operation start to finish** — base URLs, daily start/stop and what it costs, shipping a change, rollback, migrations, TLS, troubleshooting |
+| [CI-CD.md](docs/CI-CD.md)                      | Pipeline design and _why_ it is shaped this way — versioning, image supply chain, VM lifecycle                                                     |
+| [SETUP-CHECKLIST.md](docs/SETUP-CHECKLIST.md)  | One-time setup: secrets, VM bootstrap, databases, DNS, Render                                                                                      |
+| [deploy/PORTABILITY.md](deploy/PORTABILITY.md) | Verified free-tier limits and the path back to Kubernetes                                                                                          |
+| [deploy/README.md](deploy/README.md)           | Per-target runbooks — Oracle, AWS, Azure, Render                                                                                                   |
+
+**Interfaces**
+
+| Doc                                                                 | What it covers                                          |
+| ------------------------------------------------------------------- | ------------------------------------------------------- |
+| [API-ENDPOINTS.md](docs/API-ENDPOINTS.md)                           | Full REST endpoint reference, grouped by owning service |
+| [FRONTEND-INTEGRATION-GUIDE.md](docs/FRONTEND-INTEGRATION-GUIDE.md) | What a client needs: auth flow, sockets, sync cursors   |
+| [CLIENT-MEDIA-CACHE.md](docs/CLIENT-MEDIA-CACHE.md)                 | Client-side media caching contract                      |
+| [INTEGRATIONS.md](docs/INTEGRATIONS.md)                             | External integrations and their env wiring              |
+| [FEATURE-FLAGS.md](docs/FEATURE-FLAGS.md)                           | Flag and remote-config platform                         |
+| [AI-SERVER.md](docs/AI-SERVER.md)                                   | Self-hosted AI/translation surface                      |
+
+**Features**
+
+| Doc                                           | What it covers                                                                         |
+| --------------------------------------------- | -------------------------------------------------------------------------------------- |
+| [status/SECURITY.md](docs/status/SECURITY.md) | Status/Stories threat model — each threat, its mitigation, and the test that proves it |
+
+**Audits and reports**
+
+| Doc                                                                       | What it covers                  |
+| ------------------------------------------------------------------------- | ------------------------------- |
+| [PRODUCTION-READINESS-REPORT.md](docs/PRODUCTION-READINESS-REPORT.md)     | Pre-production hardening review |
+| [PRODUCTION-READINESS-AUDIT.md](docs/PRODUCTION-READINESS-AUDIT.md)       | Readiness audit detail          |
+| [FINAL-PRODUCTION-AUDIT-REPORT.md](docs/FINAL-PRODUCTION-AUDIT-REPORT.md) | Final audit sign-off            |
+| [AUTH_GROUP_AUDIT_REPORT.md](docs/AUTH_GROUP_AUDIT_REPORT.md)             | Auth and group-membership audit |
+| [API-TEST-REPORT.md](docs/API-TEST-REPORT.md)                             | API test coverage report        |
+
+**Reference copies** — `docs/Offical-Docs/` holds the originals the working docs were derived from:
+[VelChat-Architecture-v2.md](docs/Offical-Docs/VelChat-Architecture-v2.md) and
+[VelChat-ClaudeCode-Prompts.md](docs/Offical-Docs/VelChat-ClaudeCode-Prompts.md).
+
+**Design records** — `docs/superpowers/` holds the specs and plans behind larger changes, including
+the [6-service migration](docs/superpowers/specs/2026-08-11-velchat-6-service-oracle-migration-design.md)
+and [Status Phase 1](docs/superpowers/specs/2026-08-22-status-security-reachability-design.md).
 
 ---
 
