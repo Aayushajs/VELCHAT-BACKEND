@@ -13,6 +13,12 @@ Production-grade · multi-tenant · real-time · end-to-end encrypted (personal)
 [![NestJS](https://img.shields.io/badge/NestJS-10-E0234E?logo=nestjs&logoColor=white)](https://nestjs.com)
 [![Conventional Commits](https://img.shields.io/badge/commits-conventional-FE5196?logo=conventionalcommits&logoColor=white)](https://www.conventionalcommits.org)
 
+[![CI](https://github.com/Aayushajs/VELCHAT-BACKEND/actions/workflows/ci.yml/badge.svg)](https://github.com/Aayushajs/VELCHAT-BACKEND/actions/workflows/ci.yml)
+[![Release](https://github.com/Aayushajs/VELCHAT-BACKEND/actions/workflows/release.yml/badge.svg)](https://github.com/Aayushajs/VELCHAT-BACKEND/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/Aayushajs/VELCHAT-BACKEND?logo=github&label=release)](https://github.com/Aayushajs/VELCHAT-BACKEND/releases/latest)
+[![Images](https://img.shields.io/badge/images-GHCR%20%C2%B7%20signed-2088FF?logo=github&logoColor=white)](https://github.com/Aayushajs?tab=packages&repo_name=VELCHAT-BACKEND)
+[![Signed with cosign](https://img.shields.io/badge/cosign-keyless%20signed-1D4ED8?logo=sigstore&logoColor=white)](https://docs.sigstore.dev/cosign/overview/)
+
 [Architecture](docs/VelChat-Architecture.md) · [Codebase Guide](docs/VelChat-Codebase-Guide.md) · [API Reference](docs/API-ENDPOINTS.md) · [Onboarding](docs/ONBOARDING.md)
 
 </div>
@@ -280,12 +286,15 @@ Threat coverage: [Architecture §D4](docs/VelChat-Architecture.md#d4-threat-mode
 
 One codebase, four targets, one environment contract — pick one and follow its runbook:
 
-| Target           | Free compute                            | For how long              | Profile                      |
-| ---------------- | --------------------------------------- | ------------------------- | ---------------------------- |
-| **Oracle Cloud** | A1 ARM, 2 OCPU / **12 GB**              | **forever** (Always Free) | `axis6` + local data tier    |
-| **AWS**          | `t4g.small`, 2 GB                       | until **31 Dec 2026**     | `axis6` + external data tier |
-| **Azure**        | `B1S`, 1 GB (+ $100/yr Students credit) | **12 months**             | **`mono`** — one process     |
-| **Render**       | free web services (sleep on idle)       | ongoing                   | `axis6` + managed free tiers |
+| Target           | Free compute                                | For how long              | Profile                      |
+| ---------------- | ------------------------------------------- | ------------------------- | ---------------------------- |
+| **Oracle Cloud** | A1 ARM, 2 OCPU / **12 GB**                  | **forever** (Always Free) | `axis6` + local data tier    |
+| **AWS**          | `t4g.small`, 2 GB                           | until **31 Dec 2026**     | `axis6` + external data tier |
+| **Azure**        | `B1S` free, or `B2as_v2` on Students credit | **12 months**             | **`mono`** — one process     |
+| **Render**       | free web services (sleep on idle)           | ongoing                   | `axis6` + managed free tiers |
+
+Two of those are live today: **Azure is production** (`main`) and **Render is development**
+(`dev`) — see [CI/CD](#cicd). Oracle and AWS remain supported targets with maintained runbooks.
 
 Start with Oracle: it is the only target whose compute is free indefinitely, and it has 6× the RAM
 of AWS free and 12× of Azure free. Verified limits, the portability contract and the scaling path are
@@ -300,6 +309,77 @@ Portability is the image plus the env contract, not the orchestrator: no cloud S
 code, every cloud-specific choice is an adapter behind an env var, and each Dockerfile builds
 `linux/arm64` (Oracle A1, AWS Graviton) alongside `linux/amd64` (Azure, x86). The same images run
 under Helm on EKS / AKS / OKE.
+
+---
+
+## CI/CD
+
+Two branches, two environments, and a merge is the only manual step.
+
+```text
+                    ┌──────────────────────────── pull request ────────────────────────────┐
+                    │  lint · typecheck · test · build      proto FULL_TRANSITIVE (§G7)     │
+                    │  Trivy · SBOM · secret scan           hadolint ×7 · image build ×1    │
+                    └──────────────────────────────────────────────────────────────────────┘
+                                                  │
+        ┌─────────────────────────────────────────┴─────────────────────────────────────────┐
+        │                                                                                   │
+   push to  dev                                                                    merge to  main
+        │                                                                                   │
+        ▼                                                                                   ▼
+┌───────────────────┐                                              ┌─────────────────────────────────────────┐
+│  RENDER  (dev)    │                                              │  version   semver from commit messages  │
+│  builds from src  │                                              │     │                                   │
+│  6 services       │                                              │     ▼                                   │
+│  SPLIT_PROFILE=   │                                              │  images    build ×7 → GHCR              │
+│      axis6        │                                              │     │      cosign sign (by digest)      │
+└─────────┬─────────┘                                              │     │      SBOM + provenance attached   │
+          │                                                        │     │      Trivy scan (CRITICAL = stop) │
+          ▼                                                        │     ▼                                   │
+   environment:                                                    │  publish   git tag + GitHub Release     │
+   development                                                     │     │                                   │
+                                                                   │     ▼                                   │
+                                                                   │  deploy    start VM if deallocated      │
+                                                                   │            ship compose → pull → up -d  │
+                                                                   │            smoke-check /health          │
+                                                                   │            stop VM if it started it     │
+                                                                   └────────────────────┬────────────────────┘
+                                                                                        ▼
+                                                                            ┌───────────────────────┐
+                                                                            │  AZURE  (production)  │
+                                                                            │  velchat-mono, 1 proc │
+                                                                            │  Caddy · Valkey       │
+                                                                            │  environment:         │
+                                                                            │     production        │
+                                                                            └───────────────────────┘
+```
+
+|             | `dev`                                       | `main`                   |
+| ----------- | ------------------------------------------- | ------------------------ |
+| Environment | `development`                               | `production`             |
+| Host        | Render (free web services)                  | Azure VM `B2as_v2`       |
+| Topology    | `axis6` — six services                      | `mono` — one process     |
+| Deployed by | Render, from source                         | `release.yml`, from GHCR |
+| Base URL    | `https://velchat-edge-gateway.onrender.com` | `http://20.219.132.21`   |
+
+**Versioning is the commit message.** `fix:` → patch, `feat:` → minor, `feat!:` or a
+`BREAKING CHANGE:` body → major. A `docs:`/`chore:`-only merge produces no release and no deploy.
+A pre-1.0 guard stops a stray `feat!:` from declaring `1.0.0` by accident.
+
+**Images are pushed before the tag exists**, so a failed build leaves no tag — every tag in this
+repository denotes something that actually built. Signatures cover the **digest**, not the tag,
+because a tag can be repointed at different bytes later:
+
+```bash
+cosign verify ghcr.io/aayushajs/velchat-velchat-mono:<version>   --certificate-identity-regexp "^https://github.com/Aayushajs/VELCHAT-BACKEND/"   --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+**The deploy leaves the VM as it found it.** Deallocated before → started, deployed to, deallocated
+again; already running → left running, because someone is working on it. The shutdown runs under
+`always()`, so a failed deploy cannot leave a box billing quietly.
+
+Full runbook: **[docs/RUNBOOK.md](docs/RUNBOOK.md)** · pipeline design:
+**[docs/CI-CD.md](docs/CI-CD.md)** · one-time setup: **[docs/SETUP-CHECKLIST.md](docs/SETUP-CHECKLIST.md)**
 
 ---
 
