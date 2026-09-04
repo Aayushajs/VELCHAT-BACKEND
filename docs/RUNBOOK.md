@@ -14,11 +14,11 @@ Companions: [`CI-CD.md`](CI-CD.md) explains *why* the pipeline is shaped the way
 | | |
 | --- | --- |
 | Branches | `main` (production → Azure) and `dev` (development → Render). Nothing else. |
-| Live | `http://20.219.132.21/health` → `200` |
+| Live | `https://velchat.duckdns.org/health` → `200` |
 | Latest release | `v8.0.0` — seven signed images on GHCR |
 | VM | `velchat-vm`, Central India, B2as_v2 (2 vCPU / 8 GB), **static** IP `20.219.132.21` |
 | Auto-shutdown | **19:30 IST daily.** The box is off outside working hours; start it before you expect it to answer. |
-| TLS | none yet — no DNS name, so Caddy serves plain HTTP |
+| TLS | yes — `velchat.duckdns.org`, Let's Encrypt via Caddy |
 
 ---
 
@@ -29,18 +29,19 @@ there is one base URL per environment, not one per service.
 
 | Environment | Branch | Base URL | TLS |
 | --- | --- | --- | --- |
-| **production** | `main` | `http://20.219.132.21` | none yet — see §5 |
+| **production** | `main` | `https://velchat.duckdns.org` | yes — Let's Encrypt |
 | **development** | `dev` | `https://velchat-edge-gateway-2aje.onrender.com` | yes, Render terminates it |
 
 ```
-GET  http://20.219.132.21/health                 production
+GET  https://velchat.duckdns.org/health                 production
 GET  https://velchat-edge-gateway-2aje.onrender.com/health   development
 ```
 
 Two differences worth knowing before you point a client at either:
 
-- **Production is plain HTTP.** No DNS name yet, so there is no certificate. Browsers and mobile
-  apps will refuse `ws://` for the realtime socket. §5 fixes this in about two minutes.
+- **Both environments are HTTPS.** Production terminates TLS at Caddy with a Let's Encrypt
+  certificate that renews itself; Render terminates its own. `wss://` works on both, so the mobile
+  client can connect to either.
 - **Development runs the six-service topology; production runs one process.** Same code assembled
   differently (`SPLIT_PROFILE=axis6` vs `mono`), so behaviour matches — but on Render each service
   has its own hostname, and the gateway's `UPSTREAM_*` variables point at them. Only the gateway
@@ -63,7 +64,7 @@ branch policies: `production` ← `main`, `development` ← `dev`.
 WebSocket endpoints, once TLS exists:
 
 ```
-wss://<your-domain>/ws                                  production (needs a DNS name first)
+wss://velchat.duckdns.org/ws                            production
 wss://velchat-realtime-service-2aje.onrender.com/ws     development
 ```
 
@@ -208,37 +209,47 @@ touches Postgres to work.
 
 ---
 
-## 5. Adding TLS — the one real gap
+## 5. TLS
 
-Right now `DOMAIN=:80` and Caddy serves plain HTTP. The REST API works. The **mobile client will
-not connect**, because it needs `wss://`.
+Done. `velchat.duckdns.org` points at the VM, and Caddy holds a Let's Encrypt certificate it
+renews on its own. Plain HTTP is 308-redirected to HTTPS, and `wss://velchat.duckdns.org/ws`
+completes the WebSocket upgrade, so the mobile client can connect.
 
-Any free hostname fixes it:
+```
+https://velchat.duckdns.org/health   200
+http://velchat.duckdns.org/health    308 -> https
+issuer                               Let's Encrypt
+```
 
-- **DuckDNS** — duckdns.org, sign in with GitHub, pick a name, paste `20.219.132.21`
-- **nip.io** — no signup at all: `20.219.132.21.nip.io` already resolves
+### Changing the hostname
 
-Then:
+Three values move together — the domain Caddy serves, the CORS origin, and the token issuer:
 
 ```bash
 pnpm vm ssh
-sed -i 's/^DOMAIN=.*/DOMAIN=velchat.duckdns.org/' ~/velchat.env
-sed -i 's|^CORS_ORIGINS=.*|CORS_ORIGINS=https://velchat.duckdns.org|' ~/velchat.env
-sed -i 's|^JWT_ISSUER=.*|JWT_ISSUER=https://velchat.duckdns.org|' ~/velchat.env
+cd ~
+sed -i 's|^DOMAIN=.*|DOMAIN=<new-host>|'                    velchat.env
+sed -i 's|^CORS_ORIGINS=.*|CORS_ORIGINS=https://<new-host>|' velchat.env
+sed -i 's|^JWT_ISSUER=.*|JWT_ISSUER=https://<new-host>|'     velchat.env
 cd ~/velchat-deploy/azure && docker compose --env-file ~/velchat.env up -d
 exit
 
-gh variable set AZURE_PUBLIC_URL --body "https://velchat.duckdns.org"
+gh variable set AZURE_PUBLIC_URL --body "https://<new-host>"
 ```
 
-Caddy requests the certificate on startup, so **the name must resolve before you restart** or the
-request fails. Verify:
+**The name must resolve before the restart.** Caddy requests the certificate on startup, and a
+name that does not yet resolve fails the ACME challenge — then it backs off, so a premature restart
+costs you a wait rather than just an error.
 
-```bash
-curl https://velchat.duckdns.org/health
-```
+Changing `JWT_ISSUER` invalidates tokens signed under the old issuer, so everyone signs in again.
+That is the correct behaviour, not a bug, but do it deliberately.
 
----
+### Renewal
+
+Caddy renews automatically at roughly two-thirds of the certificate's life and stores state in the
+`caddydata` volume, which survives `docker compose up -d`. Renewal needs **port 80 reachable** —
+if the security group is ever tightened to 443 only, renewal silently fails and the certificate
+expires ~60 days later.
 
 ## 6. Render — the dev environment
 

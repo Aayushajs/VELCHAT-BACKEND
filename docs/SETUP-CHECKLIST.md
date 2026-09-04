@@ -89,18 +89,15 @@ POSTGRES_URL=... pnpm --filter @velchat/migrations migrate
 
 ---
 
-## 4. DNS — not done, and this is the one real gap
+## 4. DNS and TLS
 
-There is no DNS name yet, so `~/velchat.env` carries `DOMAIN=:80` and Caddy serves **plain HTTP**.
-The REST API works over `http://20.219.132.21`, but the mobile client needs `wss://` and will not
-connect until a hostname exists.
+Done. `velchat.duckdns.org` → `20.219.132.21`, with a Let's Encrypt certificate Caddy obtained and
+renews itself. HTTP redirects to HTTPS and the WebSocket upgrade completes, so the mobile client
+can connect.
 
-Any free name works — DuckDNS gives you `something.duckdns.org` in about two minutes, and
-`20.219.132.21.nip.io` resolves with no signup at all. Point an `A` record at the VM, set `DOMAIN`
-to that name in `~/velchat.env`, and restart. Caddy requests the certificate itself on startup, so
-the name has to resolve **before** the restart or the request fails.
-
----
+To move to a different hostname, see [`RUNBOOK.md`](RUNBOOK.md) section 5 — three values change
+together (`DOMAIN`, `CORS_ORIGINS`, `JWT_ISSUER`) and the name has to resolve *before* the restart,
+because Caddy requests the certificate on startup.
 
 ## 5. GitHub — repository secrets
 
@@ -115,7 +112,7 @@ permissions. The table is here so the setup can be reproduced, not because it is
 | `AZURE_HOST` | yes | the VM's public IP or DNS name |
 | `AZURE_USER` | yes | `azureuser` |
 | `AZURE_SSH_KEY` | yes | the **private** key, full PEM including the BEGIN/END lines |
-| `AZURE_PUBLIC_URL` | — | **A repository variable, not a secret.** GitHub rejects the `secrets` context in `environment.url`, and an invalid workflow file fails on every branch. Currently `http://20.219.132.21` |
+| `AZURE_PUBLIC_URL` | — | **A repository variable, not a secret.** GitHub rejects the `secrets` context in `environment.url`, and an invalid workflow file fails on every branch. Currently `https://velchat.duckdns.org` |
 | `AZURE_SSH_HOST_KEY` | recommended | output of `ssh-keyscan -H <ip>`; pins the host against MITM |
 | `AZURE_SSH_PORT` | no | defaults to `22` |
 

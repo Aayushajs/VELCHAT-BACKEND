@@ -136,12 +136,13 @@ The first automated release landed on **`v8.0.0`**, not `0.2.0`. The repository 
 
 ### What is still outstanding
 
-1. **No DNS name.** `DOMAIN=:80`, so Caddy serves plain HTTP. The mobile client needs `wss://` and
-   cannot connect until a hostname exists. Any free name (DuckDNS, nip.io) plus a `DOMAIN` change
-   and a restart is the whole fix.
-2. **Production is not always-on.** The deploy deallocates the VM when it was the one that started
+1. **Production is not always-on.** The deploy deallocates the VM when it was the one that started
    it, so the site is down between deploys. Right for a demo box, wrong for one serving clients.
-3. **Migrations have not been run** against the Neon Postgres.
+2. **Migrations have not been run** against the Neon Postgres.
+
+TLS is no longer outstanding: `velchat.duckdns.org` resolves to the VM, Caddy holds a Let's Encrypt
+certificate it renews itself, HTTP redirects to HTTPS, and `wss://` completes the upgrade — so the
+mobile client can connect.
 
 Render is no longer outstanding: six services are live on `dev`, the blueprint resolves upstreams
 with `fromService` (Render appends a random suffix to taken names — `-2aje` here — so hardcoded

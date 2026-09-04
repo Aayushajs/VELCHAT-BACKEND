@@ -13,8 +13,8 @@ version, seven signed container images, a GitHub Release, and a running deployme
 | Host | Render (free web services) | Azure VM `B2as_v2`, Central India |
 | Topology | `axis6` — six services | `mono` — one process |
 | Deployed by | Render, building from source | `release.yml`, pulling signed images from GHCR |
-| Base URL | `https://velchat-edge-gateway-2aje.onrender.com` | `http://20.219.132.21` |
-| TLS | yes, Render terminates it | **none yet** — no DNS name |
+| Base URL | `https://velchat-edge-gateway-2aje.onrender.com` | `https://velchat.duckdns.org` |
+| TLS | yes, Render terminates it | yes — Let's Encrypt via Caddy |
 | Data tier | Neon · Atlas · **Upstash** · Cloudinary | Neon · Atlas · **local Valkey** · Cloudinary |
 | Always on | sleeps after ~15 min idle | only while the VM is running |
 
@@ -266,7 +266,7 @@ and pushed to GHCR, signed, scanned, tagged, released, and deployed to the Azure
 answered its health check from the public internet.
 
 ```
-http://20.219.132.21/health  ->  200  {"status":"ok","service":"velchat-mono", ...}
+https://velchat.duckdns.org/health  ->  200  {"status":"ok","service":"velchat-mono", ...}
 ```
 
 The box runs `ghcr.io/aayushajs/velchat-velchat-mono:8.0.0`, pulled from the registry by the deploy
@@ -292,9 +292,6 @@ push, cosign signing, and the SSH deploy.
 
 ## Known gaps
 
-- **No TLS on production.** No DNS name, so `DOMAIN=:80` and Caddy serves plain HTTP. The REST API
-  works; the mobile client needs `wss://` and will not connect until a hostname exists. Any free
-  name fixes it — see [RUNBOOK](RUNBOOK.md) section 5.
 - **Production is not always-on.** The deploy deallocates the VM when it started it, so the site is
   down between deploys. Correct for a demo box, wrong for one serving clients.
 - **Each image rebuilds the whole monorepo.** A shared base image with seven thin images on top
