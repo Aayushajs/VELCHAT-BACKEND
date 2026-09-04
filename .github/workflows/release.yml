@@ -407,11 +407,16 @@ jobs:
     needs: [deploy]
     if: always()
     runs-on: ubuntu-latest
-    permissions:
-      # Deleting an environment needs repository administration, not just contents.
-      administration: write
+    # No `permissions:` block: deleting an environment needs repository administration, which is
+    # not one of the permissions a workflow can request for GITHUB_TOKEN. (Declaring
+    # `administration: write` there is invalid and makes the whole workflow file fail to parse —
+    # which is reported as a failed run on every branch, not just this one.) It therefore needs a
+    # PAT with repo admin, supplied as ADMIN_TOKEN, and stays inert without one.
+    env:
+      HAS_ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN != '' }}
     steps:
       - name: Delete the Render environments left over from the 13-service topology
+        if: ${{ env.HAS_ADMIN_TOKEN == 'true' }}
         # STOPGAP, not a fix. Render is still connected to the pre-consolidation blueprint on
         # `main`, so on every push it deploys thirteen services that no longer exist and creates a
         # `main - velchat-<service>` environment for each. They then crowd the repo's Deployments
@@ -442,4 +447,4 @@ jobs:
             echo "::warning::Render is still deploying the old 13-service blueprint from main. Recreate the blueprint on dev — docs/RUNBOOK.md section 6."
           fi
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.ADMIN_TOKEN }}
