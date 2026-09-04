@@ -273,22 +273,36 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Ensure the VM is running
+        id: vm
         if: ${{ env.HAS_AZURE_CREDS == 'true' }}
         run: |
           set -euo pipefail
           state=$(az vm get-instance-view -g velchat -n velchat-vm             --query "instanceView.statuses[1].displayStatus" -o tsv)
           echo "power state: $state"
-          if [ "$state" != "VM running" ]; then
-            echo "starting…"
-            az vm start -g velchat -n velchat-vm -o none
-            # SSH is not accepting connections the instant the VM reports running.
-            for i in $(seq 1 30); do
-              if nc -z -w 5 "$HOST" "${PORT:-22}" 2>/dev/null; then
-                echo "ssh reachable after ~$((i * 5))s"; break
-              fi
-              sleep 5
-            done
+
+          if [ "$state" = "VM running" ]; then
+            # Already on — someone is working on it. Leave it on when we are done.
+            echo "started_by_ci=false" >> "$GITHUB_OUTPUT"
+            echo "The VM was already running; it will be left running."
+            exit 0
           fi
+
+          # Recorded BEFORE the start call, so the deallocate step still knows to run even if
+          # something below fails. Leaving a VM running by accident is the expensive mistake here.
+          echo "started_by_ci=true" >> "$GITHUB_OUTPUT"
+          echo "The VM was deallocated; starting it and it will be deallocated again afterwards."
+          az vm start -g velchat -n velchat-vm -o none
+
+          # 'VM running' arrives before sshd is listening, so wait on the port, not the status.
+          for i in $(seq 1 36); do
+            if nc -z -w 5 "$HOST" "${PORT:-22}" 2>/dev/null; then
+              echo "ssh reachable after ~$((i * 5))s"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::VM started but port ${PORT:-22} never opened"
+          exit 1
         env:
           HOST: ${{ secrets.AZURE_HOST }}
           PORT: ${{ secrets.AZURE_SSH_PORT }}
@@ -356,3 +370,76 @@ jobs:
           exit 1
         env:
           URL: ${{ vars.AZURE_PUBLIC_URL }}
+
+      # LAST, and always(): if this job started the VM it must put it back, whether the deploy
+      # succeeded, failed, or the run was cancelled. Leaving a B2as_v2 running unnoticed burns
+      # roughly $1.20 a day out of a fixed credit, so the failure mode to design against is not
+      # "stop did not happen" but "stop was skipped because something else broke".
+      #
+      # It deliberately does NOT run when the VM was already on — someone is working on it, and a
+      # deploy is not a reason to pull the box out from under them.
+      - name: Deallocate the VM if this job started it
+        if: ${{ always() && env.HAS_AZURE_CREDS == 'true' && steps.vm.outputs.started_by_ci == 'true' }}
+        run: |
+          set -uo pipefail
+          echo "This job started the VM; deallocating it again."
+          for attempt in 1 2 3; do
+            if az vm deallocate -g velchat -n velchat-vm -o none; then
+              echo "deallocated"
+              break
+            fi
+            echo "deallocate attempt $attempt failed; retrying in 15s"
+            sleep 15
+          done
+
+          # Verify rather than trust: a silent failure here is a bill, so confirm the final state
+          # and fail loudly if the box is still running.
+          state=$(az vm get-instance-view -g velchat -n velchat-vm             --query "instanceView.statuses[1].displayStatus" -o tsv 2>/dev/null || echo unknown)
+          echo "final power state: $state"
+          if [ "$state" != "VM deallocated" ]; then
+            echo "::error::VM is still '$state' after deallocate. Stop it by hand: pnpm vm stop"
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------------------------
+  tidy-stale-environments:
+    name: remove dead 13-service environments
+    needs: [deploy]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      # Deleting an environment needs repository administration, not just contents.
+      administration: write
+    steps:
+      - name: Delete the Render environments left over from the 13-service topology
+        # STOPGAP, not a fix. Render is still connected to the pre-consolidation blueprint on
+        # `main`, so on every push it deploys thirteen services that no longer exist and creates a
+        # `main - velchat-<service>` environment for each. They then crowd the repo's Deployments
+        # sidebar, where `main` should show production (Azure) and nothing else.
+        #
+        # This removes only those thirteen exact names, so it cannot touch `production`,
+        # `development`, or anything Render creates once it correctly tracks `dev`. It becomes a
+        # no-op the moment the blueprint is recreated — see docs/RUNBOOK.md section 6, which is the
+        # actual fix. Until then Render also keeps burning build minutes on a dead topology, which
+        # this does nothing about.
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          dead="ai-service api-gateway auth-service automation-service call-service chat-service \
+                group-channel-service media-service notification-service presence-service \
+                realtime-gateway search-service user-service"
+          removed=0
+          for svc in $dead; do
+            name="main - velchat-$svc"
+            enc=$(jq -rn --arg n "$name" '$n|@uri')
+            if gh api -X DELETE "repos/${GITHUB_REPOSITORY}/environments/${enc}" >/dev/null 2>&1; then
+              echo "removed: $name"
+              removed=$((removed + 1))
+            fi
+          done
+          echo "removed $removed stale environment(s)"
+          if [ "$removed" -gt 0 ]; then
+            echo "::warning::Render is still deploying the old 13-service blueprint from main. Recreate the blueprint on dev — docs/RUNBOOK.md section 6."
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

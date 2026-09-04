@@ -121,8 +121,30 @@ The merge triggers `release.yml`, which does all of this on its own:
 version   →  next semver from the commit messages since the last v* tag
 images    →  build 7 → push to GHCR → cosign sign → attest → Trivy scan
 publish   →  create the tag → GitHub Release with generated notes
-deploy    →  ship compose to the VM → pull → up -d → smoke-check /health
+deploy    →  start the VM if needed → ship compose → pull → up -d → smoke-check → stop it again
 ```
+
+### What the deploy does to the VM
+
+It leaves the box in the state it found it:
+
+| VM before the deploy | After |
+| --- | --- |
+| **deallocated** | started, deployed to, then **deallocated again** |
+| **already running** | deployed to, **left running** |
+
+The second row matters as much as the first: if the box is up, someone is working on it, and a
+deploy is not a reason to pull it out from under them.
+
+The deallocate step runs under `always()`, so it fires whether the deploy succeeded, failed, or was
+cancelled — the mistake to design against is not "stop failed" but "stop was skipped because
+something else broke". It records whether it started the VM *before* calling `az vm start`, so even
+a failure during startup still triggers the shutdown. It retries three times and then reads the
+power state back, failing loudly if the box is still running rather than reporting success and
+leaving a meter ticking.
+
+A B2as_v2 left on unnoticed costs roughly **$1.20 a day**, so this is the difference between the
+credit lasting months and lasting weeks.
 
 Images are pushed **before** the tag exists, so a failed build leaves no tag. Every tag in this
 repository denotes something that actually built.
