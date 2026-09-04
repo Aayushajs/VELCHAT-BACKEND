@@ -354,13 +354,13 @@ Two branches, two environments, and a merge is the only manual step.
                                                                             └───────────────────────┘
 ```
 
-|             | `dev`                                       | `main`                   |
-| ----------- | ------------------------------------------- | ------------------------ |
-| Environment | `development`                               | `production`             |
-| Host        | Render (free web services)                  | Azure VM `B2as_v2`       |
-| Topology    | `axis6` — six services                      | `mono` — one process     |
-| Deployed by | Render, from source                         | `release.yml`, from GHCR |
-| Base URL    | `https://velchat-edge-gateway.onrender.com` | `http://20.219.132.21`   |
+|             | `dev`                                       | `main`                        |
+| ----------- | ------------------------------------------- | ----------------------------- |
+| Environment | `development`                               | `production`                  |
+| Host        | Render (free web services)                  | Azure VM `B2as_v2`            |
+| Topology    | `axis6` — six services                      | `mono` — one process          |
+| Deployed by | Render, from source                         | `release.yml`, from GHCR      |
+| Base URL    | `https://velchat-edge-gateway.onrender.com` | `https://velchat.duckdns.org` |
 
 **Versioning is the commit message.** `fix:` → patch, `feat:` → minor, `feat!:` or a
 `BREAKING CHANGE:` body → major. A `docs:`/`chore:`-only merge produces no release and no deploy.

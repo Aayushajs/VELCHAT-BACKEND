@@ -103,6 +103,19 @@ stampVersion();
  * Connection strings are optional in the base schema because not every service
  * touches every datastore; a service asserts what it needs via `requireX(cfg)`.
  */
+/**
+ * Accept a PEM however the platform allows it to be written: multi-line, or on one line with
+ * escaped newlines (dotenv, Render's dashboard, GitHub secrets). Returns it with real newlines,
+ * which is the only form `crypto` and `jsonwebtoken` accept.
+ */
+function unescapePem(v: string | undefined): string | undefined {
+  if (!v) return v;
+  const newline = String.fromCharCode(10);
+  const escaped = String.fromCharCode(92) + 'n';
+  const s = v.trim().split(escaped).join(newline);
+  return s || undefined;
+}
+
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
@@ -193,8 +206,16 @@ export const envSchema = z.object({
   // service refuses to boot rather than serving unauthenticated traffic (DEF-02).
   // Absent in auth-service ⇒ an EPHEMERAL keypair is generated, so every restart invalidates all
   // outstanding tokens and no other service can verify them (DEF-13). Always set both in prod.
-  JWT_PRIVATE_PEM: z.string().optional(),
-  JWT_PUBLIC_PEM: z.string().optional(),
+  //
+  // Normalised here, once, because an env file has no multi-line form: deploys carry the PEM on a
+  // single line with a literal backslash-n. Four places consume these — the auth module, the
+  // WebSocket fabric, the channels module and the mono bootstrap — and only the auth module was
+  // un-escaping. The other three handed jsonwebtoken a string it cannot parse, so every token was
+  // rejected with "secretOrPublicKey must be an asymmetric key": the service looked healthy and
+  // served 185 routes while nobody could authenticate on any of them. Doing it in the schema means
+  // a consumer cannot forget.
+  JWT_PRIVATE_PEM: z.string().optional().transform(unescapePem),
+  JWT_PUBLIC_PEM: z.string().optional().transform(unescapePem),
   // Explicit, greppable dev escape hatch: run without JWT verification. Refused in production.
   // Shared secret for service-to-service calls, sent as `x-velchat-internal`. Required by the
   // membership lookup the WebSocket fabric depends on: that endpoint is user-guarded, so an
