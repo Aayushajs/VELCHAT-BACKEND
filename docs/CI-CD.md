@@ -7,46 +7,119 @@ version, seven signed container images, a GitHub Release, and a running deployme
 
 ## Environments
 
-| Branch | Environment | Target | How it deploys |
-| --- | --- | --- | --- |
-| `dev` | development | **Render** (free tier, 6 services) | Render watches `dev` and builds from source on its own runners, via `render.yaml`. No images involved. |
-| `main` | production | **Azure** B1S (`velchat-mono`) | `release.yml` versions the merge, publishes signed images to GHCR, then deploys them over SSH. |
+| | development | production |
+| --- | --- | --- |
+| Branch | `dev` | `main` |
+| Host | Render (free web services) | Azure VM `B2as_v2`, Central India |
+| Topology | `axis6` — six services | `mono` — one process |
+| Deployed by | Render, building from source | `release.yml`, pulling signed images from GHCR |
+| Base URL | `https://velchat-edge-gateway-2aje.onrender.com` | `http://20.219.132.21` |
+| TLS | yes, Render terminates it | **none yet** — no DNS name |
+| Data tier | Neon · Atlas · **Upstash** · Cloudinary | Neon · Atlas · **local Valkey** · Cloudinary |
+| Always on | sleeps after ~15 min idle | only while the VM is running |
 
 Both branches run the full `ci.yml` on push, because both deploy from a push and neither should
 deploy something unverified.
 
-The two targets deliberately run different topologies — Render runs the six services
-(`SPLIT_PROFILE=axis6`), Azure runs all feature groups in one process (`SPLIT_PROFILE=mono`,
-because 1 GB cannot hold six Node processes). That is the same code assembled differently, not two
-applications, so dev remains a fair test of production behaviour. Render free services also sleep
-after ~15 minutes idle, so a cold start there is expected and is not a production signal.
+Two differences are deliberate rather than incidental:
+
+- **Redis.** Render has no local container, so it uses Upstash. The Azure box runs Valkey locally
+  because `EVENT_BUS=redis-streams` means consumers read continuously, and Upstash's free 500k
+  commands/month is exhausted by that alone in about a day. If the dev event bus goes quiet, that
+  is the first thing to check.
+- **Topology.** Render runs six services, Azure runs one. Same code through the same assembler —
+  only `SPLIT_PROFILE` differs — so dev stays a fair test of production behaviour, but Render gives
+  each service its own hostname and the gateway routes between them via `fromService`.
+
+Render appends a random suffix when a service name is taken, which is why the URLs carry `-2aje`.
+The blueprint resolves upstreams with `fromService` rather than hardcoding them, so the suffix does
+not matter.
 
 ## The pipeline
 
 ```text
-pull request
-   └─ ci.yml
-        verify        lint · typecheck · build · test
-        proto-compat  buf breaking-change check against main (§G7)
-        security      Trivy fs scan (CRITICAL) · CycloneDX SBOM
-        images        hadolint every Dockerfile · build velchat-mono (no push)
-
-merge to main
-   └─ release.yml
-        version   ── derive the next semver from Conventional Commits
-        images    ── build 7 images → push to GHCR → cosign sign → attest → Trivy scan
-        publish   ── create the tag → GitHub Release with generated notes
-        deploy    ── ship compose to the Azure VM → pull → up -d → smoke-check /health
+                              ┌─────────────────────────┐
+                              │      pull request       │
+                              └────────────┬────────────┘
+                                           │
+   ┌───────────────────────────────────────┴───────────────────────────────────────┐
+   │ verify        lint · typecheck · test · build          (whole monorepo)        │
+   │ proto-compat  buf breaking-change check vs main         (§G7 FULL_TRANSITIVE)  │
+   │ security      Trivy fs scan · CycloneDX SBOM            (CRITICAL = block)     │
+   │ images        hadolint ×7 · build velchat-mono          (no push)              │
+   └───────────────────────────────────────┬───────────────────────────────────────┘
+                                           │  all green
+        ┌──────────────────────────────────┴──────────────────────────────────┐
+        │                                                                     │
+   push to dev                                                          merge to main
+        │                                                                     │
+        ▼                                                                     ▼
+┌────────────────────┐                        ┌───────────────────────────────────────────┐
+│ RENDER builds from │                        │ version   read commits since the last v*  │
+│ source, 6 services │                        │           tag → next semver               │
+│ SPLIT_PROFILE=     │                        │              │                            │
+│    axis6           │                        │              ├── bump=none ──► stop here   │
+└─────────┬──────────┘                        │              ▼                            │
+          │                                   │ images ×7  build → push GHCR              │
+          │ CI polls /health                  │            cosign sign (digest)           │
+          ▼                                   │            SBOM + provenance attached     │
+   environment:                               │            Trivy scan (CRITICAL = stop)   │
+   development                                │              ▼                            │
+   (dev only)                                 │ publish    git tag + GitHub Release       │
+                                              │              ▼                            │
+                                              │ deploy     ┌─ VM deallocated? ─┐          │
+                                              │            │  yes → start it   │          │
+                                              │            └─────────┬─────────┘          │
+                                              │              scp compose + Caddyfile      │
+                                              │              docker compose pull / up -d  │
+                                              │              smoke-check /health          │
+                                              │            ┌─ did WE start it? ─┐         │
+                                              │            │  yes → deallocate  │always() │
+                                              │            └────────────────────┘         │
+                                              └───────────────────┬───────────────────────┘
+                                                                  ▼
+                                                          environment:
+                                                          production
+                                                          (main only)
 ```
 
-Images are pushed **before** the tag is created. A failed build therefore leaves no tag and no
-release, so every tag in this repository denotes something that actually built.
+Three properties are worth stating explicitly, because they are what make the pipeline safe rather
+than merely automated:
 
-If a push to `main` contains no `feat`, `fix`, `perf`, `revert` or breaking commit — a docs-only or
-`chore` merge — `version` reports `bump=none` and the remaining jobs are skipped. No empty release
-is cut.
+1. **Images are pushed before the tag exists.** A failed build therefore leaves no tag and no
+   release, so a tag in this repository always denotes something that actually built.
+2. **A `docs:`/`chore:`-only merge stops after `version`.** No release, no deploy, no noise.
+3. **The deploy leaves the VM as it found it** — see below.
 
----
+### What the deploy does to the VM
+
+| VM before | After | Why |
+| --- | --- | --- |
+| deallocated | started → deployed → **deallocated again** | The box is off most of the day to conserve credit; a deploy should not silently turn it into a running bill. |
+| already running | deployed → **left running** | Someone is working on it. A deploy is not a reason to pull the box out from under them. |
+
+The shutdown runs under `always()`. The failure to design against is not "stop failed" but "stop
+was skipped because something else broke" — a failed deploy is exactly when a box gets forgotten.
+The started-by-CI flag is written *before* `az vm start`, so even a failure during startup still
+triggers the shutdown. It retries three times, then reads the power state back and fails loudly if
+the VM is still running rather than reporting success over a ticking meter.
+
+A `B2as_v2` left on unnoticed costs roughly **$1.20/day** out of a fixed credit.
+
+> **Consequence worth understanding:** with auto-stop on, production is only reachable while the VM
+> is running. Between deploys the site is down. That is correct for a demo box and wrong for one
+> serving real clients — if you need it always-on, remove the deallocate step and accept ~$36/month.
+
+### Branch policies
+
+`production` accepts deployments only from `main`, `development` only from `dev`. Set as GitHub
+environment branch policies, so a workflow cannot deploy the wrong branch to the wrong place even
+if its `if:` condition is edited incorrectly.
+
+> GitHub's repo-home Deployments panel is **not** branch-filtered — it lists every environment
+> regardless of the branch being viewed, and there is no setting to change that. Use the
+> Deployments page's left sidebar to view one environment at a time. Render additionally creates
+> its own `dev - velchat-<service>` environment per service, which is Render's naming, not ours.
 
 ## Versioning
 
@@ -219,11 +292,18 @@ push, cosign signing, and the SSH deploy.
 
 ## Known gaps
 
-- **No TLS.** There is no DNS name yet, so `DOMAIN=:80` and Caddy serves plain HTTP. The REST API
-  works; the mobile client needs `wss://` and will not connect until a hostname exists. Setting
-  `DOMAIN` to a real name is the only change required — Caddy obtains the certificate itself.
-- **Each image rebuilds the whole monorepo.** A shared base image carrying one `pnpm -r build`,
-  with seven thin images on top, would cut release build time by roughly seven times. The matrix
-  runs in parallel so wall-clock is acceptable today, but it is seven times the Actions minutes.
+- **No TLS on production.** No DNS name, so `DOMAIN=:80` and Caddy serves plain HTTP. The REST API
+  works; the mobile client needs `wss://` and will not connect until a hostname exists. Any free
+  name fixes it — see [RUNBOOK](RUNBOOK.md) section 5.
+- **Production is not always-on.** The deploy deallocates the VM when it started it, so the site is
+  down between deploys. Correct for a demo box, wrong for one serving clients.
+- **Each image rebuilds the whole monorepo.** A shared base image with seven thin images on top
+  would cut release build time roughly sevenfold. The matrix runs in parallel so wall-clock is
+  acceptable, but it is seven times the Actions minutes.
+- **Only `velchat-mono` is exercised on pull requests.** The other six Dockerfiles are structurally
+  identical and hadolint covers all seven, but only the release build proves them.
 - **`UPSTREAM_STATUS` is undocumented** in the env contract. Harmless under `axis6`, where the
-  `STATUS → CONTENT` topology mapping covers it, but a `full13` deployment needs it set.
+  `STATUS → CONTENT` topology mapping covers it; a `full13` deployment needs it set.
+- **Two timing-sensitive suites flake under parallel load** (`feature-realtime/ws-fabric.spec.ts`,
+  occasionally `feature-auth`). They pass when their package runs alone. Re-run the package before
+  assuming a break.

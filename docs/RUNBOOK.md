@@ -30,11 +30,11 @@ there is one base URL per environment, not one per service.
 | Environment | Branch | Base URL | TLS |
 | --- | --- | --- | --- |
 | **production** | `main` | `http://20.219.132.21` | none yet — see §5 |
-| **development** | `dev` | `https://velchat-edge-gateway.onrender.com` | yes, Render terminates it |
+| **development** | `dev` | `https://velchat-edge-gateway-2aje.onrender.com` | yes, Render terminates it |
 
 ```
 GET  http://20.219.132.21/health                 production
-GET  https://velchat-edge-gateway.onrender.com/health   development
+GET  https://velchat-edge-gateway-2aje.onrender.com/health   development
 ```
 
 Two differences worth knowing before you point a client at either:
@@ -49,14 +49,22 @@ Two differences worth knowing before you point a client at either:
 Render free services sleep after ~15 minutes idle, so the first request after a quiet period takes
 several seconds. That is a cold start, not an outage.
 
-> Render is **not deploying `dev` yet** — it is still on the old 13-service blueprint from `main`,
-> so the URL above will not answer until the blueprint is synced. See §6.
+> Render appends a random suffix when a service name is taken, hence `-2aje`. The blueprint
+> resolves upstreams with `fromService`, so the suffix never has to be hardcoded anywhere.
+
+Both environments accept deployments only from their own branch, enforced as GitHub environment
+branch policies: `production` ← `main`, `development` ← `dev`.
+
+> GitHub's repo-home Deployments panel is **not** branch-filtered. It lists every environment
+> whatever branch you are viewing, and no setting changes that — open the Deployments page and pick
+> an environment in the left sidebar for a filtered view. Render also creates its own
+> `dev - velchat-<service>` environment per service; that naming is Render's, not ours.
 
 WebSocket endpoints, once TLS exists:
 
 ```
-wss://<your-domain>/ws                            production
-wss://velchat-realtime-service.onrender.com/ws     development
+wss://<your-domain>/ws                                  production (needs a DNS name first)
+wss://velchat-realtime-service-2aje.onrender.com/ws     development
 ```
 
 ---
@@ -234,50 +242,39 @@ curl https://velchat.duckdns.org/health
 
 ## 6. Render — the dev environment
 
-**Outstanding. Until this is done, `dev` has no deployment.**
+Live. Six services on `dev`, rebuilt from source by Render on every push:
 
-Render is connected to the **old 13-service blueprint on `main`**. In the repo's Deployments
-sidebar that shows as thirteen `main - velchat-*` environments, named for services that stopped
-existing at the 6-service consolidation — and they rebuild on every push to `main`, building a
-topology this repo no longer has.
+```
+velchat-edge-gateway-2aje       ← the only one clients talk to
+velchat-identity-service-2aje
+velchat-messaging-service-2aje
+velchat-realtime-service-2aje
+velchat-content-service-2aje
+velchat-platform-service-2aje
+```
 
-`render.yaml` here describes six services, each pinned to `branch: dev`. Render does not re-read a
-blueprint on its own, and syncing an existing one tends to leave the old services orphaned rather
-than removing them. Deleting and recreating is cleaner:
+Credentials live in the Render **Env Group `velchat-shared`**, not in the blueprint. The names that
+matter, because getting them wrong fails at boot rather than at build:
 
-1. **Render dashboard → the existing Blueprint → Delete.**
-2. **Delete the thirteen stale services** (`velchat-api-gateway`, `velchat-ai-service`,
-   `velchat-auth-service`, and so on). Deleting the blueprint does not remove them.
-3. **New → Blueprint → connect `Aayushajs/VELCHAT-BACKEND`.** It reads the current `render.yaml`:
-   six services, each on `dev`.
-4. **Env Groups → `velchat-shared`** → fill in `POSTGRES_URL`, `MONGO_URL`, `VALKEY_URL`,
-   `CLOUDINARY_URL`. The same values the VM uses are in `~/velchat.env`.
-5. Once `https://velchat-edge-gateway.onrender.com/health` answers, activate the deployment record:
+| Variable | Note |
+| --- | --- |
+| `JWT_PRIVATE_PEM` / `JWT_PUBLIC_PEM` | **`_PEM`, not `_KEY`.** Config reads `_PEM`; nothing reads `_KEY`, so setting the wrong name looks right and every service refuses to boot with "JWT_PUBLIC_PEM is not set". Dev uses its own pair, not production's. |
+| `POSTGRES_URL` · `MONGO_URL` · `CLOUDINARY_URL` | same providers as production |
+| `VALKEY_URL` | **Upstash** — Render has no local container. See the note in [CI-CD.md](CI-CD.md) about the free command quota. |
 
-   ```bash
-   gh variable set RENDER_BASE_URL --body "https://velchat-edge-gateway.onrender.com"
-   ```
+Everything else (`SMTP_URL`, `MAIL_*`, `OTEL_*`) is optional; unset just means a safe fallback.
 
-### Why that last step exists
+After a push to `dev`, CI polls the gateway's `/health` and records a `development` deployment once
+Render is actually serving — it polls rather than assuming, because a record that turns green
+without checking would be worse than none. The URL comes from the `RENDER_BASE_URL` variable.
 
-Render names its own environments `<branch> - <service>`, so after step 3 you get six
-`dev - velchat-*` entries. It never writes to GitHub's `development` environment, which is why
-creating one by hand does nothing on its own.
+**Cold starts are normal.** Free services sleep after ~15 minutes idle, and waking six of them can
+take a minute. A `000`/timeout on first request is a cold start, not an outage — retry before
+diagnosing.
 
-The `development` job in `ci.yml` fills that gap: on a push to `dev` it polls the Render gateway's
-`/health` and records a `development` deployment once Render is actually serving. That gives one
-clean entry per branch — `production` for `main`, `development` for `dev` — instead of six per-service
-rows. It stays inert until `RENDER_BASE_URL` is set, so it produces no failures before Render works.
-
-It polls rather than assuming: a deployment record that turns green without checking anything would
-be worse than not having one.
-
-### One caveat on Render's free tier
-
-Services sleep after ~15 minutes idle and cold-start on the next request, and the free managed
-datastores are metered. Upstash in particular allows 500k Redis commands/month, which the event bus
-alone can exhaust in about a day — which is why the **Azure box runs Valkey locally** rather than
-pointing at Upstash. Keep that difference in mind when dev behaves differently from production.
+If Render ever needs rebuilding from scratch: delete the Blueprint **and** its services (deleting
+the blueprint alone orphans them), then **New → Blueprint** against this repo. `render.yaml`
+describes six services pinned to `branch: dev`.
 
 ## 7. Secrets and where they live
 
