@@ -51,22 +51,42 @@ export function splitProfile(env: NodeJS.ProcessEnv = process.env): SplitProfile
  * runtime owner first; an explicit `UPSTREAM_<LOGICAL>` still wins, so a single service can be
  * peeled out and pointed elsewhere without switching the whole profile.
  */
+/**
+ * Accept a bare hostname as well as a full URL.
+ *
+ * Render's blueprint can only inject a service's *host* (`fromService … property: host`), with no
+ * scheme — and a hardcoded `https://…onrender.com` is not an option because Render appends a
+ * random suffix when a service name is taken. A scheme-less value is therefore the normal shape
+ * there, and left unhandled it produces an unusable upstream that fails at request time rather
+ * than at boot. Anything with a scheme is passed through untouched.
+ */
+function withScheme(value: string): string {
+  const v = value.trim();
+  if (!v || /^[a-z][a-z0-9+.-]*:\/\//i.test(v)) return v;
+  // localhost is plain HTTP; a managed hostname is TLS-terminated by the platform.
+  const local = v.startsWith('localhost') || v.startsWith('127.0.0.1');
+  return `${local ? 'http' : 'https'}://${v}`;
+}
+
 export function resolveUpstreamFor(
   logical: string,
   devPort: number,
   env: NodeJS.ProcessEnv = process.env,
 ): string {
   const direct = env[`UPSTREAM_${logical}`];
-  if (direct) return direct;
+  if (direct) return withScheme(direct);
 
   const profile = splitProfile(env);
   if (profile === 'mono') {
-    return env.UPSTREAM_MONO ?? 'http://localhost:3000';
+    return withScheme(env.UPSTREAM_MONO ?? 'http://localhost:3000');
   }
   if (profile === 'axis6') {
     const runtime = AXIS6[logical];
     if (runtime) {
-      return env[`UPSTREAM_${runtime}`] ?? `http://localhost:${DEV_PORTS[runtime] ?? devPort}`;
+      const configured = env[`UPSTREAM_${runtime}`];
+      return configured
+        ? withScheme(configured)
+        : `http://localhost:${DEV_PORTS[runtime] ?? devPort}`;
     }
   }
   return `http://localhost:${devPort}`;

@@ -51,3 +51,47 @@ describe('status routing (Phase 1 — regression for the wrong-upstream defect)'
     expect(resolveUpstream('/presence/status')).toBe('http://realtime:3006');
   });
 });
+
+describe('upstream scheme normalisation', () => {
+  const KEYS = ['SPLIT_PROFILE', 'UPSTREAM_IDENTITY', 'UPSTREAM_CONTENT', 'UPSTREAM_MONO'];
+  const saved: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    for (const k of KEYS) {
+      saved[k] = process.env[k];
+      delete process.env[k];
+    }
+    process.env.SPLIT_PROFILE = 'axis6';
+  });
+
+  afterEach(() => {
+    for (const k of KEYS) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  });
+
+  // Render's blueprint can only inject a service's host, with no scheme, and a hardcoded
+  // onrender.com URL is not usable because Render appends a random suffix to a taken name.
+  it('adds https to a bare managed hostname', () => {
+    process.env.UPSTREAM_IDENTITY = 'velchat-identity-service-2aje.onrender.com';
+    expect(resolveUpstream('/auth/login')).toBe(
+      'https://velchat-identity-service-2aje.onrender.com',
+    );
+  });
+
+  it('leaves a value that already has a scheme alone', () => {
+    process.env.UPSTREAM_IDENTITY = 'http://identity:3002';
+    expect(resolveUpstream('/auth/login')).toBe('http://identity:3002');
+  });
+
+  // A bare localhost is a developer's own machine, where there is no TLS terminator.
+  it('uses http for a bare localhost', () => {
+    process.env.UPSTREAM_CONTENT = 'localhost:3008';
+    expect(resolveUpstream('/status')).toBe('http://localhost:3008');
+  });
+
+  it('still falls back to the dev port when nothing is configured', () => {
+    expect(resolveUpstream('/status')).toBe('http://localhost:3008');
+  });
+});

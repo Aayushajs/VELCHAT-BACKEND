@@ -106,12 +106,20 @@ services:
       # service (AUTH, CHAT, PRESENCE, …) onto whichever of these owns it — see
       # apps/edge-gateway/src/gateway/topology.ts.
       - { key: SPLIT_PROFILE, value: axis6 }
-      - { key: UPSTREAM_IDENTITY, value: https://velchat-identity-service.onrender.com }
-      - { key: UPSTREAM_MESSAGING, value: https://velchat-messaging-service.onrender.com }
-      - { key: UPSTREAM_REALTIME, value: https://velchat-realtime-service.onrender.com }
-      - { key: UPSTREAM_CONTENT, value: https://velchat-content-service.onrender.com }
-      - { key: UPSTREAM_PLATFORM, value: https://velchat-platform-service.onrender.com }
-
+      # fromService, not a hardcoded onrender.com URL: Render appends a random suffix when a
+      # service name is already taken (velchat-identity-service-2aje), so a literal URL points at
+      # a host that does not exist and every routed request 404s while the gateway itself looks
+      # healthy. fromService resolves the real host at deploy time.
+      - key: UPSTREAM_IDENTITY
+        fromService: { name: velchat-identity-service, type: web, property: host }
+      - key: UPSTREAM_MESSAGING
+        fromService: { name: velchat-messaging-service, type: web, property: host }
+      - key: UPSTREAM_REALTIME
+        fromService: { name: velchat-realtime-service, type: web, property: host }
+      - key: UPSTREAM_CONTENT
+        fromService: { name: velchat-content-service, type: web, property: host }
+      - key: UPSTREAM_PLATFORM
+        fromService: { name: velchat-platform-service, type: web, property: host }
   - type: web
     name: velchat-identity-service
     runtime: docker
@@ -175,8 +183,8 @@ services:
       - { fromGroup: velchat-shared }
       - { key: SERVICE_NAME, value: realtime-service }
       # The WebSocket fabric resolves conversation membership from the service that owns it.
-      - { key: UPSTREAM_IDENTITY, value: https://velchat-identity-service.onrender.com }
-
+      - key: UPSTREAM_IDENTITY
+        fromService: { name: velchat-identity-service, type: web, property: host }
   - type: web
     name: velchat-content-service
     runtime: docker
