@@ -39,4 +39,32 @@ describe('MembershipProjection (§A10.5 event-sourced)', () => {
     const proj = new MembershipProjection(fakeRedis());
     expect(await proj.members('never-seen')).toEqual([]);
   });
+
+  /**
+   * The projection has to satisfy `MembershipResolver` so `WsFabric` can authorize inbound frames
+   * from it. Without an `isMember`, a deployment that owns conversations in-process (mono) has no
+   * resolver to pass at all — and `mayAct()` fails closed, so EVERY `delivered`, `read`, `typing`
+   * and `skdm` frame is refused. That is "blue ticks and typing never work", with the fabric
+   * behaving exactly as designed.
+   */
+  describe('isMember (MembershipResolver port)', () => {
+    it('confirms a member and denies a non-member', async () => {
+      const proj = new MembershipProjection(fakeRedis());
+      await proj.seed('c1', ['a', 'b']);
+      await expect(proj.isMember('c1', 'a')).resolves.toBe(true);
+      await expect(proj.isMember('c1', 'stranger')).resolves.toBe(false);
+    });
+
+    it('fails CLOSED when membership cannot be determined', async () => {
+      const proj = new MembershipProjection(fakeRedis()); // cold, no HTTP fallback configured
+      await expect(proj.isMember('never-seen', 'a')).resolves.toBe(false);
+    });
+
+    it('denies on empty ids rather than consulting the projection', async () => {
+      const proj = new MembershipProjection(fakeRedis());
+      await proj.seed('c1', ['a']);
+      await expect(proj.isMember('', 'a')).resolves.toBe(false);
+      await expect(proj.isMember('c1', '')).resolves.toBe(false);
+    });
+  });
 });

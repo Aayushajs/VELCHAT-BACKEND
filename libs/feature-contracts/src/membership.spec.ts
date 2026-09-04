@@ -83,6 +83,33 @@ describe('HttpMembershipResolver', () => {
     await expect(resolver().isMember('conv-1', 'nobody')).resolves.toBe(false);
   });
 
+  /**
+   * The upstream does NOT return a bare array. `GET /conversations/:id/members` returns the
+   * standard success envelope, because ResponseInterceptor wraps every non-excluded handler:
+   *
+   *   { success, statusCode, message, data: ['u1','u2'], requestId }
+   *
+   * Reading only `body` / `body.members` therefore yields [] against the REAL service — which
+   * means isMember() answers "no" for genuine members, and every inbound `delivered` / `read` /
+   * `typing` frame is refused. That is precisely "blue ticks and typing never work", with no
+   * error anywhere: the guard is behaving exactly as designed on data it misread.
+   */
+  it('reads the members out of the standard response envelope', async () => {
+    svc.setResponse(() => ({
+      status: 200,
+      body: {
+        success: true,
+        statusCode: 200,
+        message: 'OK',
+        data: ['u1', 'u2'],
+        requestId: 'req-1',
+      },
+    }));
+
+    await expect(resolver().members('conv-1')).resolves.toEqual(['u1', 'u2']);
+    await expect(resolver().isMember('conv-1', 'u1')).resolves.toBe(true);
+  });
+
   it('collapses concurrent lookups of the same conversation into one request', async () => {
     svc.setResponse(() => ({ status: 200, body: ['u1'], delayMs: 40 }));
     const r = resolver();

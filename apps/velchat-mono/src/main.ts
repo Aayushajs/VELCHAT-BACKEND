@@ -46,6 +46,7 @@ async function main(): Promise<void> {
     // In mono, conversations are owned by THIS process; the HTTP resolver is only a fallback
     // for a split deployment, so it points at itself.
     process.env.UPSTREAM_IDENTITY || `http://127.0.0.1:${config.HTTP_PORT}`,
+    config.INTERNAL_API_SECRET,
   );
   const skdm = new SkdmService(new SkdmStore(valkey.redis), router, projection, logger);
   const typing = new TypingRelay(projection, router);
@@ -57,6 +58,12 @@ async function main(): Promise<void> {
     // already refuses to boot without it.
     jwtPublicKey: config.JWT_PUBLIC_PEM,
     sink: bus ? new ReceiptPublisher(bus) : undefined,
+    // Without this, `mayAct()` fails closed and EVERY inbound `delivered`, `read`, `typing` and
+    // `skdm` frame is refused — delivery still works (that path uses the projection directly), so
+    // the symptom is the subtle one: messages arrive, but ticks never turn grey/blue and typing
+    // never shows. The projection is the right resolver here: conversations live in THIS process,
+    // so membership is a Valkey set read with an HTTP auto-heal, not a per-frame round-trip.
+    membership: projection,
     skdm,
     typing,
   });
