@@ -3,7 +3,6 @@ import '@velchat/common/dist/telemetry-bootstrap';
 import 'reflect-metadata';
 import { hostname } from 'node:os';
 import { loadConfig } from '@velchat/config';
-import { HttpMembershipResolver } from '@velchat/feature-contracts';
 import {
   createLogger,
   createMetrics,
@@ -48,26 +47,29 @@ async function main(): Promise<void> {
   const registry = new ConnectionRegistry(valkey.redis);
   const router = new EventRouter(registry, new ValkeyPodPublisher(valkey.redis));
   // Membership comes from the service that owns conversations; the Valkey projection is the cache.
+  const internalSecret = resolveInternalSecret(config);
   const projection = new MembershipProjection(
     valkey.redis,
     process.env.UPSTREAM_IDENTITY || 'http://localhost:3002',
+    internalSecret,
   );
   const skdm = new SkdmService(new SkdmStore(valkey.redis), router, projection, logger);
   const typing = new TypingRelay(projection, router);
 
   // Authorizes inbound receipts/typing/skdm. Without it the fabric refuses every frame that names a
   // conversation — fail-closed by design, since a valid token says nothing about membership.
-  const internalSecret = resolveInternalSecret(config);
-  const membership = internalSecret
-    ? new HttpMembershipResolver({
-        baseUrl: process.env.UPSTREAM_IDENTITY || 'http://localhost:3002',
-        secret: internalSecret,
-      })
-    : undefined;
-  if (!membership) {
+  //
+  // The PROJECTION is the resolver, not a bare HTTP client: authorizing a frame must not cost an
+  // HTTP round-trip to identity-service. Typing alone emits a frame every few keystrokes per active
+  // chat, so at 10k+ concurrent sockets a per-frame resolver would aim a self-inflicted DDoS at the
+  // conversation owner. The projection answers from the Valkey set and only falls back to HTTP
+  // (single-flight, secret-authenticated) when the set is genuinely cold, then re-seeds it.
+  const membership = projection;
+  if (!internalSecret) {
     logger.warn(
-      'INTERNAL_API_SECRET is not set in production: inbound receipts, typing and sender-key ' +
-        'frames will be REFUSED because membership cannot be verified. Live delivery still works.',
+      'INTERNAL_API_SECRET is not set: when the Valkey membership projection is cold, its HTTP ' +
+        'auto-heal will 401 and inbound receipts/typing/sender-key frames will be REFUSED until ' +
+        'a conversation event re-seeds it. Live delivery still works.',
     );
   }
 

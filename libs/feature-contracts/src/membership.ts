@@ -55,6 +55,16 @@ export class HttpMembershipResolver implements MembershipResolver {
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
+  /**
+   * Pull the member ids out of whatever shape the upstream answered with.
+   *
+   * The live service returns the standard success envelope — `ResponseInterceptor` wraps every
+   * non-excluded handler, so the bare `string[]` the controller returns arrives as
+   * `{ success, statusCode, message, data: [...], requestId }`. Accepting only a bare array
+   * silently yields `[]` against the real service, which reads as "not a member" and makes the
+   * fabric refuse every receipt and typing frame. Accept the envelope, the bare array, and
+   * `{members}` so this port cannot be broken again by a response-shape change.
+   */
   async members(conversationId: string): Promise<string[]> {
     const existing = this.inflight.get(conversationId);
     if (existing) return existing;
@@ -86,12 +96,42 @@ export class HttpMembershipResolver implements MembershipResolver {
       });
       if (!res.ok) return [];
       const body: unknown = await res.json();
-      const list = Array.isArray(body) ? body : (body as { members?: unknown })?.members;
-      return Array.isArray(list) ? list.filter((m): m is string => typeof m === 'string') : [];
+      return extractMemberIds(body);
     } catch {
       return []; // timeout, abort, DNS, connection refused — all "unknown", never "allowed"
     } finally {
       clearTimeout(timer);
     }
   }
+}
+
+/**
+ * Accepts every shape `GET /conversations/:id/members` can legitimately answer with:
+ *   - `['u1','u2']`                      a bare array (direct handler / test double)
+ *   - `{ data: ['u1','u2'] }`            the standard success envelope (the REAL service)
+ *   - `{ members: ['u1','u2'] }`         a named field
+ *   - `{ data: { members: [...] } }`     an enveloped named field
+ * Anything else — including an error envelope — yields `[]`, which every caller already
+ * treats as "unknown" (fails closed for authorization, empty for best-effort fan-out).
+ */
+export function extractMemberIds(body: unknown): string[] {
+  const asList = (v: unknown): string[] | null =>
+    Array.isArray(v) ? v.filter((m): m is string => typeof m === 'string') : null;
+
+  const direct = asList(body);
+  if (direct) return direct;
+  if (!body || typeof body !== 'object') return [];
+
+  const obj = body as { members?: unknown; data?: unknown };
+  const named = asList(obj.members);
+  if (named) return named;
+
+  const enveloped = asList(obj.data);
+  if (enveloped) return enveloped;
+
+  const inner = obj.data;
+  if (inner && typeof inner === 'object') {
+    return asList((inner as { members?: unknown }).members) ?? [];
+  }
+  return [];
 }

@@ -1,5 +1,6 @@
 export {
   HttpMembershipResolver,
+  extractMemberIds,
   type MembershipResolver,
   type HttpMembershipResolverOptions,
 } from './membership';
