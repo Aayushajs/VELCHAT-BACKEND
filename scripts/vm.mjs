@@ -9,8 +9,9 @@
 // overrides in deploy/azure/.vmrc (gitignored) or export them in your shell.
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 const c = {
   reset: '\x1b[0m',
@@ -67,6 +68,9 @@ const CFG = {
   fixedPerMonth: Number(env('AZ_FIXED_PER_MONTH', '7.5')), // 64 GB StandardSSD + static IP, approx
   creditTotal: Number(env('AZ_CREDIT_TOTAL', '100')), // the grant, not what is left
   creditRemaining: env('AZ_CREDIT_REMAINING', ''), // what the portal last showed you, if you set it
+
+  // 2Factor SMS — the OTP credit pool, unrelated to Azure. Unlike Azure, this balance IS readable.
+  otpApiKey: env('OTP_API_KEY', ''),
 };
 
 /**
@@ -189,6 +193,12 @@ function httpStatus(url) {
   return r.status === 0 ? Number(String(r.stdout || '').trim()) || 0 : 0;
 }
 
+/** Response body for a URL, or '' if it could not be reached. */
+function httpBody(url) {
+  const r = spawnSync('curl', ['-sS', '--max-time', '25', url], { encoding: 'utf8' });
+  return r.status === 0 ? String(r.stdout || '').trim() : '';
+}
+
 /** Run a command over SSH, streaming output. Returns the exit code. */
 function ssh(remoteCmd, { interactive = false } = {}) {
   const ip = publicIp();
@@ -280,6 +290,64 @@ function runningIntervals(sinceDays) {
   return intervals;
 }
 
+/**
+ * Real spend from the Cost Management API, `{ cost, currency }`, or null.
+ *
+ * This is measured money, not a rate multiplied by hours. The older `az consumption` path returns
+ * empty cost fields on this subscription — every row came back with pretaxCost "None" — which is
+ * why spend used to be estimated. Cost Management answers properly.
+ *
+ * It is aggressively throttled, so a 429 is expected rather than exceptional and is retried.
+ */
+function actualCost(timeframe) {
+  const body = JSON.stringify({
+    type: 'ActualCost',
+    timeframe,
+    dataset: { granularity: 'None', aggregation: { totalCost: { name: 'Cost', function: 'Sum' } } },
+  });
+  const file = join(tmpdir(), `velchat-cost-${process.pid}.json`);
+  writeFileSync(file, body);
+
+  const sub = az(['account', 'show', '--query', 'id', '-o', 'tsv'], { quiet: true });
+  const url =
+    `https://management.azure.com/subscriptions/${sub}` +
+    '/providers/Microsoft.CostManagement/query?api-version=2023-03-01';
+
+  try {
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const out = spawnSync(
+        AZ,
+        ['rest', '--method', 'post', '--url', url, '--body', `@${file}`, '-o', 'json'],
+        { encoding: 'utf8', shell: process.platform === 'win32', maxBuffer: 16 * 1024 * 1024 },
+      );
+      const text = String(out.stdout || '') + String(out.stderr || '');
+      if (text.includes('429')) {
+        sleepSync(20_000);
+        continue;
+      }
+      try {
+        const row = JSON.parse(out.stdout)?.properties?.rows?.[0];
+        if (!row) return null;
+        return { cost: Number(row[0]), currency: String(row[1] || '') };
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  } finally {
+    try {
+      unlinkSync(file);
+    } catch {
+      /* best effort */
+    }
+  }
+}
+
+/** Block for `ms`. Only used between throttled API retries, where sleeping is the point. */
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
 const hoursBetween = (from, to) => (to - from) / 3_600_000;
 
 function humanDuration(ms) {
@@ -364,46 +432,77 @@ const commands = {
       0,
     );
 
-    const compute30 = hours30 * CFG.ratePerHour;
-    const spend30 = compute30 + CFG.fixedPerMonth;
+    ui.title('running time (from the activity log)');
+    ui.info(`last 24h : ${hours24.toFixed(1)} h`);
+    ui.info(`last 30d : ${hours30.toFixed(1)} h`);
 
-    ui.title('measured usage');
-    ui.info(`last 24h : ${hours24.toFixed(1)} h  ->  ${money(hours24 * CFG.ratePerHour)}`);
-    ui.info(`last 30d : ${hours30.toFixed(1)} h  ->  ${money(compute30)} compute`);
-    ui.info(
-      `           + ${money(CFG.fixedPerMonth)} fixed (disk + static IP)  =  ${money(spend30)}`,
-    );
-
-    ui.title('projection');
-    const perDay = hours24 * CFG.ratePerHour;
-    const dailyAvg30 = compute30 / 30;
-    ui.info(`at the last 24h rate : ${money(perDay * 30 + CFG.fixedPerMonth)} / month`);
-    ui.info(`at the 30-day average: ${money(dailyAvg30 * 30 + CFG.fixedPerMonth)} / month`);
-    ui.dim(`Always-on would be ${money(730 * CFG.ratePerHour + CFG.fixedPerMonth)} / month.`);
-
-    // Runway. The portal is the only authority on the balance, so this projects from whatever you
-    // last told it rather than inventing a number.
-    const remaining = CFG.creditRemaining === '' ? null : Number(CFG.creditRemaining);
-    ui.title('credit');
-    if (remaining === null || !Number.isFinite(remaining)) {
-      ui.warn('AZ_CREDIT_REMAINING is not set, so there is no balance to project from.');
-      ui.dim('Azure for Students does not expose cost through the API — read the balance from the');
-      ui.dim('portal (Cost Management -> Credits) and put it in deploy/azure/.vmrc:');
-      ui.dim('  AZ_CREDIT_REMAINING=158');
+    // Real money, not hours multiplied by a rate. `az consumption` returns empty cost fields on
+    // this subscription (every row came back with pretaxCost "None"); Cost Management answers.
+    ui.title('actual spend (Azure Cost Management)');
+    const mtd = actualCost('MonthToDate');
+    const lastMonth = actualCost('TheLastMonth');
+    const dayOfMonth = new Date().getUTCDate();
+    if (mtd) {
+      ui.ok(`month to date  : ${mtd.cost.toFixed(2)} ${mtd.currency}`);
+      const perMonth = (mtd.cost / Math.max(dayOfMonth, 1)) * 30;
+      ui.info(`projected month: ${perMonth.toFixed(2)} ${mtd.currency} at this pace`);
     } else {
-      const monthly = Math.max(dailyAvg30 * 30 + CFG.fixedPerMonth, 0.01);
-      const months = remaining / monthly;
-      ui.ok(`${money(remaining)} left`);
-      ui.info(
-        `at the current pace that is ~${months.toFixed(1)} months (~${Math.round(months * 30)} days)`,
-      );
-      if (running) {
-        const hoursLeft = (remaining - CFG.fixedPerMonth) / CFG.ratePerHour;
-        ui.dim(`Left running continuously it would last ~${Math.round(hoursLeft / 24)} days.`);
+      ui.warn('Cost Management did not answer — it is heavily throttled; try again shortly');
+    }
+    if (lastMonth) ui.info(`last month     : ${lastMonth.cost.toFixed(2)} ${lastMonth.currency}`);
+
+    ui.title('credit');
+    const remaining = CFG.creditRemaining === '' ? null : Number(CFG.creditRemaining);
+    if (remaining === null || !Number.isFinite(remaining)) {
+      ui.warn('Balance unknown — Azure does not expose it for a Students subscription.');
+      ui.dim('availableBalance returns Bad Request on a sponsorship account, so SPEND is readable');
+      ui.dim('but the remaining balance is not. Read it from the portal (Cost Management ->');
+      ui.dim('Credits) and set AZ_CREDIT_REMAINING in deploy/azure/.vmrc to project a runway.');
+    } else {
+      ui.ok(`${remaining} left (as you last recorded it)`);
+      if (mtd && mtd.cost > 0) {
+        const perMonth = (mtd.cost / Math.max(dayOfMonth, 1)) * 30;
+        ui.info(
+          `at ${perMonth.toFixed(2)} ${mtd.currency}/month that is ~${(remaining / perMonth).toFixed(1)} months`,
+        );
       }
     }
+  },
+
+  /** 2Factor SMS credit, read live. Nothing to configure beyond the API key. */
+  async otp() {
+    if (!CFG.otpApiKey) {
+      ui.fail('OTP_API_KEY is not set in deploy/azure/.vmrc');
+      process.exit(1);
+    }
+    ui.title('2Factor SMS credit');
+
+    // Only the subscribed pools answer; the rest return "Addon Services Not Subscribed", which is
+    // information rather than an error — it says which pool the account actually draws from.
+    const pools = ['TRANSACTIONAL_SMS', 'SMS', 'PROMOTIONAL_SMS', 'VOICE_OTP'];
+    let found = false;
+    for (const pool of pools) {
+      const body = httpBody(
+        `https://2factor.in/API/V1/${CFG.otpApiKey}/ADDON_SERVICES/BAL/${pool}`,
+      );
+      let parsed;
+      try {
+        parsed = JSON.parse(body);
+      } catch {
+        continue;
+      }
+      if (parsed.Status === 'Success') {
+        const credits = Number(parsed.Details);
+        found = true;
+        ui.ok(`${pool}: ${Number.isFinite(credits) ? credits.toFixed(0) : parsed.Details} credits`);
+      }
+    }
+    if (!found) {
+      ui.fail('No subscribed pool answered — check the key.');
+      process.exit(1);
+    }
     ui.dim(
-      'Estimated from measured running time — Azure for Students returns no cost via the API.',
+      'One OTP send consumes one credit. OTP_DEV_MODE=false means any number can request one.',
     );
   },
 
@@ -546,6 +645,7 @@ ${paint(c.bold, 'VelChat — Azure VM control')}
   pnpm vm setup             one-time: install Docker, copy compose + Caddyfile
   pnpm vm status            power state, public IP, running containers
   pnpm vm cost              uptime, measured running hours, spend and credit runway
+  pnpm vm otp               2Factor SMS credit remaining (read live)
   pnpm vm start             start the VM
   pnpm vm stop              DEALLOCATE the VM (this is what stops billing)
   pnpm vm restart           reboot the VM
