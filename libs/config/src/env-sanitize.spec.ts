@@ -31,9 +31,9 @@ describe('loadConfig — values with trailing comments', () => {
   it('strips one from a secret too, rather than sending a broken key upstream', () => {
     const cfg = loadConfig({
       ...base,
-      OTP_API_KEY: '1e51d2e3-82f8-11f1-9728-0200cd936042   # DEV key — never commit',
+      OTP_API_KEY: '00000000-0000-4000-8000-000000000000   # DEV key — never commit',
     });
-    expect(cfg.OTP_API_KEY).toBe('1e51d2e3-82f8-11f1-9728-0200cd936042');
+    expect(cfg.OTP_API_KEY).toBe('00000000-0000-4000-8000-000000000000');
   });
 
   it('keeps a strict enum parseable instead of failing the whole boot', () => {
