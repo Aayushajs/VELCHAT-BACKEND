@@ -297,9 +297,33 @@ export type AppConfig = Readonly<z.infer<typeof envSchema>>;
  * Parse + validate the environment. Throws (fail-closed) on any invalid value,
  * listing every offending key so misconfiguration is obvious in the boot log.
  */
+/**
+ * Strip what a `.env` line meant as a comment, and trim stray whitespace.
+ *
+ * `docker compose --env-file` / `env_file:` do NOT honour inline comments — everything after `=`
+ * is the value. So an ordinary-looking line like
+ *
+ *     OTP_TEMPLATE=VelChat            # DLT-approved template name
+ *
+ * arrives as `"VelChat            # DLT-approved template name"`. Nothing rejects it: the service
+ * boots, /health reports ok, and the only evidence is an upstream refusing a request built from a
+ * value nobody can see. Worse, a strict field (`OTP_DEV_MODE: 'true'|'false'`) fails validation and
+ * takes the WHOLE service down for what is visually a correct file.
+ *
+ * A comment is recognised the way dotenv itself does it — whitespace, then `#` — so a value that
+ * legitimately contains `#` (`p#ss`, a URL fragment) is untouched.
+ */
+function sanitizeEnvValue(raw: string): string {
+  return raw.replace(/\s+#.*$/, '').trim();
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   // Render (and many PaaS) inject the listen port as PORT; map it to HTTP_PORT when unset.
-  const source = env.PORT && !env.HTTP_PORT ? { ...env, HTTP_PORT: env.PORT } : env;
+  const withPort = env.PORT && !env.HTTP_PORT ? { ...env, HTTP_PORT: env.PORT } : env;
+  const source: NodeJS.ProcessEnv = {};
+  for (const [key, value] of Object.entries(withPort)) {
+    source[key] = typeof value === 'string' ? sanitizeEnvValue(value) : value;
+  }
   const parsed = envSchema.safeParse(source);
   if (!parsed.success) {
     const issues = parsed.error.issues
