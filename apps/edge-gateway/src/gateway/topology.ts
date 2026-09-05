@@ -31,6 +31,37 @@ const AXIS6: Record<string, string> = {
   AI: 'PLATFORM',
 };
 
+/**
+ * Runtime service → its deployed service slug. Used ONLY to recover a sibling's host when the
+ * blueprint's `UPSTREAM_*` never made it onto the instance (see {@link deriveSiblingHost}).
+ */
+const RENDER_SLUGS: Record<string, string> = {
+  IDENTITY: 'identity-service',
+  MESSAGING: 'messaging-service',
+  REALTIME: 'realtime-service',
+  CONTENT: 'content-service',
+  PLATFORM: 'platform-service',
+};
+
+/**
+ * Recover a sibling service's host from our own.
+ *
+ * Render names siblings identically except for the service slug — `velchat-edge-gateway-2aje`
+ * and `velchat-identity-service-2aje` share the deployment suffix — so our own external hostname
+ * already contains everything needed. This is a LAST RESORT behind `UPSTREAM_*`: without it, a
+ * gateway whose blueprint env never landed falls back to `http://localhost:<devPort>`, which in a
+ * managed container is itself. Every proxied request then 502s instantly while each upstream is
+ * healthy on its own URL — and the gateway's own /health still reports "ok", which makes it look
+ * like a client bug. Returns null when the host doesn't match the expected shape; guessing wildly
+ * would be worse than failing honestly.
+ */
+function deriveSiblingHost(runtime: string, env: NodeJS.ProcessEnv): string | null {
+  const self = env.RENDER_EXTERNAL_HOSTNAME?.trim();
+  const slug = RENDER_SLUGS[runtime];
+  if (!self || !slug || !self.includes('edge-gateway')) return null;
+  return self.replace('edge-gateway', slug);
+}
+
 /** Default dev port per runtime service, so a local run needs no env at all. */
 const DEV_PORTS: Record<string, number> = {
   IDENTITY: 3002,
@@ -84,9 +115,10 @@ export function resolveUpstreamFor(
     const runtime = AXIS6[logical];
     if (runtime) {
       const configured = env[`UPSTREAM_${runtime}`];
-      return configured
-        ? withScheme(configured)
-        : `http://localhost:${DEV_PORTS[runtime] ?? devPort}`;
+      if (configured) return withScheme(configured);
+      const derived = deriveSiblingHost(runtime, env);
+      if (derived) return withScheme(derived);
+      return `http://localhost:${DEV_PORTS[runtime] ?? devPort}`;
     }
   }
   return `http://localhost:${devPort}`;

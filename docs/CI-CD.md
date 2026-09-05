@@ -21,6 +21,11 @@ version, seven signed container images, a GitHub Release, and a running deployme
 Both branches run the full `ci.yml` on push, because both deploy from a push and neither should
 deploy something unverified.
 
+Clients talk only to the **edge gateway** — one base URL per environment, not one per service.
+Render's individual service URLs, the WebSocket endpoints, and the commands for verifying either
+environment end to end (including an authenticated `wss://` session) are in
+[RUNBOOK.md](RUNBOOK.md) section 0b.
+
 Two differences are deliberate rather than incidental:
 
 - **Redis.** Render has no local container, so it uses Upstash. The Azure box runs Valkey locally
@@ -266,7 +271,11 @@ and pushed to GHCR, signed, scanned, tagged, released, and deployed to the Azure
 answered its health check from the public internet.
 
 ```
-https://velchat.duckdns.org/health  ->  200  {"status":"ok","service":"velchat-mono", ...}
+https://velchat.duckdns.org/health                200  {"status":"ok","service":"velchat-mono", ...}
+https://velchat.duckdns.org/docs-json             200  full OpenAPI document, 185 routes
+https://velchat.duckdns.org/status/feed/<id>      401  unauthenticated — the guard is live
+  … same route with a valid bearer token         200  {"success":true,"data":[]}
+wss://velchat.duckdns.org/ws?token=<token>        101  then {"type":"connected","connId":"…"}
 ```
 
 The box runs `ghcr.io/aayushajs/velchat-velchat-mono:8.0.0`, pulled from the registry by the deploy

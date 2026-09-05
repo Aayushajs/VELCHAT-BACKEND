@@ -354,13 +354,26 @@ Two branches, two environments, and a merge is the only manual step.
                                                                             └───────────────────────┘
 ```
 
-|             | `dev`                                       | `main`                        |
-| ----------- | ------------------------------------------- | ----------------------------- |
-| Environment | `development`                               | `production`                  |
-| Host        | Render (free web services)                  | Azure VM `B2as_v2`            |
-| Topology    | `axis6` — six services                      | `mono` — one process          |
-| Deployed by | Render, from source                         | `release.yml`, from GHCR      |
-| Base URL    | `https://velchat-edge-gateway.onrender.com` | `https://velchat.duckdns.org` |
+|             | `dev`                                            | `main`                        |
+| ----------- | ------------------------------------------------ | ----------------------------- |
+| Environment | `development`                                    | `production`                  |
+| Host        | Render (free web services)                       | Azure VM `B2as_v2`            |
+| Topology    | `axis6` — six services                           | `mono` — one process          |
+| Deployed by | Render, from source                              | `release.yml`, from GHCR      |
+| Base URL    | `https://velchat-edge-gateway-2aje.onrender.com` | `https://velchat.duckdns.org` |
+
+Check either one without leaving the terminal — `/health` says the process is up, `/docs-json`
+proves the app itself is answering (it returns the full 185-route OpenAPI document, not a proxy
+page), and a guarded route must answer `401` rather than `404`:
+
+```bash
+curl https://velchat.duckdns.org/health                    # {"status":"ok",...}
+curl -s https://velchat.duckdns.org/docs-json | head -c 80  # OpenAPI, ~116 KB
+curl -s https://velchat.duckdns.org/status/feed/0           # 401 Missing access token
+```
+
+Full verification — including minting a token and opening an authenticated `wss://` session — is in
+[docs/RUNBOOK.md](docs/RUNBOOK.md) section 0b.
 
 **Versioning is the commit message.** `fix:` → patch, `feat:` → minor, `feat!:` or a
 `BREAKING CHANGE:` body → major. A `docs:`/`chore:`-only merge produces no release and no deploy.

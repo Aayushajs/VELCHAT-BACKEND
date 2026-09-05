@@ -158,8 +158,19 @@ export class OtpService {
         )}`,
       );
       if (resp.Status !== 'Success') {
+        // Log the provider's OWN reason. Without it this failure is a black box: the client sees
+        // "Internal server error", the log says "rejected", and the actual cause — an exhausted
+        // balance, a template name the account never had approved, a number the operator refuses
+        // — is unknowable without reproducing the call by hand with the production key.
         this.logger.warn(
-          { phone, action: 'otp.send', status: 'rejected' },
+          {
+            phone,
+            action: 'otp.send',
+            status: 'rejected',
+            providerStatus: resp.Status,
+            providerDetails: resp.Details,
+            template: this.template,
+          },
           'OTP provider rejected send',
         );
         throw new AppError('OTP_SEND_FAILED', 'Failed to send OTP', 502);
