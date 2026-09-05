@@ -25,33 +25,109 @@ Companions: [`CI-CD.md`](CI-CD.md) explains *why* the pipeline is shaped the way
 ## 0b. Base URLs
 
 Clients only ever talk to the **edge gateway**. It routes to whichever service owns the path, so
-there is one base URL per environment, not one per service.
+there is one base URL per environment — not one per service.
 
-| Environment | Branch | Base URL | TLS |
-| --- | --- | --- | --- |
-| **production** | `main` | `https://velchat.duckdns.org` | yes — Let's Encrypt |
-| **development** | `dev` | `https://velchat-edge-gateway-2aje.onrender.com` | yes, Render terminates it |
+| | production | development |
+| --- | --- | --- |
+| Branch | `main` | `dev` |
+| Base URL | `https://velchat.duckdns.org` | `https://velchat-edge-gateway-2aje.onrender.com` |
+| WebSocket | `wss://velchat.duckdns.org/ws` | `wss://velchat-edge-gateway-2aje.onrender.com/ws` |
+| Swagger UI | `https://velchat.duckdns.org/docs` | `…onrender.com/docs` |
+| OpenAPI JSON | `https://velchat.duckdns.org/docs-json` | `…onrender.com/docs-json` |
+| TLS | Let's Encrypt, via Caddy | Render terminates it |
+| Topology | `mono` — one process | `axis6` — six services |
+| Availability | only while the VM is running | sleeps after ~15 min idle |
+
+### Individual Render services
+
+Only the gateway is a client concern. These are for debugging one service directly:
 
 ```
-GET  https://velchat.duckdns.org/health                 production
-GET  https://velchat-edge-gateway-2aje.onrender.com/health   development
+https://velchat-edge-gateway-2aje.onrender.com        the one clients use
+https://velchat-identity-service-2aje.onrender.com    auth · users · orgs · channels
+https://velchat-messaging-service-2aje.onrender.com   chat · notifications · search
+https://velchat-realtime-service-2aje.onrender.com    presence · the WebSocket fabric
+https://velchat-content-service-2aje.onrender.com     media · status/stories
+https://velchat-platform-service-2aje.onrender.com    calls · automation · AI
 ```
 
-Two differences worth knowing before you point a client at either:
+Render appends a random suffix when a service name is taken, hence `-2aje`. The blueprint resolves
+upstreams with `fromService`, so that suffix is never hardcoded anywhere — do not copy it into
+config.
 
-- **Both environments are HTTPS.** Production terminates TLS at Caddy with a Let's Encrypt
-  certificate that renews itself; Render terminates its own. `wss://` works on both, so the mobile
-  client can connect to either.
-- **Development runs the six-service topology; production runs one process.** Same code assembled
-  differently (`SPLIT_PROFILE=axis6` vs `mono`), so behaviour matches — but on Render each service
-  has its own hostname, and the gateway's `UPSTREAM_*` variables point at them. Only the gateway
-  URL is a client concern.
+Production has no equivalent list: `mono` runs every feature group in one process behind one URL.
 
-Render free services sleep after ~15 minutes idle, so the first request after a quiet period takes
-several seconds. That is a cold start, not an outage.
+### Checking an environment
 
-> Render appends a random suffix when a service name is taken, hence `-2aje`. The blueprint
-> resolves upstreams with `fromService`, so the suffix never has to be hardcoded anywhere.
+Everything below is verified working against production. Substitute the dev base URL to check
+Render instead.
+
+**Is it up?**
+
+```bash
+curl https://velchat.duckdns.org/health    # {"status":"ok","service":"velchat-mono",...}
+curl https://velchat.duckdns.org/ready     # {"status":"ready"}
+```
+
+**Is TLS real, and does HTTP redirect?**
+
+```bash
+curl -sI http://velchat.duckdns.org/health | head -1        # 308
+echo | openssl s_client -connect velchat.duckdns.org:443   -servername velchat.duckdns.org 2>/dev/null   | openssl x509 -noout -issuer -enddate                    # Let's Encrypt + expiry
+```
+
+**Is the API actually serving?** `/docs-json` returns the full OpenAPI document — 185 routes — so a
+200 with a large body proves the app is answering, not just the proxy.
+
+```bash
+curl -s https://velchat.duckdns.org/docs-json | head -c 200
+```
+
+**Is the auth guard live?** An unauthenticated call to a guarded route must be rejected. A `404`
+here would mean the route is missing; `401` is the correct answer.
+
+```bash
+curl -s https://velchat.duckdns.org/status/feed/00000000-0000-0000-0000-000000000000
+# {"success":false,"statusCode":401,"message":"Missing access token",...}
+```
+
+**Does an authenticated call work?** Mint a token with the running key. It needs `account_id`,
+`device_id` **and `iss` matching `JWT_ISSUER`** — the guard checks the issuer, and a token without
+it is rejected exactly like an invalid one, which is an easy way to misdiagnose a working system.
+
+```bash
+pnpm vm ssh
+docker exec velchat-velchat-mono-1 node -e '
+  const jwt = require("/repo/node_modules/.pnpm/jsonwebtoken@9.0.3/node_modules/jsonwebtoken");
+  const priv = process.env.JWT_PRIVATE_PEM;          // config normalises the escapes
+  console.log(jwt.sign(
+    { account_id: "00000000-0000-0000-0000-0000000000aa",
+      device_id:  "00000000-0000-0000-0000-0000000000bb", scope: "access" },
+    priv, { algorithm: "RS256", expiresIn: 300, issuer: process.env.JWT_ISSUER }));'
+```
+
+```bash
+curl -s -H "Authorization: Bearer <token>"   https://velchat.duckdns.org/status/feed/00000000-0000-0000-0000-0000000000aa
+# {"success":true,"statusCode":200,"data":[]}
+```
+
+**Does the WebSocket work?** The token goes in `?token=` or an `Authorization` header. A correct
+connection answers with a `connected` frame carrying its connection id; a rejected one closes with
+code `4001`.
+
+```bash
+node -e '
+  const WebSocket = require("ws");
+  const ws = new WebSocket("wss://velchat.duckdns.org/ws?token=" + process.argv[1]);
+  ws.on("open",    () => console.log("open"));
+  ws.on("message", (d) => { console.log(d.toString()); process.exit(0); });
+  ws.on("close",   (c) => console.log("closed", c));' "<token>"
+# {"kind":"durable","type":"connected","data":{"connId":"…"}}
+```
+
+> A `000` or timeout against **development** is almost always a cold start — Render sleeps free
+> services after ~15 minutes and waking six of them takes up to a minute. Retry before diagnosing.
+> Against **production**, it means the VM is deallocated: `pnpm vm start`.
 
 Both environments accept deployments only from their own branch, enforced as GitHub environment
 branch policies: `production` ← `main`, `development` ← `dev`.
@@ -60,15 +136,6 @@ branch policies: `production` ← `main`, `development` ← `dev`.
 > whatever branch you are viewing, and no setting changes that — open the Deployments page and pick
 > an environment in the left sidebar for a filtered view. Render also creates its own
 > `dev - velchat-<service>` environment per service; that naming is Render's, not ours.
-
-WebSocket endpoints, once TLS exists:
-
-```
-wss://velchat.duckdns.org/ws                            production
-wss://velchat-realtime-service-2aje.onrender.com/ws     development
-```
-
----
 
 ## 1. Daily loop
 
