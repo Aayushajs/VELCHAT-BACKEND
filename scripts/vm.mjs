@@ -58,6 +58,15 @@ const CFG = {
   host: env('AZ_HOST', ''),
   composeRemote: env('AZ_COMPOSE_PATH', '~/velchat-deploy/azure/compose.yml'),
   envRemote: env('AZ_ENV_PATH', '~/velchat.env'),
+
+  // Billing inputs. Azure's consumption API returns empty cost fields on an Azure for Students
+  // subscription, so spend is computed from measured running time rather than read back. That
+  // makes these numbers an ESTIMATE: they track compute, which is the part that varies with what
+  // you do, and carry the fixed monthly items as a flat figure.
+  ratePerHour: Number(env('AZ_RATE_PER_HOUR', '0.0492')), // B2as_v2, Central India, pay-as-you-go
+  fixedPerMonth: Number(env('AZ_FIXED_PER_MONTH', '7.5')), // 64 GB StandardSSD + static IP, approx
+  creditTotal: Number(env('AZ_CREDIT_TOTAL', '100')), // the grant, not what is left
+  creditRemaining: env('AZ_CREDIT_REMAINING', ''), // what the portal last showed you, if you set it
 };
 
 /**
@@ -87,6 +96,8 @@ function az(args, { quiet = false } = {}) {
   try {
     return execFileSync(AZ, args, {
       encoding: 'utf8',
+      // An activity-log page runs to megabytes; execFileSync's 1 MB default fails with ENOBUFS.
+      maxBuffer: 64 * 1024 * 1024,
       stdio: quiet ? ['ignore', 'pipe', 'pipe'] : ['ignore', 'pipe', 'inherit'],
       shell: process.platform === 'win32', // az is a .cmd shim on Windows
     }).trim();
@@ -110,22 +121,26 @@ function requireLogin() {
   }
 }
 
-const powerState = () =>
-  az(
-    [
-      'vm',
-      'get-instance-view',
-      '-g',
-      CFG.group,
-      '-n',
-      CFG.vm,
-      '--query',
-      'instanceView.statuses[?starts_with(code, `PowerState/`)].displayStatus | [0]',
-      '-o',
-      'tsv',
-    ],
-    { quiet: true },
-  );
+/**
+ * Current power state, e.g. "VM running" / "VM deallocated".
+ *
+ * Fetches JSON and picks the status here rather than filtering with a `--query`. On Windows `az` is
+ * a .bat shim, so the CLI runs through cmd, and cmd treats the `|` inside a JMESPath expression as
+ * a pipe — the command fails with "'[0]' is not recognized". Parsing locally sidesteps every
+ * shell-quoting difference between platforms.
+ */
+const powerState = () => {
+  const raw = az(['vm', 'get-instance-view', '-g', CFG.group, '-n', CFG.vm, '-o', 'json'], {
+    quiet: true,
+  });
+  try {
+    const statuses = JSON.parse(raw)?.instanceView?.statuses ?? [];
+    const power = statuses.find((st) => String(st.code || '').startsWith('PowerState/'));
+    return power?.displayStatus ?? '';
+  } catch {
+    return '';
+  }
+};
 
 const publicIp = () => {
   if (CFG.host) return CFG.host;
@@ -136,6 +151,43 @@ const publicIp = () => {
     },
   );
 };
+
+/** Run a command over SSH and return its stdout, or '' if it fails. */
+function sshCapture(remoteCmd) {
+  const ip = publicIp();
+  if (!ip) return '';
+  const args = [
+    '-p',
+    CFG.port,
+    '-o',
+    'StrictHostKeyChecking=accept-new',
+    '-o',
+    'ConnectTimeout=15',
+  ];
+  if (CFG.key) args.push('-i', CFG.key);
+  args.push(`${CFG.user}@${ip}`, remoteCmd);
+  const r = spawnSync('ssh', args, { encoding: 'utf8' });
+  return r.status === 0 ? String(r.stdout || '').trim() : '';
+}
+
+/** HTTP status for a URL, or 0 if it could not be reached. Uses curl to avoid a dependency. */
+function httpStatus(url) {
+  const r = spawnSync(
+    'curl',
+    [
+      '-s',
+      '-o',
+      process.platform === 'win32' ? 'NUL' : '/dev/null',
+      '-w',
+      '%{http_code}',
+      '--max-time',
+      '20',
+      url,
+    ],
+    { encoding: 'utf8' },
+  );
+  return r.status === 0 ? Number(String(r.stdout || '').trim()) || 0 : 0;
+}
 
 /** Run a command over SSH, streaming output. Returns the exit code. */
 function ssh(remoteCmd, { interactive = false } = {}) {
@@ -169,6 +221,79 @@ function ssh(remoteCmd, { interactive = false } = {}) {
   return r.status ?? 1;
 }
 
+/**
+ * Running intervals from the activity log, newest last.
+ *
+ * The log is the only record of when the box was actually on: an already-running VM still logs a
+ * `start` (the call is a no-op), and a run that is still going has no `deallocate` yet — so a naive
+ * pairing double-counts. State is tracked instead, and an open interval is closed at "now".
+ */
+function runningIntervals(sinceDays) {
+  const raw = az(
+    [
+      'monitor',
+      'activity-log',
+      'list',
+      '-g',
+      CFG.group,
+      '--offset',
+      `${sinceDays}d`,
+      '--max-events',
+      '1000',
+      '--query',
+      '[].{t:eventTimestamp,o:operationName.value,s:status.value}',
+      '-o',
+      'json',
+    ],
+    { quiet: true },
+  );
+
+  let rows = [];
+  try {
+    rows = JSON.parse(raw);
+  } catch {
+    return null; // no log, or the CLI returned something unexpected
+  }
+
+  const events = [];
+  for (const r of rows) {
+    if (r.s !== 'Succeeded') continue;
+    const op = String(r.o || '').toLowerCase();
+    const at = Date.parse(r.t);
+    if (Number.isNaN(at)) continue;
+    if (op.endsWith('/start/action')) events.push({ at, kind: 'start' });
+    else if (op.endsWith('/deallocate/action')) events.push({ at, kind: 'stop' });
+  }
+  events.sort((a, b) => a.at - b.at);
+
+  const intervals = [];
+  let openedAt = null;
+  for (const e of events) {
+    if (e.kind === 'start') {
+      if (openedAt === null) openedAt = e.at; // a second start while running is a no-op
+    } else if (openedAt !== null) {
+      intervals.push([openedAt, e.at]);
+      openedAt = null;
+    }
+  }
+  if (openedAt !== null) intervals.push([openedAt, Date.now()]); // still running
+  return intervals;
+}
+
+const hoursBetween = (from, to) => (to - from) / 3_600_000;
+
+function humanDuration(ms) {
+  const total = Math.max(0, Math.floor(ms / 60_000));
+  const d = Math.floor(total / 1440);
+  const h = Math.floor((total % 1440) / 60);
+  const m = total % 60;
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+const money = (n) => `$${n.toFixed(2)}`;
+
 const compose = (rest) =>
   `docker compose -f ${CFG.composeRemote} --env-file ${CFG.envRemote} ${rest}`;
 
@@ -192,6 +317,94 @@ const commands = {
       ui.title('containers');
       ssh(compose('ps'));
     }
+  },
+
+  /** Is it up, how long has it been up, and what has that cost. */
+  async cost() {
+    requireLogin();
+    const state = powerState();
+    const running = state === 'VM running';
+
+    ui.title(`${CFG.vm} — ${running ? 'RUNNING' : state || 'unknown'}`);
+
+    // Uptime of the current run, read from the box itself so it reflects reality rather than the
+    // log's view of it.
+    if (running) {
+      const bootedAt = sshCapture('date -u +%s -d "$(uptime -s)"');
+      const booted = Number(bootedAt);
+      if (Number.isFinite(booted) && booted > 0) {
+        const upMs = Date.now() - booted * 1000;
+        ui.ok(
+          `up for ${humanDuration(upMs)}  (this run costs ${money(hoursBetween(booted * 1000, Date.now()) * CFG.ratePerHour)} so far)`,
+        );
+      }
+      const url = process.env.AZURE_PUBLIC_URL || 'https://velchat.duckdns.org';
+      const code = httpStatus(`${url}/health`);
+      (code === 200 ? ui.ok : ui.warn)(`${url}/health -> ${code || 'no answer'}`);
+    } else {
+      ui.warn('deallocated — compute is not being billed, and the site is not reachable');
+    }
+
+    // Measured running time. 30 days is a window, not a calendar month: the activity log retains
+    // 90 days, and a fixed window is comparable week to week in a way "so far this month" is not.
+    const intervals = runningIntervals(30);
+    if (intervals === null) {
+      ui.warn('activity log unavailable — cannot measure running hours');
+      return;
+    }
+
+    const monthMs = Date.now() - 30 * 86_400_000;
+    const hours30 = intervals.reduce(
+      (sum, [a, b]) => sum + hoursBetween(Math.max(a, monthMs), b),
+      0,
+    );
+    const dayMs = Date.now() - 86_400_000;
+    const hours24 = intervals.reduce(
+      (sum, [a, b]) => (b <= dayMs ? sum : sum + hoursBetween(Math.max(a, dayMs), b)),
+      0,
+    );
+
+    const compute30 = hours30 * CFG.ratePerHour;
+    const spend30 = compute30 + CFG.fixedPerMonth;
+
+    ui.title('measured usage');
+    ui.info(`last 24h : ${hours24.toFixed(1)} h  ->  ${money(hours24 * CFG.ratePerHour)}`);
+    ui.info(`last 30d : ${hours30.toFixed(1)} h  ->  ${money(compute30)} compute`);
+    ui.info(
+      `           + ${money(CFG.fixedPerMonth)} fixed (disk + static IP)  =  ${money(spend30)}`,
+    );
+
+    ui.title('projection');
+    const perDay = hours24 * CFG.ratePerHour;
+    const dailyAvg30 = compute30 / 30;
+    ui.info(`at the last 24h rate : ${money(perDay * 30 + CFG.fixedPerMonth)} / month`);
+    ui.info(`at the 30-day average: ${money(dailyAvg30 * 30 + CFG.fixedPerMonth)} / month`);
+    ui.dim(`Always-on would be ${money(730 * CFG.ratePerHour + CFG.fixedPerMonth)} / month.`);
+
+    // Runway. The portal is the only authority on the balance, so this projects from whatever you
+    // last told it rather than inventing a number.
+    const remaining = CFG.creditRemaining === '' ? null : Number(CFG.creditRemaining);
+    ui.title('credit');
+    if (remaining === null || !Number.isFinite(remaining)) {
+      ui.warn('AZ_CREDIT_REMAINING is not set, so there is no balance to project from.');
+      ui.dim('Azure for Students does not expose cost through the API — read the balance from the');
+      ui.dim('portal (Cost Management -> Credits) and put it in deploy/azure/.vmrc:');
+      ui.dim('  AZ_CREDIT_REMAINING=158');
+    } else {
+      const monthly = Math.max(dailyAvg30 * 30 + CFG.fixedPerMonth, 0.01);
+      const months = remaining / monthly;
+      ui.ok(`${money(remaining)} left`);
+      ui.info(
+        `at the current pace that is ~${months.toFixed(1)} months (~${Math.round(months * 30)} days)`,
+      );
+      if (running) {
+        const hoursLeft = (remaining - CFG.fixedPerMonth) / CFG.ratePerHour;
+        ui.dim(`Left running continuously it would last ~${Math.round(hoursLeft / 24)} days.`);
+      }
+    }
+    ui.dim(
+      'Estimated from measured running time — Azure for Students returns no cost via the API.',
+    );
   },
 
   async start() {
@@ -332,6 +545,7 @@ ${paint(c.bold, 'VelChat — Azure VM control')}
 
   pnpm vm setup             one-time: install Docker, copy compose + Caddyfile
   pnpm vm status            power state, public IP, running containers
+  pnpm vm cost              uptime, measured running hours, spend and credit runway
   pnpm vm start             start the VM
   pnpm vm stop              DEALLOCATE the VM (this is what stops billing)
   pnpm vm restart           reboot the VM
@@ -345,6 +559,8 @@ ${paint(c.dim, 'Config (env vars, or deploy/azure/.vmrc):')}
   AZ_RESOURCE_GROUP=${CFG.group}   AZ_VM_NAME=${CFG.vm}
   AZ_SSH_USER=${CFG.user}          AZ_SSH_KEY=${CFG.key || '(ssh default identity)'}
   AZ_HOST=${CFG.host || '(looked up via Azure CLI)'}
+  AZ_RATE_PER_HOUR=${CFG.ratePerHour}   AZ_FIXED_PER_MONTH=${CFG.fixedPerMonth}
+  AZ_CREDIT_REMAINING=${CFG.creditRemaining || '(unset — see `vm cost`)'}
 
 ${paint(c.dim, 'Requires the Azure CLI and `az login`.')}
 `);
