@@ -7,6 +7,7 @@ import {
   type EventEnvelope,
 } from '@velchat/common';
 import type { EventBus, EventHandler } from '../event-bus.port';
+import { pendingSubscriptions } from '../late-subscription';
 
 interface Subscription {
   topic: string;
@@ -111,13 +112,32 @@ export class RedisStreamsEventBus implements EventBus {
     this.subscriptions.push({ topic, groupId, handler: handler as EventHandler });
   }
 
+  /**
+   * Start reading. Safe to call again after MORE consumers have subscribed — and it has to be.
+   *
+   * The composition root starts the bus during application bootstrap, but the realtime fan-out
+   * consumer can only be wired afterwards, because it needs the HTTP server. Returning early on
+   * the second call left those subscriptions with no reader at all: `message.sent`,
+   * `message.read` and `conversation.created` were published and consumed by nobody, so messages
+   * were stored and acknowledged while not one frame was ever pushed to a socket — realtime
+   * silently doing nothing, with every health check green.
+   *
+   * So a repeat call is not a no-op; it starts readers for whatever is not covered yet.
+   */
   async start(): Promise<void> {
-    if (this.running) return;
+    const first = !this.running;
     this.running = true;
+
+    const pending = pendingSubscriptions(
+      this.subscriptions,
+      this.groups.map((g) => ({ groupId: g.groupId, topics: g.topics })),
+    );
+    if (pending.length === 0) return;
 
     // Group the subscriptions so each consumer group reads all of its topics in ONE call.
     const byGroup = new Map<string, Subscription[]>();
     for (const sub of this.subscriptions) {
+      if (!pending.some((p) => p.groupId === sub.groupId && p.topic === sub.topic)) continue;
       const list = byGroup.get(sub.groupId) ?? [];
       list.push(sub);
       byGroup.set(sub.groupId, list);
@@ -147,10 +167,12 @@ export class RedisStreamsEventBus implements EventBus {
       group.loop = this.consumeLoop(group);
     }
 
-    this.reclaimTimer = setInterval(() => void this.reclaimAbandoned(), RECLAIM_INTERVAL_MS);
-    // Sweep once shortly after start so a previous process's stranded entries are not left waiting
-    // a full interval.
-    setTimeout(() => void this.reclaimAbandoned(), 1_000).unref?.();
+    if (first) {
+      this.reclaimTimer = setInterval(() => void this.reclaimAbandoned(), RECLAIM_INTERVAL_MS);
+      // Sweep once shortly after start so a previous process's stranded entries are not left
+      // waiting a full interval.
+      setTimeout(() => void this.reclaimAbandoned(), 1_000).unref?.();
+    }
   }
 
   private async consumeLoop(group: ConsumerGroup): Promise<void> {
