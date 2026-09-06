@@ -166,7 +166,19 @@ jobs:
             org.opencontainers.image.version=${{ needs.version.outputs.version }}
             org.opencontainers.image.licenses=AGPL-3.0-or-later
 
+      # Retried, because this step downloads a binary from the internet and the image is ALREADY
+      # pushed by the time it runs. A transient TLS failure here (exit 35) failed the whole job,
+      # which skipped `publish` and `deploy` — so a fix sat in the registry, unshipped, while
+      # production kept serving the previous build and looked like the fix had not worked.
       - uses: sigstore/cosign-installer@v3
+        id: cosign
+        continue-on-error: true
+      - uses: sigstore/cosign-installer@v3
+        if: steps.cosign.outcome == 'failure'
+        id: cosign_retry
+        continue-on-error: true
+      - uses: sigstore/cosign-installer@v3
+        if: steps.cosign_retry.outcome == 'failure'
 
       - name: Sign the image (keyless)
         # Signs the DIGEST, not a tag: a tag can be repointed at different bytes later, a digest
