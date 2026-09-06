@@ -11,6 +11,7 @@ import {
 import { TenancyService } from './tenancy.service';
 import { AddMemberDto, CreateOrgDto, CreateTeamDto, CreateWorkspaceDto } from './tenancy.dto';
 import type { Role, ScopeType } from './tenancy.types';
+import { scopeRoute } from './scope-routes';
 
 /** Org / workspace / team + membership REST (§B3). Routed via the gateway: /orgs /workspaces /teams. */
 @ApiTags('tenancy')
@@ -43,7 +44,7 @@ export class TenancyController {
     return this.tenancy.createTeam(body.creator, body.orgId, body.name);
   }
 
-  @Post(':scopeType/:scopeId/members')
+  @Post(scopeRoute(':scopeId/members'))
   @ApiOperation({ summary: 'Add a member', description: 'Admin+ only; cannot grant owner.' })
   @ApiParam({ name: 'scopeType', enum: ['org', 'workspace', 'team'] })
   @ApiParam({ name: 'scopeId', description: 'Scope id.' })
@@ -56,7 +57,7 @@ export class TenancyController {
     return this.tenancy.addMember(body.actorId, scopeType, scopeId, body.userId, body.role);
   }
 
-  @Delete(':scopeType/:scopeId/members/:userId')
+  @Delete(scopeRoute(':scopeId/members/:userId'))
   @ApiOperation({ summary: 'Remove a member', description: 'Admin+ only.' })
   @ApiParam({ name: 'scopeType', enum: ['org', 'workspace', 'team'] })
   @ApiParam({ name: 'scopeId', description: 'Scope id.' })
@@ -72,7 +73,7 @@ export class TenancyController {
     return this.tenancy.removeMember(actorId, scopeType, scopeId, userId);
   }
 
-  @Get(':scopeType/:scopeId/members')
+  @Get(scopeRoute(':scopeId/members'))
   @ApiOperation({ summary: 'List members of a scope' })
   @ApiParam({ name: 'scopeType', enum: ['org', 'workspace', 'team'] })
   @ApiParam({ name: 'scopeId', description: 'Scope id.' })

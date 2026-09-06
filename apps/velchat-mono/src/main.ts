@@ -46,12 +46,21 @@ async function main(): Promise<void> {
   const registry = new ConnectionRegistry(valkey.redis);
   const router = new EventRouter(registry, new ValkeyPodPublisher(valkey.redis));
   // Membership comes from the service that owns conversations; the Valkey projection is the cache.
+  // Conversations are owned by THIS process, so membership is a direct call. The HTTP fallback
+  // stays for a split deployment, but it must not be the primary path here: healing the cache
+  // through our own API depends on routing, on the guard, and on INTERNAL_API_SECRET being set —
+  // and every one of those fails by returning "no members", which fan-out turns into a silently
+  // dropped message rather than an error anyone can see.
+  // Resolved by string token, so this stays free of a package dependency on group-channel.
+  const resolveMembers = app.get<(id: string) => Promise<string[]>>(
+    'CONVERSATION_MEMBERS_RESOLVER',
+    { strict: false },
+  );
   const projection = new MembershipProjection(
     valkey.redis,
-    // In mono, conversations are owned by THIS process; the HTTP resolver is only a fallback
-    // for a split deployment, so it points at itself.
     process.env.UPSTREAM_IDENTITY || `http://127.0.0.1:${config.HTTP_PORT}`,
     config.INTERNAL_API_SECRET,
+    resolveMembers ?? undefined,
   );
   const skdm = new SkdmService(new SkdmStore(valkey.redis), router, projection, logger);
   const typing = new TypingRelay(projection, router);
