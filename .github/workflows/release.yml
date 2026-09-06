@@ -230,19 +230,30 @@ jobs:
           name: ${{ needs.version.outputs.tag }}
           generate_release_notes: true
           body: |
-            Container images for `${{ needs.version.outputs.version }}` — signed with cosign, each carrying an SBOM and build provenance.
+            ## 🚀 Velchat Release `${{ needs.version.outputs.version }}`
 
-            Pull:
+            We are excited to announce the latest release! 
+            All container images are securely signed with [cosign](https://github.com/sigstore/cosign) and include an **SBOM** and **Build Provenance** for full supply chain security. 🛡️
 
+            ---
+
+            ### 📦 Container Images
+
+            Pull the latest images from the GitHub Container Registry:
+
+            ```bash
+            docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-velchat-mono:${{ needs.version.outputs.version }}
+            docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-edge-gateway:${{ needs.version.outputs.version }}
+            docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-identity-service:${{ needs.version.outputs.version }}
+            docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-messaging-service:${{ needs.version.outputs.version }}
+            docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-realtime-service:${{ needs.version.outputs.version }}
+            docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-content-service:${{ needs.version.outputs.version }}
+            docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-platform-service:${{ needs.version.outputs.version }}
             ```
-            ghcr.io/${{ needs.version.outputs.owner }}/velchat-velchat-mono:${{ needs.version.outputs.version }}
-            ghcr.io/${{ needs.version.outputs.owner }}/velchat-edge-gateway:${{ needs.version.outputs.version }}
-            ghcr.io/${{ needs.version.outputs.owner }}/velchat-identity-service:${{ needs.version.outputs.version }}
-            ghcr.io/${{ needs.version.outputs.owner }}/velchat-messaging-service:${{ needs.version.outputs.version }}
-            ghcr.io/${{ needs.version.outputs.owner }}/velchat-realtime-service:${{ needs.version.outputs.version }}
-            ghcr.io/${{ needs.version.outputs.owner }}/velchat-content-service:${{ needs.version.outputs.version }}
-            ghcr.io/${{ needs.version.outputs.owner }}/velchat-platform-service:${{ needs.version.outputs.version }}
-            ```
+
+            ---
+
+            ### 🔐 Security & Verification
 
             Verify a signature before trusting an image:
 
@@ -251,6 +262,10 @@ jobs:
               --certificate-identity-regexp "^https://github.com/${{ github.repository }}/" \
               --certificate-oidc-issuer https://token.actions.githubusercontent.com
             ```
+
+            ---
+
+            ### 📝 What's New
 
   deploy:
     name: deploy to Azure
