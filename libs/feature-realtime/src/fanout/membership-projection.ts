@@ -27,10 +27,19 @@ export class MembershipProjection {
    *                    with neither returns 401, which this class reads as "no members" and turns
    *                    into a silently dropped fan-out. Without this the auto-heal cannot heal.
    */
+  /**
+   * @param resolve Optional DIRECT lookup, preferred over the HTTP fallback.
+   *
+   * A single-process deployment owns the conversation data itself, so healing a cold cache by
+   * calling its own HTTP API is a needless dependency on routing, on the guard, and on a shared
+   * secret being present — three ways for the heal to fail silently, each of which ends as a
+   * dropped message rather than an error. When the owner is in-process, ask it directly.
+   */
   constructor(
     private readonly redis: Redis,
     private readonly fallbackUrl?: string,
     private readonly internalSecret?: string,
+    private readonly resolve?: (conversationId: string) => Promise<string[]>,
   ) {}
 
   private key(conversationId: string): string {
@@ -58,6 +67,19 @@ export class MembershipProjection {
   async members(conversationId: string): Promise<string[]> {
     const cached = await this.redis.smembers(this.key(conversationId));
     if (cached.length > 0) return cached;
+
+    // In-process owner first: no HTTP, no route, no secret, nothing to misconfigure.
+    if (this.resolve) {
+      try {
+        const direct = await this.resolve(conversationId);
+        if (direct.length > 0) {
+          await this.seed(conversationId, direct);
+          return direct;
+        }
+      } catch {
+        // fall through to HTTP; a resolver failure must not be the end of the road
+      }
+    }
 
     // No fallback configured → return empty (dev / test)
     if (!this.fallbackUrl) return [];
