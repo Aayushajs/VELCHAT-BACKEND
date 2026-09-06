@@ -79,11 +79,16 @@ default profile.)
 
 | Method | Path | Purpose |
 |---|---|---|
+| POST | `/status/media/presigned-url` | Generate Cloudinary signed URL for direct upload |
 | POST | `/status` | Post a status. 24h server-set expiry |
-| POST | `/status/:id/view` | Record a view (idempotent, audience-checked) |
-| POST | `/status/:id/reactions` | React with an emoji |
+| POST | `/status/:id/view` | Record a view (idempotent, buffered via Valkey) |
+| POST | `/status/:id/reactions` | React with an emoji (buffered via Valkey) |
 | GET | `/status/:id/viewers?limit=&after=` | Viewer list — author only, cursor-paginated |
-| GET | `/status/feed/:authorId` | An author'"'"'s active statuses visible to the caller |
+| GET | `/status/:id/reactions?limit=&after=` | Reactions list — author only, cursor-paginated |
+| GET | `/status/feed/:authorId` | An author's active statuses visible to the caller |
+| POST | `/status/bulk-sync` | Multi-device active feed sync (returns all unexpired status metadata) |
+| POST | `/status/:userId/mute` | Mute a user's statuses from appearing in the feed |
+| DELETE | `/status/:userId/mute` | Unmute a user's statuses |
 | DELETE | `/status/:id` | Soft-delete a status (author only) |
 
 > Every `/status` endpoint derives the acting account from the verified access token. The former
