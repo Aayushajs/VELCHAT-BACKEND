@@ -18,8 +18,13 @@ import {
   TypingRelay,
 } from '@velchat/feature-realtime';
 import { AppModule, INFRA } from './app.module';
+import { monoEventBusDefault } from './event-bus-default';
 
 async function main(): Promise<void> {
+  // BEFORE loadConfig(): a single process has nobody else to deliver to, so it should not route
+  // its own events through Redis Streams to reach itself. See `monoEventBusDefault` — an explicit
+  // EVENT_BUS is still honoured.
+  process.env.EVENT_BUS = monoEventBusDefault(process.env);
   const config = loadConfig();
   const logger = createLogger(config);
   const metrics = createMetrics(config.SERVICE_NAME);
