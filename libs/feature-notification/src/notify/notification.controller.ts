@@ -7,8 +7,9 @@ import {
   ApiCreatedResponse,
   ApiQuery,
 } from '@nestjs/swagger';
+import { Public } from '@velchat/common';
 import { NotificationService } from './notification.service';
-import { RegisterEndpointDto, SetPrefsDto } from './notification.dto';
+import { DeviceAckDto, RegisterEndpointDto, SetPrefsDto } from './notification.dto';
 
 /** Notification prefs + device registration (§B10). Routed via the gateway: /notifications. */
 @ApiTags('notifications')
@@ -54,5 +55,31 @@ export class NotificationController {
   @ApiCreatedResponse({ description: 'Endpoint registered.' })
   registerEndpoint(@Body() body: RegisterEndpointDto) {
     return this.notify.registerEndpoint(body);
+  }
+
+  /**
+   * A device acknowledging a push it received (§B4.4).
+   *
+   * `@Public()` on purpose: this is the one call a phone makes when it has been woken from a
+   * KILLED state, where the access token has long expired and refreshing one from native would
+   * rotate the refresh-token family behind the JS side's back — a silent logout, which is
+   * strictly worse than a missing tick. Authentication is possession of the push token
+   * registered for this device, compared in constant time; the service then re-checks
+   * conversation membership and fails closed.
+   *
+   * Without this route "delivered" was unreachable whenever the recipient's app was closed —
+   * i.e. a permanent single tick for someone who is plainly online.
+   */
+  @Public()
+  @Post('ack')
+  @ApiOperation({
+    summary: 'Acknowledge a push from the device (delivered/read)',
+    description:
+      'Authenticated by the registered push token, not a JWT — the calling app may have been ' +
+      'woken from a killed state. Advances a monotonic watermark only; exposes no content.',
+  })
+  @ApiCreatedResponse({ description: 'Receipt published.' })
+  ack(@Body() body: DeviceAckDto) {
+    return this.notify.ackFromDevice(body);
   }
 }

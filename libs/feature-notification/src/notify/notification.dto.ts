@@ -76,3 +76,35 @@ export class RegisterEndpointDto {
   @IsObject()
   subscription?: Record<string, unknown>;
 }
+
+/**
+ * A woken device acknowledging a push (`POST /notifications/ack`). Deliberately NOT bearer-authed
+ * — the credential is `pushToken`, because a device woken from a killed state has no usable JWT
+ * and refreshing one from native would rotate the refresh family out from under the JS side.
+ * See `push-ack.ts` for the full rationale and threat model.
+ */
+export class DeviceAckDto {
+  @ApiProperty({ description: 'Device id this push endpoint belongs to.' })
+  @IsString()
+  @IsNotEmpty()
+  deviceId!: string;
+
+  @ApiProperty({ description: 'The FCM/APNs token registered for this device — the credential.' })
+  @IsString()
+  @IsNotEmpty()
+  pushToken!: string;
+
+  @ApiProperty({ description: 'Conversation being acknowledged.' })
+  @IsString()
+  @IsNotEmpty()
+  conversationId!: string;
+
+  @ApiProperty({
+    description: 'Cumulative watermark: every message at or below this seq (accepts a string).',
+  })
+  upToSeq!: number | string;
+
+  @ApiProperty({ enum: ['delivered', 'read'] })
+  @IsIn(['delivered', 'read'])
+  state!: string;
+}

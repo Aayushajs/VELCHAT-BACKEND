@@ -1,8 +1,9 @@
-import { uuidv7, type Logger } from '@velchat/common';
+import { uuidv7, UnauthorizedError, ValidationError, type Logger } from '@velchat/common';
 import type { MessageSentPayload, CallStartedPayload } from '@velchat/shared-types';
 import { NotificationRepository, type PrefPatch } from './notification.repository';
 import { MembersProjection } from './members.projection';
 import { decideNotify, type NotifyPrefs } from './notify-policy';
+import { parseDeviceAck, type DeviceAck, type DeviceReceiptEmitter } from './push-ack';
 
 const DEFAULT_PREFS: NotifyPrefs = { level: 'all' };
 
@@ -17,7 +18,58 @@ export class NotificationService {
     private readonly repo: NotificationRepository,
     private readonly members: MembersProjection,
     private readonly logger: Logger,
+    /**
+     * Publishes the durable receipt event for a device ack. Optional so a deployment that has
+     * not wired the bus into this feature still boots — `ackFromDevice` then reports the ack as
+     * unsupported instead of silently pretending it succeeded.
+     */
+    private readonly receipts?: DeviceReceiptEmitter,
   ) {}
+
+  /**
+   * A woken device acknowledging a push (§B4.4). This is the ONLY receipt path that works while
+   * the recipient's app is closed, which is exactly the case where a sender otherwise stares at
+   * one tick forever. Authenticated by the push token, not a JWT — see `push-ack.ts` for why,
+   * and for the blast radius of that choice.
+   *
+   * Fails CLOSED at every step. Membership is re-checked here even though the push was addressed
+   * to this user, because the endpoint row outlives the membership that justified it: a user
+   * removed from a group must not keep advancing its watermarks.
+   */
+  async ackFromDevice(body: unknown): Promise<{ acked: boolean }> {
+    const ack: DeviceAck | null = parseDeviceAck(body);
+    if (!ack) throw new ValidationError('deviceId, pushToken, conversationId, upToSeq, state');
+
+    const userId = await this.repo.accountForPushToken(ack.deviceId, ack.pushToken);
+    if (!userId) {
+      // Unknown device, no stored token, or a mismatch — indistinguishable on purpose.
+      this.logger.debug({ deviceId: ack.deviceId }, 'device ack rejected: unknown endpoint');
+      throw new UnauthorizedError('Unknown push endpoint');
+    }
+
+    const members = await this.members.members(ack.conversationId);
+    if (!members.includes(userId)) {
+      // Empty projection lands here too, and that is the correct answer: "cannot confirm" is not
+      // "allow". The same reasoning as ReceiptPublisher.mayPublish.
+      this.logger.debug(
+        { userId, conversationId: ack.conversationId },
+        'device ack rejected: not a member',
+      );
+      throw new UnauthorizedError('Not a member of this conversation');
+    }
+
+    if (!this.receipts) {
+      this.logger.warn('device ack received but no receipt emitter is wired');
+      return { acked: false };
+    }
+
+    await this.receipts.emit(ack.state, userId, ack.conversationId, ack.upToSeq);
+    this.logger.debug(
+      { userId, conversationId: ack.conversationId, upToSeq: ack.upToSeq, state: ack.state },
+      'device ack published',
+    );
+    return { acked: true };
+  }
 
   async onMessageSent(m: MessageSentPayload): Promise<void> {
     const recipients = (await this.members.members(m.conversation_id)).filter(
