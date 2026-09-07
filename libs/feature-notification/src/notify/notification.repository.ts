@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import type { PostgresClient } from '@velchat/database';
 import type { NotificationPrefRow, PushEndpointRow, OutboxRow } from '@velchat/database';
 
@@ -73,6 +74,30 @@ export class NotificationRepository {
         e.subscription ? JSON.stringify(e.subscription) : null,
       ],
     );
+  }
+
+  /**
+   * Resolve the owner of a push endpoint by proving possession of its token (see `push-ack.ts`).
+   *
+   * The token is compared in Node with `timingSafeEqual`, not in SQL. A `WHERE token = $2` would
+   * work, but this endpoint is reachable without a JWT, so the comparison is the whole
+   * authentication step — doing it in constant time removes the question rather than arguing
+   * about how exploitable a database string compare is.
+   *
+   * Returns null for an unknown device, a device with no token stored, or a token mismatch. The
+   * caller must not distinguish those three: they are all "not this device".
+   */
+  async accountForPushToken(deviceId: string, token: string): Promise<string | null> {
+    const res = await this.pg.pool.query(
+      'SELECT user_id, token FROM push_endpoints WHERE device_id = $1',
+      [deviceId],
+    );
+    const row = res.rows[0] as { user_id: string; token: string | null } | undefined;
+    if (!row?.token) return null;
+    const a = Buffer.from(row.token, 'utf8');
+    const b = Buffer.from(token, 'utf8');
+    if (a.length !== b.length) return null; // timingSafeEqual throws on a length mismatch
+    return timingSafeEqual(a, b) ? row.user_id : null;
   }
 
   async endpointsFor(userId: string): Promise<PushEndpointRow[]> {
