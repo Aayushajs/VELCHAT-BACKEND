@@ -3,6 +3,8 @@ import type { PushSender, PushTarget, PushPayload } from '../push.port';
 
 /** Web Push (VAPID) — open standard, no third party (§A3.5). */
 export class WebPushSender implements PushSender {
+  readonly kind = 'webpush';
+
   constructor(vapid: { publicKey: string; privateKey: string; subject: string }) {
     webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
   }

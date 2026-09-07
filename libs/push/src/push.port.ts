@@ -32,4 +32,14 @@ export interface PushPayload {
 
 export interface PushSender {
   send(target: PushTarget, payload: PushPayload): Promise<void>;
+
+  /**
+   * Which transport this actually is — `fcm`, `webpush`, `log`, or a composite's summary.
+   *
+   * Exists because a misconfigured deployment is INVISIBLE from the outside: with no `FCM_*`
+   * env, `createPushRouter` silently returns `LogPushSender`, every push is "sent" successfully,
+   * and no device ever hears anything. That failure has cost real debugging time, so the
+   * answer is now something a caller can read and report.
+   */
+  readonly kind: string;
 }

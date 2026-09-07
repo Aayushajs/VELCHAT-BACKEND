@@ -25,6 +25,8 @@ export class NotificationService {
      * unsupported instead of silently pretending it succeeded.
      */
     private readonly receipts?: DeviceReceiptEmitter,
+    /** The transport, for diagnostics only — this service never sends through it. */
+    private readonly push?: { readonly kind: string },
   ) {}
 
   /**
@@ -139,6 +141,26 @@ export class NotificationService {
         dedupeKey: `call:${c.call_id}:${userId}`,
       });
     }
+  }
+
+  /**
+   * What transport pushes will really go out on, and whether a device ack can be published.
+   *
+   * Diagnostics only, and deliberately boolean — it exposes no key, no id and no count. It
+   * exists because both of these failures are INVISIBLE from outside: with no `FCM_*` env the
+   * router silently becomes a log sender and every push "succeeds" while no phone ever hears
+   * anything, and with no event bus wired the ack returns `acked:false`. Answering both in one
+   * unauthenticated GET turns a day of guessing into one request.
+   */
+  pushDiagnostics(): { transport: string; delivers: boolean; canAck: boolean } {
+    const transport = this.push?.kind ?? 'unknown';
+    return {
+      transport,
+      // A composite reports what it routes to, so "mobile:none" and "log" both mean undelivered.
+      delivers:
+        transport !== 'log' && transport !== 'unknown' && !transport.includes('mobile:none'),
+      canAck: this.receipts !== undefined,
+    };
   }
 
   setPref(userId: string, scopeType: string, scopeId: string, patch: PrefPatch): Promise<void> {
