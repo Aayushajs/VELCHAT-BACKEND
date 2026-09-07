@@ -73,6 +73,7 @@ export class NotificationWiring {
       this.members,
       deps.logger,
       busReceiptEmitter(deps.eventBus),
+      deps.push,
     );
     this.worker = new OutboxWorker(this.repo, deps.push, deps.logger);
     this.consumer = new NotificationConsumer(deps.eventBus, this.service, this.members);

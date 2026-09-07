@@ -230,42 +230,174 @@ jobs:
           name: ${{ needs.version.outputs.tag }}
           generate_release_notes: true
           body: |
-            ## 🚀 Velchat Release `${{ needs.version.outputs.version }}`
+            <div align="center">
 
-            We are excited to announce the latest release! 
-            All container images are securely signed with [cosign](https://github.com/sigstore/cosign) and include an **SBOM** and **Build Provenance** for full supply chain security. 🛡️
+            # Velchat ${{ needs.version.outputs.tag }}
+
+            **Enterprise-Grade Real-Time Communication Platform**
+
+            [![Release](https://img.shields.io/badge/Release-${{ needs.version.outputs.version }}-6C3FE2?style=for-the-badge&logo=github)](https://github.com/${{ github.repository }}/releases/tag/${{ needs.version.outputs.tag }})
+            [![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)](https://github.com/${{ github.repository }}/blob/main/LICENSE)
+            [![Signed](https://img.shields.io/badge/Cosign-Signed-2ea44f?style=for-the-badge&logo=sigstore)](https://www.sigstore.dev/)
+            [![SBOM](https://img.shields.io/badge/SBOM-Included-orange?style=for-the-badge&logo=linux-containers)](https://www.cisa.gov/sbom)
+            [![Provenance](https://img.shields.io/badge/SLSA-Provenance-blueviolet?style=for-the-badge&logo=slsa)](https://slsa.dev/)
 
             ---
 
-            ### 📦 Container Images
+            *All container images are cryptographically signed, carry a full Software Bill of Materials (SBOM), and include build provenance for complete supply-chain transparency.*
 
-            Pull the latest images from the GitHub Container Registry:
+            </div>
+
+            ---
+
+            ## Container Images
+
+            Every service is published to the **GitHub Container Registry** with three tags: the exact version, the commit SHA, and `latest`.
+
+            | Service | Image | Pull Command |
+            |:--------|:------|:-------------|
+            | **Mono (All-in-One)** | `ghcr.io/${{ needs.version.outputs.owner }}/velchat-velchat-mono` | `docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-velchat-mono:${{ needs.version.outputs.version }}` |
+            | **Edge Gateway** | `ghcr.io/${{ needs.version.outputs.owner }}/velchat-edge-gateway` | `docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-edge-gateway:${{ needs.version.outputs.version }}` |
+            | **Identity Service** | `ghcr.io/${{ needs.version.outputs.owner }}/velchat-identity-service` | `docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-identity-service:${{ needs.version.outputs.version }}` |
+            | **Messaging Service** | `ghcr.io/${{ needs.version.outputs.owner }}/velchat-messaging-service` | `docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-messaging-service:${{ needs.version.outputs.version }}` |
+            | **Realtime Service** | `ghcr.io/${{ needs.version.outputs.owner }}/velchat-realtime-service` | `docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-realtime-service:${{ needs.version.outputs.version }}` |
+            | **Content Service** | `ghcr.io/${{ needs.version.outputs.owner }}/velchat-content-service` | `docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-content-service:${{ needs.version.outputs.version }}` |
+            | **Platform Service** | `ghcr.io/${{ needs.version.outputs.owner }}/velchat-platform-service` | `docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-platform-service:${{ needs.version.outputs.version }}` |
+
+            <details>
+            <summary><strong>Quick Start — Pull all images at once</strong></summary>
 
             ```bash
-            docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-velchat-mono:${{ needs.version.outputs.version }}
-            docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-edge-gateway:${{ needs.version.outputs.version }}
-            docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-identity-service:${{ needs.version.outputs.version }}
-            docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-messaging-service:${{ needs.version.outputs.version }}
-            docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-realtime-service:${{ needs.version.outputs.version }}
-            docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-content-service:${{ needs.version.outputs.version }}
-            docker pull ghcr.io/${{ needs.version.outputs.owner }}/velchat-platform-service:${{ needs.version.outputs.version }}
+            VERSION=${{ needs.version.outputs.version }}
+            OWNER=${{ needs.version.outputs.owner }}
+
+            for svc in velchat-mono edge-gateway identity-service messaging-service \
+                       realtime-service content-service platform-service; do
+              docker pull "ghcr.io/${OWNER}/velchat-${svc}:${VERSION}"
+            done
+            ```
+
+            </details>
+
+            ---
+
+            ## Architecture Overview
+
+            ```
+            ┌─────────────────────────────────────────────────────────────────────┐
+            │                        VELCHAT  v${{ needs.version.outputs.version }}                          │
+            ├─────────────────────────────────────────────────────────────────────┤
+            │                                                                     │
+            │   Client ──► Edge Gateway ──┬──► Identity Service    (Auth/Users)   │
+            │                             ├──► Messaging Service   (Chat/DMs)     │
+            │                             ├──► Realtime Service    (WebSocket)    │
+            │                             ├──► Content Service     (Media/Files)  │
+            │                             └──► Platform Service    (Admin/Config) │
+            │                                                                     │
+            │   All-in-One Alternative:  velchat-mono                             │
+            │                                                                     │
+            └─────────────────────────────────────────────────────────────────────┘
             ```
 
             ---
 
-            ### 🔐 Security & Verification
+            ## Security & Supply Chain
 
-            Verify a signature before trusting an image:
+            Every image in this release is:
+
+            - **Signed** with [Sigstore Cosign](https://www.sigstore.dev/) (keyless OIDC)
+            - **Attested** with [SLSA Build Provenance](https://slsa.dev/) (level 2+)
+            - **Scanned** with [Trivy](https://trivy.dev/) for critical vulnerabilities
+            - **Bundled** with a full SBOM (Software Bill of Materials)
+
+            <details>
+            <summary><strong>Verify image signature</strong></summary>
 
             ```bash
-            cosign verify ghcr.io/${{ needs.version.outputs.owner }}/velchat-velchat-mono:${{ needs.version.outputs.version }} \
+            cosign verify \
+              ghcr.io/${{ needs.version.outputs.owner }}/velchat-velchat-mono:${{ needs.version.outputs.version }} \
               --certificate-identity-regexp "^https://github.com/${{ github.repository }}/" \
               --certificate-oidc-issuer https://token.actions.githubusercontent.com
             ```
 
+            </details>
+
+            <details>
+            <summary><strong>Verify build provenance</strong></summary>
+
+            ```bash
+            gh attestation verify \
+              oci://ghcr.io/${{ needs.version.outputs.owner }}/velchat-velchat-mono:${{ needs.version.outputs.version }} \
+              --owner ${{ needs.version.outputs.owner }}
+            ```
+
+            </details>
+
+            <details>
+            <summary><strong>Inspect the SBOM</strong></summary>
+
+            ```bash
+            docker buildx imagetools inspect \
+              ghcr.io/${{ needs.version.outputs.owner }}/velchat-velchat-mono:${{ needs.version.outputs.version }} \
+              --format '{{ json .SBOM }}'
+            ```
+
+            </details>
+
             ---
 
-            ### 📝 What's New
+            ## Deployment
+
+            <details>
+            <summary><strong>Docker Compose (Recommended)</strong></summary>
+
+            ```bash
+            # Clone the repository
+            git clone https://github.com/${{ github.repository }}.git
+            cd VELCHAT-BACKEND
+
+            # Set the version
+            export TAG=${{ needs.version.outputs.version }}
+
+            # Start all services
+            docker compose -f deploy/azure/compose.yml up -d
+            ```
+
+            </details>
+
+            <details>
+            <summary><strong>Single Container (velchat-mono)</strong></summary>
+
+            ```bash
+            docker run -d \
+              --name velchat \
+              -p 3000:3000 \
+              --env-file .env \
+              ghcr.io/${{ needs.version.outputs.owner }}/velchat-velchat-mono:${{ needs.version.outputs.version }}
+            ```
+
+            </details>
+
+            ---
+
+            ## Upgrade Guide
+
+            | From | To | Migration |
+            |:-----|:---|:----------|
+            | `${{ needs.version.outputs.version }}` (latest) | — | You are here |
+            | Any prior version | `${{ needs.version.outputs.version }}` | Pull new images and restart containers |
+
+            ```bash
+            # Upgrade in-place
+            export TAG=${{ needs.version.outputs.version }}
+            docker compose -f deploy/azure/compose.yml pull
+            docker compose -f deploy/azure/compose.yml up -d --remove-orphans
+            docker image prune -f
+            ```
+
+            ---
+
+            ## Changelog
 
   deploy:
     name: deploy to Azure

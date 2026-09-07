@@ -88,10 +88,20 @@ export class NotificationRepository {
    * caller must not distinguish those three: they are all "not this device".
    */
   async accountForPushToken(deviceId: string, token: string): Promise<string | null> {
-    const res = await this.pg.pool.query(
-      'SELECT user_id, token FROM push_endpoints WHERE device_id = $1',
-      [deviceId],
-    );
+    let res;
+    try {
+      res = await this.pg.pool.query(
+        'SELECT user_id, token FROM push_endpoints WHERE device_id = $1',
+        [deviceId],
+      );
+    } catch {
+      // `push_endpoints.device_id` is a uuid column, so a device id that is not a uuid makes
+      // Postgres reject the QUERY rather than return zero rows. On this endpoint — which is
+      // reachable without a JWT — that surfaced as a 500 instead of the 401 it should be, and a
+      // 500 on an unauthenticated route is both a worse error and a louder signal to a prober.
+      // Swallowing it keeps all failure modes indistinguishable: "not this device".
+      return null;
+    }
     const row = res.rows[0] as { user_id: string; token: string | null } | undefined;
     if (!row?.token) return null;
     const a = Buffer.from(row.token, 'utf8');

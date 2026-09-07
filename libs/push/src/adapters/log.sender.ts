@@ -3,6 +3,8 @@ import type { PushSender, PushTarget, PushPayload } from '../push.port';
 
 /** Dev push sender — logs instead of sending (no transport configured). */
 export class LogPushSender implements PushSender {
+  readonly kind = 'log';
+
   constructor(private readonly logger: Logger) {}
 
   async send(target: PushTarget, payload: PushPayload): Promise<void> {

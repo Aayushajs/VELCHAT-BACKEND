@@ -6,6 +6,8 @@ import type { PushSender, PushTarget, PushPayload } from '../push.port';
  * for E2EE chats — no content (§B10).
  */
 export class FcmSender implements PushSender {
+  readonly kind = 'fcm';
+
   constructor(
     private readonly projectId: string,
     private readonly accessToken: () => Promise<string>,

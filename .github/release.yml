@@ -6,32 +6,46 @@ changelog:
       - dependabot
       - github-actions[bot]
   categories:
-    - title: 💥 Breaking Changes
+    - title: 'Breaking Changes'
       labels:
         - breaking-change
         - breaking
-    - title: ✨ Exciting New Features
+    - title: 'New Features'
       labels:
         - enhancement
         - feature
         - feat
-    - title: 🐛 Bug Fixes
+    - title: 'Bug Fixes'
       labels:
         - bug
         - fix
-    - title: ⚡ Performance Improvements
+        - bugfix
+    - title: 'Performance'
       labels:
         - performance
         - perf
-    - title: 🧹 Maintenance & Refactoring
+    - title: 'Security'
+      labels:
+        - security
+    - title: 'Maintenance'
       labels:
         - refactor
         - chore
         - cleanup
-    - title: 📚 Documentation
+        - maintenance
+    - title: 'Documentation'
       labels:
         - documentation
         - docs
-    - title: 📦 Dependency Updates
+    - title: 'Dependencies'
       labels:
         - dependencies
+        - deps
+    - title: 'Infrastructure'
+      labels:
+        - infrastructure
+        - ci
+        - devops
+    - title: 'Other Changes'
+      labels:
+        - '*'

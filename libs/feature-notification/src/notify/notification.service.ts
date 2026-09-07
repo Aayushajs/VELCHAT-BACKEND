@@ -4,6 +4,7 @@ import { NotificationRepository, type PrefPatch } from './notification.repositor
 import { MembersProjection } from './members.projection';
 import { decideNotify, type NotifyPrefs } from './notify-policy';
 import { parseDeviceAck, type DeviceAck, type DeviceReceiptEmitter } from './push-ack';
+import { messagePreview } from './preview';
 
 const DEFAULT_PREFS: NotifyPrefs = { level: 'all' };
 
@@ -24,6 +25,8 @@ export class NotificationService {
      * unsupported instead of silently pretending it succeeded.
      */
     private readonly receipts?: DeviceReceiptEmitter,
+    /** The transport, for diagnostics only — this service never sends through it. */
+    private readonly push?: { readonly kind: string },
   ) {}
 
   /**
@@ -75,6 +78,9 @@ export class NotificationService {
     const recipients = (await this.members.members(m.conversation_id)).filter(
       (u) => u !== m.sender_account_id,
     );
+    // Computed ONCE per message, not once per recipient: it is pure and identical for everyone
+    // in the conversation, and a group of 200 would otherwise redo the same truncation 200 times.
+    const preview = messagePreview(m);
     for (const userId of recipients) {
       const pref = await this.repo.getPref(userId, 'conversation', m.conversation_id);
       const prefs: NotifyPrefs = pref
@@ -94,12 +100,26 @@ export class NotificationService {
         );
         continue;
       }
-      // Privacy: NO message content in the payload — just ids. The device fetches + decrypts (§A19).
+      // Every FCM data value is a STRING on the wire, so ids and seq are stringified here rather
+      // than left for the sender to coerce.
       const queued = await this.repo.enqueue({
         id: uuidv7(),
         userId,
         type: 'message',
-        payload: { conversationId: m.conversation_id, messageId: m.message_id, seq: String(m.seq) },
+        payload: {
+          conversationId: m.conversation_id,
+          messageId: m.message_id,
+          seq: String(m.seq),
+          // The sender's ID, not their name. The client already mirrors display names locally
+          // (`PushStore.putConversationNames`), so resolving it there costs the server no lookup
+          // and keeps one more piece of personal data off the push.
+          senderId: m.sender_account_id,
+          // `kind` lets the client render "Photo" in ITS language. `preview` is present only
+          // when the server genuinely holds readable plaintext — see `preview.ts` for the rule,
+          // and for why enabling E2EE tightens this automatically rather than needing a change.
+          kind: preview.kind,
+          ...(preview.text !== undefined ? { preview: preview.text } : {}),
+        },
         dedupeKey: `msg:${m.message_id}:${userId}`,
       });
       this.logger.debug({ userId, messageId: m.message_id, queued }, 'push enqueued');
@@ -121,6 +141,26 @@ export class NotificationService {
         dedupeKey: `call:${c.call_id}:${userId}`,
       });
     }
+  }
+
+  /**
+   * What transport pushes will really go out on, and whether a device ack can be published.
+   *
+   * Diagnostics only, and deliberately boolean — it exposes no key, no id and no count. It
+   * exists because both of these failures are INVISIBLE from outside: with no `FCM_*` env the
+   * router silently becomes a log sender and every push "succeeds" while no phone ever hears
+   * anything, and with no event bus wired the ack returns `acked:false`. Answering both in one
+   * unauthenticated GET turns a day of guessing into one request.
+   */
+  pushDiagnostics(): { transport: string; delivers: boolean; canAck: boolean } {
+    const transport = this.push?.kind ?? 'unknown';
+    return {
+      transport,
+      // A composite reports what it routes to, so "mobile:none" and "log" both mean undelivered.
+      delivers:
+        transport !== 'log' && transport !== 'unknown' && !transport.includes('mobile:none'),
+      canAck: this.receipts !== undefined,
+    };
   }
 
   setPref(userId: string, scopeType: string, scopeId: string, patch: PrefPatch): Promise<void> {

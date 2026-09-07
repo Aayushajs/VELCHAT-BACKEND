@@ -58,6 +58,26 @@ export class NotificationController {
   }
 
   /**
+   * Is push actually wired on this deployment?
+   *
+   * `@Public()` and boolean-only: no key, no id, no count. It exists because the two ways this
+   * silently does nothing — missing `FCM_*` env (the router degrades to a log sender and every
+   * push "succeeds") and a missing event bus (acks return `acked:false`) — are both invisible
+   * from outside, and diagnosing them by asking someone to read server logs has already cost
+   * more than this endpoint.
+   */
+  @Public()
+  @Get('push-status')
+  @ApiOperation({
+    summary: 'Whether push transports are configured (diagnostics)',
+    description: 'Booleans only — reveals no credentials, ids or counts.',
+  })
+  @ApiOkResponse({ description: '{ transport, delivers, canAck }' })
+  pushStatus() {
+    return this.notify.pushDiagnostics();
+  }
+
+  /**
    * A device acknowledging a push it received (§B4.4).
    *
    * `@Public()` on purpose: this is the one call a phone makes when it has been woken from a
