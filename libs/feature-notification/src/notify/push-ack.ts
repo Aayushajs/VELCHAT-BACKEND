@@ -66,6 +66,9 @@ export function parseDeviceAck(body: unknown): DeviceAck | null {
   const b = body as Record<string, unknown>;
 
   const deviceId = str(b.deviceId, MAX_ID_LEN);
+  // `token` is tolerated here but is NOT a second spelling of the REST contract: the global pipe
+  // runs with `forbidNonWhitelisted`, so a body using it is rejected before this is reached. The
+  // tolerance is for callers arriving on another transport.
   const pushToken = str(b.pushToken ?? b.token, MAX_TOKEN_LEN);
   const conversationId = str(b.conversationId, MAX_ID_LEN);
   if (!deviceId || !pushToken || !conversationId) return null;

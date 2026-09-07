@@ -1,12 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsArray,
   IsIn,
+  IsInt,
   IsISO8601,
   IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
+  Min,
 } from 'class-validator';
 
 export class SetPrefsDto {
@@ -99,10 +102,26 @@ export class DeviceAckDto {
   @IsNotEmpty()
   conversationId!: string;
 
+  /**
+   * Cumulative watermark: this receipt covers every message at or below `upToSeq`.
+   *
+   * The decorators are NOT optional here. The global pipe runs with `whitelist` AND
+   * `forbidNonWhitelisted` (`libs/common/src/nest/bootstrap.ts`), so a property with no
+   * class-validator decorator is not merely stripped — the whole request is rejected with 400.
+   * An undecorated `upToSeq` would therefore have failed EVERY ack, and the failure would have
+   * been invisible: a refused ack looks exactly like the missing-tick bug this endpoint fixes.
+   *
+   * `@Type(() => Number)` because a client that stringifies the seq (every value in an FCM data
+   * payload is a string on the wire) must still be accepted rather than 400'd.
+   */
   @ApiProperty({
-    description: 'Cumulative watermark: every message at or below this seq (accepts a string).',
+    description: 'Cumulative watermark: every message at or below this seq (a string is coerced).',
+    type: Number,
   })
-  upToSeq!: number | string;
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  upToSeq!: number;
 
   @ApiProperty({ enum: ['delivered', 'read'] })
   @IsIn(['delivered', 'read'])
