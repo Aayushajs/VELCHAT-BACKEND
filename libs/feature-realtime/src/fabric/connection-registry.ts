@@ -46,7 +46,25 @@ export class ConnectionRegistry {
     }
   }
 
-  async heartbeat(userId: string): Promise<void> {
+  /**
+   * Refresh this connection's entry — and RE-ADD it, because refreshing alone is not enough.
+   *
+   * `EXPIRE` on a key that has already expired does nothing and returns 0. The entry is only ever
+   * created by `register`, which runs once, on connect. So a socket whose heartbeats paused for
+   * longer than the TTL — a backgrounded app with throttled timers, a sleeping radio, a tunnel
+   * that stalls — lost its registry entry permanently while the WebSocket stayed open. The server
+   * then believed that user was offline for the entire life of the connection:
+   *
+   *   - fan-out could not find their sockets, so `message.delivered` / `message.read` reached
+   *     nobody and the SENDER's ticks never advanced past one;
+   *   - inbound messages were not routed either, leaving the client on REST catch-up only;
+   *   - `isOnline` stayed false, so every message also sent a push to a user who was connected.
+   *
+   * `SADD` is idempotent while the member is present and recreates the key when it is not, so one
+   * extra set write per heartbeat buys an entry that can always heal.
+   */
+  async heartbeat(userId: string, conn: ConnInfo): Promise<void> {
+    await this.redis.sadd(this.key(userId), JSON.stringify(conn));
     await this.redis.expire(this.key(userId), this.ttlSec);
   }
 
