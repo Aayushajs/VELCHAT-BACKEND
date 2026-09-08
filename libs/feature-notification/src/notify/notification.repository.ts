@@ -117,6 +117,19 @@ export class NotificationRepository {
     return res.rows as PushEndpointRow[];
   }
 
+  /**
+   * Remove an endpoint the push provider has told us is permanently invalid (FCM `UNREGISTERED`,
+   * Web Push 410 Gone).
+   *
+   * Pruning is not housekeeping, it is correctness. Every sign-out deletes the FCM token and the
+   * next login provisions a NEW device id, so stale rows accumulate one per login — and each one
+   * fails every future notification for that user. FCM's own guidance is to delete on these
+   * responses rather than keep paying for them.
+   */
+  async deleteEndpoint(deviceId: string): Promise<void> {
+    await this.pg.pool.query('DELETE FROM push_endpoints WHERE device_id = $1', [deviceId]);
+  }
+
   /** Enqueue a push idempotently — the unique dedupeKey means one push per (event, user). */
   async enqueue(o: {
     id: string;

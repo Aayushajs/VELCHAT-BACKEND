@@ -1,5 +1,6 @@
 import type { Logger } from '@velchat/common';
 import type { PushSender, PushTarget, WebPushSubscription } from '@velchat/push';
+import { PushSendError } from '@velchat/push';
 import type { PushEndpointRow } from '@velchat/database';
 import { NotificationRepository } from './notification.repository';
 
@@ -47,17 +48,85 @@ export class OutboxWorker {
         await this.repo.markSent(row.id); // no device to push to → nothing to do
         continue;
       }
-      try {
-        const data = stringifyValues(row.payload as Record<string, unknown>);
-        await Promise.all(
-          endpoints.map((e) => this.push.send(toTarget(e), { type: row.type, data })),
+      const data = stringifyValues(row.payload as Record<string, unknown>);
+      // Per endpoint, INDEPENDENTLY. `Promise.all` failed the whole row as soon as any single
+      // device failed — and because the sends run in parallel, the devices that DID receive it
+      // got the notification again on every retry. One stale token (a sign-out leaves one behind
+      // per login) was therefore enough to turn every message into a stream of duplicates on the
+      // user's live phone, and then bury the row in the DLQ.
+      const results = await Promise.allSettled(
+        endpoints.map((e) => this.push.send(toTarget(e), { type: row.type, data })),
+      );
+
+      let delivered = 0;
+      let retryable = 0;
+      for (let i = 0; i < results.length; i++) {
+        const r = results[i];
+        const endpoint = endpoints[i];
+        if (!r || !endpoint) continue;
+        if (r.status === 'fulfilled') {
+          delivered++;
+          continue;
+        }
+        const err = r.reason as unknown;
+        if (err instanceof PushSendError && err.gone) {
+          // Never coming back. Drop it so it stops failing every future notification.
+          const deviceId = deviceIdOf(endpoint);
+          if (!deviceId) {
+            this.logger.warn('push endpoint gone but its id is unreadable — not pruning');
+            continue;
+          }
+          try {
+            await this.repo.deleteEndpoint(deviceId);
+            this.logger.info(
+              { deviceId, status: err.status },
+              'push endpoint pruned (provider says gone)',
+            );
+          } catch (delErr) {
+            this.logger.warn({ err: String(delErr) }, 'push endpoint prune failed');
+          }
+          continue;
+        }
+        if (err instanceof PushSendError && !err.retryable) {
+          // A client error we do not model. Retrying re-earns it; log and move on.
+          this.logger.warn(
+            { deviceId: deviceIdOf(endpoint), status: err.status },
+            'push refused, not retrying',
+          );
+          continue;
+        }
+        retryable++;
+        this.logger.debug({ deviceId: deviceIdOf(endpoint), err: String(err) }, 'push send failed');
+      }
+
+      // Retry ONLY when something might still succeed. A row whose every failure was permanent
+      // is finished — retrying it just re-delivers to whoever already got it.
+      if (retryable > 0 && delivered === 0) {
+        await this.repo.markRetryOrDead(
+          row.id,
+          row.attempts,
+          MAX_ATTEMPTS,
+          `${retryable} endpoint(s) failed transiently`,
         );
+      } else {
         await this.repo.markSent(row.id);
-      } catch (err) {
-        await this.repo.markRetryOrDead(row.id, row.attempts, MAX_ATTEMPTS, String(err));
       }
     }
   }
+}
+
+/**
+ * The endpoint's device id, read from either casing.
+ *
+ * `PushEndpointRow` is drizzle's inferred type, so it SAYS `deviceId` — but the repository reads
+ * these rows with raw `pg` (`SELECT *`), which returns the column names verbatim: `device_id`.
+ * The existing code never tripped on it because every other field it touches is a single word.
+ * Reading `e.deviceId` here would have been `undefined` at runtime, and the prune would have
+ * silently done nothing while the log claimed otherwise.
+ */
+function deviceIdOf(e: PushEndpointRow): string {
+  const raw = e as unknown as { deviceId?: string; device_id?: string };
+  return raw.deviceId ?? raw.device_id ?? '';
 }
 
 function toTarget(e: PushEndpointRow): PushTarget {

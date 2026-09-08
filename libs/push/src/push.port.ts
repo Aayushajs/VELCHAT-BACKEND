@@ -30,6 +30,35 @@ export interface PushPayload {
   data?: Record<string, string>;
 }
 
+/**
+ * A send that failed, carrying enough for the caller to decide what to do about it.
+ *
+ * The distinction that matters is `gone`: FCM answers 404/`UNREGISTERED` for a token belonging to
+ * an app that was uninstalled, cleared, or signed out (which deletes the token). That endpoint
+ * will NEVER succeed, so retrying it re-fails the whole notification on every attempt — and since
+ * the sends run in parallel, each retry re-delivers to the endpoints that DID work. One stale row
+ * therefore turns into a stream of duplicate notifications on the user's live phone.
+ *
+ * `retryable` is the opposite case — a 5xx or a network blip — where the same send later is the
+ * correct response.
+ */
+export class PushSendError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    /** The endpoint is permanently invalid and should be removed. */
+    readonly gone: boolean,
+  ) {
+    super(message);
+    this.name = 'PushSendError';
+  }
+
+  /** Anything that is not `gone` and not a client error is worth another attempt. */
+  get retryable(): boolean {
+    return !this.gone && (this.status === 0 || this.status >= 500);
+  }
+}
+
 export interface PushSender {
   send(target: PushTarget, payload: PushPayload): Promise<void>;
 
