@@ -1,6 +1,6 @@
 import { ConnectionRegistry } from './connection-registry';
 
-function fakeRedis(): never & { __expireNow(key: string): void } {
+function fakeRedis() {
   const sets = new Map<string, Set<string>>();
   return {
     async sadd(key: string, value: string) {
@@ -29,7 +29,7 @@ function fakeRedis(): never & { __expireNow(key: string): void } {
     async scard(key: string) {
       return sets.get(key)?.size ?? 0;
     },
-  } as never;
+  };
 }
 
 describe('ConnectionRegistry (§B9.1)', () => {
@@ -41,7 +41,7 @@ describe('ConnectionRegistry (§B9.1)', () => {
     // forever: fan-out could not reach their sockets, so the sender's ticks never advanced past
     // one, and every message also pushed to a user who was online.
     const redis = fakeRedis();
-    const reg = new ConnectionRegistry(redis);
+    const reg = new ConnectionRegistry(redis as never);
     const conn = { podId: 'pod-A', connId: 'c1', deviceId: 'd1' };
 
     await reg.register('u1', conn);
@@ -56,7 +56,7 @@ describe('ConnectionRegistry (§B9.1)', () => {
   });
 
   it('a heartbeat does not duplicate a connection that is still present', async () => {
-    const reg = new ConnectionRegistry(fakeRedis());
+    const reg = new ConnectionRegistry(fakeRedis() as never);
     const conn = { podId: 'pod-A', connId: 'c1', deviceId: 'd1' };
     await reg.register('u1', conn);
     await reg.heartbeat('u1', conn);
@@ -65,14 +65,14 @@ describe('ConnectionRegistry (§B9.1)', () => {
   });
 
   it('registers a connection and reports it online', async () => {
-    const reg = new ConnectionRegistry(fakeRedis());
+    const reg = new ConnectionRegistry(fakeRedis() as never);
     await reg.register('u1', { podId: 'pod-A', connId: 'c1', deviceId: 'd1' });
     expect(await reg.isOnline('u1')).toBe(true);
     expect(await reg.podsFor('u1')).toEqual(['pod-A']);
   });
 
   it('dedupes pods across multiple connections', async () => {
-    const reg = new ConnectionRegistry(fakeRedis());
+    const reg = new ConnectionRegistry(fakeRedis() as never);
     await reg.register('u1', { podId: 'pod-A', connId: 'c1', deviceId: 'd1' });
     await reg.register('u1', { podId: 'pod-A', connId: 'c2', deviceId: 'd2' });
     await reg.register('u1', { podId: 'pod-B', connId: 'c3', deviceId: 'd3' });
@@ -81,7 +81,7 @@ describe('ConnectionRegistry (§B9.1)', () => {
   });
 
   it('unregisters a connection by connId', async () => {
-    const reg = new ConnectionRegistry(fakeRedis());
+    const reg = new ConnectionRegistry(fakeRedis() as never);
     await reg.register('u1', { podId: 'pod-A', connId: 'c1', deviceId: 'd1' });
     await reg.unregister('u1', 'c1');
     expect(await reg.isOnline('u1')).toBe(false);

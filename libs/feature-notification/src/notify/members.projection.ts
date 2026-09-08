@@ -28,8 +28,23 @@ export class MembersProjection {
     return this.redis.smembers(this.key(conversationId));
   }
 
-  /** Online iff the realtime gateway holds ≥1 live socket for this user. */
+  /**
+   * Is the user ACTIVELY USING the app right now — the only state in which a push would be noise.
+   *
+   * Reads presence (`online:{u}`), not the socket registry (`conn:{u}`). Holding a socket is not
+   * the same as looking at the screen, and treating it as such is why a backgrounded app got no
+   * notification at all: the client keeps its WebSocket for a grace period after backgrounding,
+   * the server saw a live connection, `decideNotify` said "they can see it", and no push was ever
+   * enqueued. Worse, that grace period is itself gated on push being available — so a device that
+   * had not registered for push kept its socket indefinitely and could never receive one. A
+   * deadlock: no push, therefore no push.
+   *
+   * Presence has none of that. `online:{u}` is refreshed by a 20s client heartbeat against a 30s
+   * TTL, and Android throttles that timer the moment the app leaves the foreground — so the key
+   * lapses on its own, and the client also announces `presence/offline` immediately on
+   * backgrounding. Foreground means online; anything else does not.
+   */
   async isOnline(userId: string): Promise<boolean> {
-    return (await this.redis.scard(`conn:${userId}`)) > 0;
+    return (await this.redis.scard(`online:${userId}`)) > 0;
   }
 }
