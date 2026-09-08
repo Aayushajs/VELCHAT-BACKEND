@@ -399,6 +399,7 @@ pnpm vm ssh   # confirm it works, then delete the old key
 | Release failed on Trivy | A CRITICAL CVE **with a fix available**. Read the table in the log; it names the package and the fixed version. |
 | Every branch shows a failed `release` run at 0s | The workflow file is invalid. GitHub reports that on all branches, not just the one that triggers it. |
 | Deploy succeeded but the site is unchanged | Check what is actually running: `docker inspect velchat-velchat-mono-1 --format '{{.Config.Image}}'`. |
+| The site went BACKWARDS after a manual `up -d` | `TAG` in `~/velchat.env` was stale (it was `latest`, whose local image was days old). CI exports `TAG` into the shell — which wins over `--env-file` — so a CI deploy is correct while a hand-run `up -d` silently reverts to whatever `~/velchat.env` says. Keep `TAG` pinned to the version actually deployed, and verify with `docker inspect` after any manual `up -d`. |
 | Container restarts in a loop | `pnpm vm logs velchat-mono`. A missing required env var and a bad database URL both look like this. |
 
 Useful directly on the box:
@@ -409,6 +410,11 @@ cd ~/velchat-deploy/azure
 docker compose --env-file ~/velchat.env ps
 docker compose --env-file ~/velchat.env logs --tail=100 velchat-mono
 docker stats --no-stream          # is 8 GB actually enough?
+
+# Changed something in ~/velchat.env and need the container to see it? Pass TAG explicitly.
+# A bare `up -d` uses the TAG in ~/velchat.env, which is NOT necessarily what CI last deployed
+# — that path has already rolled production back several days once.
+TAG=$(docker inspect velchat-velchat-mono-1 --format '{{.Config.Image}}' | cut -d: -f2)   docker compose --env-file ~/velchat.env up -d velchat-mono
 ```
 
 ---
