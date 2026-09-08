@@ -1,3 +1,4 @@
+export { PushSendError } from './push.port';
 export type {
   PushSender,
   PushTarget,

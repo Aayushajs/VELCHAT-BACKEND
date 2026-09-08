@@ -1,3 +1,4 @@
+import { PushSendError } from '../push.port';
 import type { PushSender, PushTarget, PushPayload } from '../push.port';
 
 /**
@@ -30,6 +31,13 @@ export class FcmSender implements PushSender {
         }),
       },
     );
-    if (!res.ok) throw new Error(`FCM send failed: ${res.status}`);
+    if (!res.ok) {
+      // 404 = UNREGISTERED: the token belonged to an install that is gone (uninstalled, data
+      // cleared, or signed out — which deletes the token). 400 = INVALID_ARGUMENT: the token is
+      // malformed and will never become valid. Both mean "delete this endpoint", and FCM's own
+      // guidance is to prune on them rather than keep paying for the failure.
+      const gone = res.status === 404 || res.status === 400;
+      throw new PushSendError(`FCM send failed: ${res.status}`, res.status, gone);
+    }
   }
 }
