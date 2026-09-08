@@ -36,7 +36,7 @@ export class PresenceController {
   @ApiOperation({ summary: 'Refresh online TTL (periodic ping)' })
   @ApiOkResponse({ description: 'Heartbeat refreshed.' })
   heartbeat(@Body() body: HeartbeatDto) {
-    return this.presence.heartbeat(body.userId);
+    return this.presence.heartbeat(body.userId, body.deviceId);
   }
 
   @Put('status')
