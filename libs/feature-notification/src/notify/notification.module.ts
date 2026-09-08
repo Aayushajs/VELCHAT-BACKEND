@@ -68,14 +68,16 @@ export class NotificationWiring {
   constructor(deps: NotificationModuleDeps) {
     this.repo = new NotificationRepository(deps.pg);
     this.members = new MembersProjection(deps.redis);
+    this.worker = new OutboxWorker(this.repo, deps.push, deps.logger);
     this.service = new NotificationService(
       this.repo,
       this.members,
       deps.logger,
       busReceiptEmitter(deps.eventBus),
       deps.push,
+      // Constructed before the service so the kick is a real reference, not a late binding.
+      () => this.worker.kick(),
     );
-    this.worker = new OutboxWorker(this.repo, deps.push, deps.logger);
     this.consumer = new NotificationConsumer(deps.eventBus, this.service, this.members);
   }
 }

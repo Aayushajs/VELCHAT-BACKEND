@@ -14,6 +14,8 @@ const MAX_ATTEMPTS = 6;
  */
 export class OutboxWorker {
   private timer?: ReturnType<typeof setInterval>;
+  /** True while a tick is in flight, so `kick()` cannot overlap the timer's own pass. */
+  private ticking = false;
 
   constructor(
     private readonly repo: NotificationRepository,
@@ -33,8 +35,35 @@ export class OutboxWorker {
     this.timer = undefined;
   }
 
+  /**
+   * Deliver NOW, rather than at the next poll.
+   *
+   * The timer is a safety net for rows this misses (a crash between enqueue and kick, a retry
+   * coming due); it should not be how a notification is normally sent. Waiting for it added up to
+   * `intervalMs` of dead time to every push — on a chat app, seconds of latency the user reads as
+   * "the notification did not arrive", because by the time it lands they have already opened the
+   * app to check.
+   *
+   * Never throws and never awaits the caller: the enqueue must not be able to fail because a
+   * delivery attempt did.
+   */
+  kick(): void {
+    if (this.ticking) return;
+    void this.tick();
+  }
+
   /** One delivery pass — exported for tests + the interval. */
   async tick(): Promise<void> {
+    if (this.ticking) return;
+    this.ticking = true;
+    try {
+      await this.runTick();
+    } finally {
+      this.ticking = false;
+    }
+  }
+
+  private async runTick(): Promise<void> {
     let rows;
     try {
       rows = await this.repo.claimPending(this.batch);
