@@ -179,7 +179,13 @@ export class WsFabric {
 
     switch (msg.type) {
       case 'ping':
-        await this.registry.heartbeat(ctx.userId);
+        // Pass the connection so the heartbeat can RE-ADD it, not merely extend a TTL that may
+        // already have lapsed — see `ConnectionRegistry.heartbeat`.
+        await this.registry.heartbeat(ctx.userId, {
+          podId: this.opts.podId,
+          connId: ctx.connId,
+          deviceId: ctx.deviceId,
+        });
         this.write(ctx, { kind: 'ephemeral', type: 'pong', data: {} });
         break;
 
