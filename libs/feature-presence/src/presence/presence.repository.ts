@@ -16,7 +16,21 @@ export class PresenceRepository {
     await this.redis.expire(`online:${userId}`, ONLINE_TTL_SEC);
   }
 
-  async heartbeat(userId: string): Promise<void> {
+  /**
+   * Refresh a device's presence. RE-ADDS it rather than only extending the TTL.
+   *
+   * EXPIRE does nothing on a key that has already gone, and `addDevice` only runs when the client
+   * announces itself. With a 30s TTL against a 20s beat, one late heartbeat — a throttled timer,
+   * a radio waking back up — dropped the key, and every beat after that was a no-op against a key
+   * that no longer existed. The user then read as offline for the rest of the session while their
+   * app sat open: contacts saw a frozen "last seen", and the notification policy pushed to
+   * someone who was already looking at the chat.
+   *
+   * `deviceId` is optional only so an older client that posts `{userId}` alone keeps working — it
+   * gets the previous refresh-if-present behaviour, which is no worse than what it had.
+   */
+  async heartbeat(userId: string, deviceId?: string): Promise<void> {
+    if (deviceId) await this.redis.sadd(`online:${userId}`, deviceId);
     await this.redis.expire(`online:${userId}`, ONLINE_TTL_SEC);
   }
 

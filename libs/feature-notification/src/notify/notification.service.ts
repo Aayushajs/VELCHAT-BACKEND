@@ -27,6 +27,11 @@ export class NotificationService {
     private readonly receipts?: DeviceReceiptEmitter,
     /** The transport, for diagnostics only — this service never sends through it. */
     private readonly push?: { readonly kind: string },
+    /**
+     * Ask the outbox worker to deliver immediately instead of at its next poll. Optional so a
+     * deployment that has not wired it still works — just with the poll interval's latency.
+     */
+    private readonly kickOutbox?: () => void,
   ) {}
 
   /**
@@ -123,6 +128,10 @@ export class NotificationService {
         dedupeKey: `msg:${m.message_id}:${userId}`,
       });
       this.logger.debug({ userId, messageId: m.message_id, queued }, 'push enqueued');
+      // Deliver on the spot. The worker's timer is the safety net, not the delivery path — a
+      // notification that arrives seconds late has usually been overtaken by the user opening
+      // the app, which reads as never having arrived at all.
+      if (queued) this.kickOutbox?.();
     }
   }
 

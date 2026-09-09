@@ -34,8 +34,13 @@ export class PresenceService {
     await this.fanout(userId);
   }
 
-  async heartbeat(userId: string): Promise<void> {
-    await this.repo.heartbeat(userId);
+  /**
+   * Keep a device's presence alive. The device id is passed through so a beat can RECOVER a
+   * presence key whose TTL lapsed — see the repository for why that is not the same as extending
+   * it. Optional, so a client that predates sending it still works.
+   */
+  async heartbeat(userId: string, deviceId?: string): Promise<void> {
+    await this.repo.heartbeat(userId, deviceId);
   }
 
   async offline(userId: string, deviceId: string): Promise<void> {

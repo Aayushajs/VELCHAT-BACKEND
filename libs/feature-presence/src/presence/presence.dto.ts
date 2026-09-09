@@ -18,6 +18,18 @@ export class HeartbeatDto {
   @IsString()
   @IsNotEmpty()
   userId!: string;
+
+  /**
+   * The beating device. Optional for compatibility with clients that only send `userId`, but
+   * without it a beat cannot restore a presence key whose TTL has lapsed — it can only extend one
+   * that is still there. Decorated because the global ValidationPipe runs with
+   * `forbidNonWhitelisted`, where an undecorated property is a 400 rather than a silent strip.
+   */
+  @ApiPropertyOptional({ description: 'Device id sending the heartbeat.' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  deviceId?: string;
 }
 
 export class SetStatusDto {
