@@ -8,6 +8,7 @@ import { ChatService } from './chat.service';
 import { ChatRepository } from './chat.repository';
 import { SeqService } from './seq.service';
 import { ChatEvents } from './chat.events';
+import { ReceiptsRepository } from './receipts.repository';
 
 export interface ChatModuleDeps {
   logger: Logger;
@@ -24,7 +25,11 @@ export class ChatModule {
     // unreachable, so a Valkey outage degrades latency rather than failing sends (§B4.3).
     const seq = new SeqService(deps.valkey.redis, deps.mongo);
     const events = new ChatEvents(deps.eventBus);
-    const service = new ChatService(repo, seq, events);
+    // The receipt store is constructed here as well as in the composition root (which wires the
+    // consumer that WRITES it), because the read side belongs to chat: a client asks for the
+    // conversation it is looking at.
+    const receiptStore = new ReceiptsRepository(deps.mongo);
+    const service = new ChatService(repo, seq, events, receiptStore);
 
     return {
       module: ChatModule,
