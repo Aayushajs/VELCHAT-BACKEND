@@ -55,6 +55,22 @@ export class ChatController {
     return this.chat.history(id, afterSeq ? Number(afterSeq) : 0, limit ? Number(limit) : 50);
   }
 
+  @Get('conversations/:id/receipts')
+  @ApiOperation({
+    summary: "What the other members have delivered and read",
+    description:
+      'Repairs a tick that a live event could not deliver. Receipts fan out over the socket, so ' +
+      'one published while this device was reconnecting is lost — and the message then keeps a ' +
+      'single tick for good, however long ago it was really read. A client reads this on ' +
+      'reconnect and applies whatever it missed. Bounded by conversation size (at most two rows ' +
+      'per member) and excludes the caller.',
+  })
+  @ApiParam({ name: 'id', description: 'Conversation id.' })
+  @ApiOkResponse({ description: 'Watermarks: [{ userId, state, upToSeq, at }].' })
+  receipts(@CurrentUser('accountId') accountId: string, @Param('id') id: string) {
+    return this.chat.receipts(id, accountId);
+  }
+
   @Post('messages/:id/reactions')
   @ApiOperation({
     summary: 'Add a reaction to a message',

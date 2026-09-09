@@ -1,5 +1,6 @@
 import { uuidv7, ValidationError, ForbiddenError, NotFoundError } from '@velchat/common';
 import { ChatRepository, isDuplicateKey } from './chat.repository';
+import type { ReceiptsRepository, ReceiptWatermark } from './receipts.repository';
 import { SeqService } from './seq.service';
 import { ChatEvents } from './chat.events';
 import type {
@@ -26,6 +27,14 @@ export class ChatService {
     private readonly repo: ChatRepository,
     private readonly seq: SeqService,
     private readonly events: ChatEvents,
+    /**
+     * The durable receipt store. NOT named `receipts`: a constructor parameter property shadows
+     * the prototype, and a field by that name would silently replace the `receipts()` method on
+     * every instance. Optional so a deployment without it still boots and serves chat
+     * — the receipts route then reports nothing, which the client reads as "no news" rather than
+     * as an error.
+     */
+    private readonly receiptStore?: ReceiptsRepository,
   ) {}
 
   async send(input: SendMessageInput): Promise<SendAck> {
@@ -95,6 +104,23 @@ export class ChatService {
 
   async history(conversationId: string, afterSeq = 0, limit = 50): Promise<MessageDoc[]> {
     return this.repo.history(conversationId, afterSeq, Math.min(Math.max(limit, 1), 100));
+  }
+
+  /**
+   * What the OTHER members of a conversation have delivered and read.
+   *
+   * Ticks are live socket events, and a live event missed is a live event lost: a receipt
+   * published while the sender's socket was reconnecting left that message on one tick forever.
+   * This is how a client repairs that on reconnect — the store has always held the answer and
+   * nothing ever asked it.
+   *
+   * The caller's own rows are dropped. They already know what they have read, and the payload
+   * should carry only what they cannot know.
+   */
+  async receipts(conversationId: string, callerId: string): Promise<ReceiptWatermark[]> {
+    if (!this.receiptStore) return [];
+    const all = await this.receiptStore.forConversation(conversationId);
+    return all.filter((r) => r.userId !== callerId);
   }
 
   /** Add a reaction (§B15). Storage is idempotent per (user, emoji); the event is a live cue. */
