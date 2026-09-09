@@ -9,6 +9,49 @@ export interface PrefPatch {
   dndSchedule?: unknown;
 }
 
+/**
+ * Raw `pg` results carry DATABASE column names — snake_case. The row types used here are
+ * drizzle's inferred ones, which are camelCase. A `res.rows as OutboxRow[]` cast bridges those
+ * two with nothing but a promise, and the compiler accepts it because a cast through `unknown`
+ * always type-checks.
+ *
+ * That promise was false, and it cost every push in the system. `claimPending` returned rows
+ * whose `userId` was `undefined`; the worker then asked for the endpoints of nobody, got none,
+ * and marked the row `sent` under the comment "no device to push to". Postgres said delivered,
+ * the outbox said delivered, nothing was logged anywhere — and FCM was never called at all.
+ *
+ * So the translation lives here, in the one place that knows both spellings, and every method
+ * returns rows that genuinely match the type on its signature. The camelCase fallbacks are for a
+ * caller that hands us already-mapped rows (drizzle, or a test), which makes this a
+ * normalisation rather than a second guess about the driver.
+ */
+function toOutboxRow(r: Record<string, unknown>): OutboxRow {
+  return {
+    id: r.id as OutboxRow['id'],
+    userId: (r.user_id ?? r.userId) as OutboxRow['userId'],
+    type: r.type as OutboxRow['type'],
+    payload: r.payload as OutboxRow['payload'],
+    dedupeKey: (r.dedupe_key ?? r.dedupeKey) as OutboxRow['dedupeKey'],
+    status: r.status as OutboxRow['status'],
+    attempts: r.attempts as OutboxRow['attempts'],
+    nextAttemptAt: (r.next_attempt_at ?? r.nextAttemptAt) as OutboxRow['nextAttemptAt'],
+    lastError: (r.last_error ?? r.lastError ?? null) as OutboxRow['lastError'],
+    createdAt: (r.created_at ?? r.createdAt) as OutboxRow['createdAt'],
+  };
+}
+
+function toPushEndpointRow(r: Record<string, unknown>): PushEndpointRow {
+  return {
+    deviceId: (r.device_id ?? r.deviceId) as PushEndpointRow['deviceId'],
+    userId: (r.user_id ?? r.userId) as PushEndpointRow['userId'],
+    platform: r.platform as PushEndpointRow['platform'],
+    token: (r.token ?? null) as PushEndpointRow['token'],
+    voipToken: (r.voip_token ?? r.voipToken ?? null) as PushEndpointRow['voipToken'],
+    subscription: (r.subscription ?? null) as PushEndpointRow['subscription'],
+    updatedAt: (r.updated_at ?? r.updatedAt) as PushEndpointRow['updatedAt'],
+  };
+}
+
 /** notification data access (§B10, Postgres). Prefs, device endpoints, and the durable outbox. */
 export class NotificationRepository {
   constructor(private readonly pg: PostgresClient) {}
@@ -114,7 +157,7 @@ export class NotificationRepository {
     const res = await this.pg.pool.query('SELECT * FROM push_endpoints WHERE user_id = $1', [
       userId,
     ]);
-    return res.rows as PushEndpointRow[];
+    return res.rows.map((r) => toPushEndpointRow(r as Record<string, unknown>));
   }
 
   /**
@@ -157,7 +200,7 @@ export class NotificationRepository {
        ) RETURNING *`,
       [limit],
     );
-    return res.rows as OutboxRow[];
+    return res.rows.map((r) => toOutboxRow(r as Record<string, unknown>));
   }
 
   async markSent(id: string): Promise<void> {

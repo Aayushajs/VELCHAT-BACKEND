@@ -100,7 +100,7 @@ export class OutboxWorker {
         const err = r.reason as unknown;
         if (err instanceof PushSendError && err.gone) {
           // Never coming back. Drop it so it stops failing every future notification.
-          const deviceId = deviceIdOf(endpoint);
+          const deviceId = endpoint.deviceId;
           if (!deviceId) {
             this.logger.warn('push endpoint gone but its id is unreadable — not pruning');
             continue;
@@ -119,13 +119,13 @@ export class OutboxWorker {
         if (err instanceof PushSendError && !err.retryable) {
           // A client error we do not model. Retrying re-earns it; log and move on.
           this.logger.warn(
-            { deviceId: deviceIdOf(endpoint), status: err.status },
+            { deviceId: endpoint.deviceId, status: err.status },
             'push refused, not retrying',
           );
           continue;
         }
         retryable++;
-        this.logger.debug({ deviceId: deviceIdOf(endpoint), err: String(err) }, 'push send failed');
+        this.logger.debug({ deviceId: endpoint.deviceId, err: String(err) }, 'push send failed');
       }
 
       // Retry ONLY when something might still succeed. A row whose every failure was permanent
@@ -142,20 +142,6 @@ export class OutboxWorker {
       }
     }
   }
-}
-
-/**
- * The endpoint's device id, read from either casing.
- *
- * `PushEndpointRow` is drizzle's inferred type, so it SAYS `deviceId` — but the repository reads
- * these rows with raw `pg` (`SELECT *`), which returns the column names verbatim: `device_id`.
- * The existing code never tripped on it because every other field it touches is a single word.
- * Reading `e.deviceId` here would have been `undefined` at runtime, and the prune would have
- * silently done nothing while the log claimed otherwise.
- */
-function deviceIdOf(e: PushEndpointRow): string {
-  const raw = e as unknown as { deviceId?: string; device_id?: string };
-  return raw.deviceId ?? raw.device_id ?? '';
 }
 
 function toTarget(e: PushEndpointRow): PushTarget {
